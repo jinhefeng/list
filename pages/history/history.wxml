@@ -1,0 +1,11 @@
+<view class="page-shell">
+  <view class="eyebrow">YOUR DRINKS, OVER TIME</view>
+  <text class="title">饮品记录</text>
+  <text class="subtitle">每一杯都在这里，按时间慢慢翻看。</text>
+  <view class="filter-card"><view class="row"><text class="filter-title">筛选日期</text><text wx:if="{{filterDate}}" class="clear-filter" bindtap="clearDate">清除</text></view><picker mode="date" value="{{filterDate}}" bindchange="onDateChange"><view class="picker-value">{{filterDate || '全部日期'}}</view></picker></view>
+  <view wx:if="{{hasRecords}}" class="record-list">
+    <view wx:for="{{records}}" wx:key="id" class="record-card history-card" data-id="{{item.id}}" bindtap="editRecord"><image wx:if="{{item.photo}}" class="record-thumb" src="{{item.photo}}" mode="aspectFill"/><view wx:else class="record-thumb placeholder">杯</view><view class="record-info"><view class="row"><text class="record-name">{{item.drinkName}}</text><text class="record-time">{{item.dateLabel}} {{item.timeLabel}}</text></view><text class="record-brand">{{item.brandName || '自定义饮品'}} · {{item.sizeMl || '—'}} ml</text><text class="record-details">{{item.sweetness || '甜度未记'}} · {{item.ice || '冰度未记'}}</text><text class="record-nutrition">{{item.nutritionLabel}}</text></view></view>
+  </view>
+  <view wx:else class="empty-card"><text class="empty-icon">◌</text><text class="empty-title">还没有这一天的记录</text><text class="empty-copy">记录第一杯，让回忆有迹可循。</text><button class="secondary-button empty-add" bindtap="addDrink">记录一杯</button></view>
+</view>
+<view class="bottom-nav"><view class="nav-item" bindtap="openHome">◉<view>今天</view></view><view class="nav-item active">▤<view>记录</view></view><view class="nav-item" bindtap="openInsights">◒<view>摄入</view></view></view>

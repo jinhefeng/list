@@ -1,0 +1,23 @@
+<view class="page-shell">
+  <view class="eyebrow">DRINK JOURNAL · {{dateLabel}}</view>
+  <text class="title">今天喝了什么？</text>
+  <text class="subtitle">记下这一杯，也记下当时的心情。</text>
+
+  <view class="hero-card">
+    <view class="hero-top"><view><text class="hero-kicker">今天的饮品</text><text class="hero-number">{{summary.drinkCount || 0}}<text class="hero-unit"> 杯</text></text></view><view class="cup-art">☕</view></view>
+    <view class="hero-stats"><view><text class="hero-stat-value">{{summary.energyLabel || '—'}}</text><text class="hero-stat-label">已知能量 kcal</text></view><view><text class="hero-stat-value">{{summary.sugarLabel || '—'}}</text><text class="hero-stat-label">已知糖量</text></view><view><text class="hero-stat-value">{{summary.caffeineLabel || '—'}}</text><text class="hero-stat-label">已知咖啡因</text></view></view>
+    <text class="hero-foot">官方 {{summary.officialCount || 0}} · 估算 {{summary.estimatedCount || 0}} · 暂无 {{summary.unavailableCount || 0}}</text>
+  </view>
+
+  <view class="row section-heading"><text class="section-title">今日记录</text><text class="more" bindtap="openHistory">全部记录 →</text></view>
+  <view wx:if="{{hasRecords}}" class="record-list">
+    <view wx:for="{{records}}" wx:key="id" class="record-card" data-id="{{item.id}}" bindtap="editRecord">
+      <image wx:if="{{item.photo}}" class="record-thumb" src="{{item.photo}}" mode="aspectFill" />
+      <view wx:else class="record-thumb placeholder">杯</view>
+      <view class="record-info"><view class="row"><text class="record-name">{{item.drinkName}}</text><text class="record-time">{{item.timeLabel}}</text></view><text class="record-brand">{{item.brandName || '自定义饮品'}} · {{item.sizeMl || '—'}} ml</text><text class="record-details">{{item.sweetness || '甜度未记'}} · {{item.ice || '冰度未记'}}</text><text class="record-nutrition">{{item.nutritionLabel}}</text></view>
+    </view>
+  </view>
+  <view wx:else class="empty-card"><text class="empty-icon">◌</text><text class="empty-title">今天还没有记录</text><text class="empty-copy">第一杯饮品，值得被记下来。</text></view>
+  <button class="primary-button add-button" bindtap="addDrink">＋ 记录一杯</button>
+</view>
+<view class="bottom-nav"><view class="nav-item active" bindtap="refresh">◉<view>今天</view></view><view class="nav-item" bindtap="openHistory">▤<view>记录</view></view><view class="nav-item" bindtap="openInsights">◒<view>摄入</view></view></view>

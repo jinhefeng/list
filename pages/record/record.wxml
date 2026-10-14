@@ -1,0 +1,51 @@
+<view class="page-shell">
+  <view class="eyebrow">A LITTLE MOMENT</view>
+  <text class="title">{{editing ? '编辑这一杯' : '记录这一杯'}}</text>
+  <text class="subtitle">选择菜单饮品，或亲手补上一杯。</text>
+
+  <view class="card photo-card" bindtap="choosePhoto">
+    <image wx:if="{{photo}}" class="drink-photo" src="{{photo}}" mode="aspectFill" />
+    <view wx:else class="photo-empty"><text class="photo-plus">＋</text><text>添加饮品照片</text><text class="muted photo-note">照片可以稍后补上</text></view>
+    <text wx:if="{{photo}}" class="remove-photo" catchtap="removePhoto">移除照片</text>
+  </view>
+
+  <view class="card">
+    <text class="section-title">喝的是什么</text>
+    <view wx:if="{{!custom}}">
+      <view class="select-row" bindtap="toggleBrandPicker"><text class="field-label">品牌</text><text>{{selectedBrand.name || '选择品牌'}}</text><text class="arrow">›</text></view>
+      <view wx:if="{{showBrandPicker}}" class="picker-box"><input class="input search-input" placeholder="搜索品牌" value="{{brandQuery}}" bindinput="onBrandSearch" /><view wx:for="{{brands}}" wx:key="id" class="picker-option" data-id="{{item.id}}" bindtap="selectBrand">{{item.name}}</view></view>
+      <view class="select-row" bindtap="toggleDrinkPicker"><text class="field-label">饮品</text><text class="select-value">{{selectedDrink.name || '选择饮品款式'}}</text><text class="arrow">›</text></view>
+      <view wx:if="{{showDrinkPicker}}" class="picker-box"><input class="input search-input" placeholder="搜索饮品" value="{{drinkQuery}}" bindinput="onDrinkSearch" /><view wx:for="{{drinks}}" wx:key="id" class="picker-option" data-id="{{item.id}}" bindtap="selectDrink">{{item.name}}</view><text wx:if="{{!drinks.length}}" class="muted">暂无匹配饮品</text></view>
+      <view wx:if="{{selectedDrink}}" class="catalog-note">菜单来源：{{selectedDrink.source}} · 更新于 {{selectedDrink.updatedAt}}</view>
+      <text class="custom-link" bindtap="enableCustom">菜单里没有？创建自定义饮品 →</text>
+    </view>
+    <view wx:else>
+      <view class="field"><text class="field-label">品牌 / 店铺</text><input class="input" placeholder="例如：街角咖啡店" data-field="brandName" value="{{brandName}}" bindinput="updateField" /></view>
+      <view class="field"><text class="field-label">饮品名称</text><input class="input" placeholder="例如：桂花乌龙拿铁" data-field="drinkName" value="{{drinkName}}" bindinput="updateField" /></view>
+      <text class="custom-link">自定义饮品 · 营养数据可选填写估算值</text>
+    </view>
+    <view class="field"><text class="field-label">杯量（毫升）</text><input class="input" type="number" placeholder="例如：500" data-field="sizeMl" value="{{sizeMl}}" bindinput="updateField" /></view>
+  </view>
+
+  <view class="card">
+    <text class="section-title">这一杯的细节</text>
+    <view class="field"><text class="field-label">甜度</text><input class="input" placeholder="例如：五分糖；不知道可留空" data-field="sweetness" value="{{sweetness}}" bindinput="updateField" /></view>
+    <view class="field"><text class="field-label">冰度</text><input class="input" placeholder="例如：少冰、热饮；不知道可留空" data-field="ice" value="{{ice}}" bindinput="updateField" /></view>
+    <view class="field"><text class="field-label">小料</text><input class="input" placeholder="可填写多个，用顿号分隔" data-field="toppings" value="{{toppings}}" bindinput="updateField" /></view>
+  </view>
+
+  <view wx:if="{{custom}}" class="card">
+    <text class="section-title">营养估算 · 可选</text>
+    <text class="helper">填写你看到的包装数据或个人估算；保存后会标注“估算值”。</text>
+    <view class="nutrition-inputs"><view class="field"><text class="field-label">能量 kcal</text><input class="input" type="digit" placeholder="—" data-field="energyKcal" value="{{energyKcal}}" bindinput="updateField" /></view><view class="field"><text class="field-label">糖 g</text><input class="input" type="digit" placeholder="—" data-field="sugarG" value="{{sugarG}}" bindinput="updateField" /></view><view class="field"><text class="field-label">咖啡因 mg</text><input class="input" type="digit" placeholder="—" data-field="caffeineMg" value="{{caffeineMg}}" bindinput="updateField" /></view></view>
+  </view>
+
+  <view class="card">
+    <text class="section-title">时间与地点</text>
+    <view class="date-time-row"><view class="date-field"><text class="field-label">日期</text><picker mode="date" value="{{date}}" bindchange="onDateChange"><view class="picker-value">{{date}}</view></picker></view><view class="date-field"><text class="field-label">时间</text><picker mode="time" value="{{time}}" bindchange="onTimeChange"><view class="picker-value">{{time}}</view></picker></view></view>
+    <view class="field"><text class="field-label">地点 · 可选</text><input class="input" placeholder="例如：公司楼下" data-field="location" value="{{location}}" bindinput="updateField" /></view>
+    <view class="field"><text class="field-label">备注 · 可选</text><textarea class="input notes-input" placeholder="写下口味或当时的心情" data-field="notes" value="{{notes}}" bindinput="updateField" /></view>
+  </view>
+  <button class="primary-button save-button" bindtap="save">{{editing ? '保存修改' : '保存这杯'}}</button>
+  <button wx:if="{{editing}}" class="delete-button" bindtap="deleteRecord">删除记录</button>
+</view>

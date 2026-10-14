@@ -1,0 +1,16 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/record/record",
+    "pages/history/history",
+    "pages/insights/insights"
+  ],
+  "window": {
+    "navigationBarTitleText": "今日喝什么",
+    "navigationBarBackgroundColor": "#f6f7f2",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f6f7f2"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

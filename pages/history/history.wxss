@@ -1,0 +1,5 @@
+.filter-card { display: flex; flex-direction: column; gap: 16rpx; margin-top: 32rpx; padding: 24rpx; border-radius: 24rpx; background: #fff; }
+.filter-title { font-size: 25rpx; font-weight: 600; }
+.clear-filter { color: #63805a; font-size: 22rpx; }
+.history-card { margin-top: 18rpx; }
+.empty-add { margin-top: 22rpx; }
