@@ -1,0 +1,9 @@
+{
+  "description": "每日饮品记录",
+  "miniprogramRoot": "./",
+  "compileType": "miniprogram",
+  "libVersion": "3.4.0",
+  "appid": "touristappid",
+  "projectname": "daily-drink-log",
+  "setting": { "urlCheck": false, "es6": true, "enhance": true, "postcss": true, "minified": true, "compileHotReLoad": true }
+}

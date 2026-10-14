@@ -1,0 +1,9 @@
+{
+  "name": "daily-drink-log-miniprogram",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Personal daily drink log WeChat mini program",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}
