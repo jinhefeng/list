@@ -1,3 +1,8 @@
+.home-header { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.catalog-entry { box-sizing: border-box; display: flex; flex: none; width: 56rpx; height: 56rpx; align-items: center; justify-content: center; border-radius: 50%; background: #edf2e9; }
+.catalog-glyph { display: flex; width: 25rpx; flex-direction: column; gap: 5rpx; }
+.catalog-glyph-line { display: block; width: 100%; height: 3rpx; border-radius: 99rpx; background: #5b7751; }
+.catalog-glyph-line.short { width: 68%; }
 .hero-card { margin-top: 32rpx; padding: 34rpx; border-radius: 32rpx; color: #f7f7ee; background: linear-gradient(135deg, #35533a, #203c2c); box-shadow: 0 22rpx 48rpx rgba(38,61,41,.18); }
 .hero-top { display: flex; align-items: center; justify-content: space-between; }
 .hero-kicker,.hero-foot { display: block; color: rgba(247,247,238,.65); font-size: 23rpx; }
@@ -14,14 +19,22 @@
 .record-list { margin-top: 18rpx; }
 .record-card { display: flex; gap: 22rpx; margin-top: 18rpx; padding: 20rpx; border-radius: 24rpx; background: #fff; }
 .record-thumb { flex: none; width: 132rpx; height: 132rpx; border-radius: 18rpx; }
+.meal-record-photos { position: relative; flex: none; }
+.meal-record-photo-cell { position: absolute; top: 0; box-sizing: border-box; width: 132rpx; height: 132rpx; overflow: hidden; border: 2rpx solid #fff; border-radius: 18rpx; background: #fff; box-shadow: 0 5rpx 12rpx rgba(35,50,35,.17); }
+.meal-record-thumb { display: block; box-sizing: border-box; width: 100%; height: 100%; border-radius: 16rpx; }
+.meal-record-photos-empty { flex: none; width: 132rpx; height: 132rpx; border-radius: 18rpx; }
+.meal-photo-count { position: absolute; right: 8rpx; bottom: 8rpx; z-index: 5; padding: 5rpx 10rpx; border-radius: 99rpx; color: #fff; background: rgba(35,48,36,.8); font-size: 18rpx; line-height: 1.25; }
 .placeholder { display: flex; align-items: center; justify-content: center; color: #75916c; background: #edf1e9; font-size: 28rpx; }
 .record-info { flex: 1; min-width: 0; }
 .record-name { overflow: hidden; max-width: 300rpx; font-size: 28rpx; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .record-time,.record-brand,.record-details,.record-nutrition { color: #81887e; font-size: 21rpx; }
 .record-brand,.record-details,.record-nutrition { display: block; margin-top: 10rpx; }
+.record-location { display: block; overflow: hidden; margin-top: 10rpx; color: #81887e; font-size: 21rpx; text-overflow: ellipsis; white-space: nowrap; }
+.meal-dish-names { word-break: break-all; line-height: 1.45; }
 .record-nutrition { color: #688060; }
 .empty-card { display: flex; flex-direction: column; align-items: center; margin-top: 18rpx; padding: 54rpx 20rpx; border-radius: 24rpx; background: #fff; }
 .empty-icon { color: #9bad91; font-size: 56rpx; }
 .empty-title { margin-top: 16rpx; font-size: 28rpx; font-weight: 600; }
 .empty-copy { margin-top: 10rpx; color: #858b80; font-size: 23rpx; }
-.add-button { margin-top: 26rpx; }
+.add-actions { display: flex; gap: 16rpx; margin-top: 26rpx; }
+.add-actions button { flex: 1; padding: 24rpx 12rpx; font-size: 25rpx; }

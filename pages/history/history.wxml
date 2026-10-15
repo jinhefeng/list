@@ -1,11 +1,29 @@
-<view class="page-shell">
-  <view class="eyebrow">YOUR DRINKS, OVER TIME</view>
-  <text class="title">饮品记录</text>
-  <text class="subtitle">每一杯都在这里，按时间慢慢翻看。</text>
-  <view class="filter-card"><view class="row"><text class="filter-title">筛选日期</text><text wx:if="{{filterDate}}" class="clear-filter" bindtap="clearDate">清除</text></view><picker mode="date" value="{{filterDate}}" bindchange="onDateChange"><view class="picker-value">{{filterDate || '全部日期'}}</view></picker></view>
-  <view wx:if="{{hasRecords}}" class="record-list">
-    <view wx:for="{{records}}" wx:key="id" class="record-card history-card" data-id="{{item.id}}" bindtap="editRecord"><image wx:if="{{item.photo}}" class="record-thumb" src="{{item.photo}}" mode="aspectFill"/><view wx:else class="record-thumb placeholder">杯</view><view class="record-info"><view class="row"><text class="record-name">{{item.drinkName}}</text><text class="record-time">{{item.dateLabel}} {{item.timeLabel}}</text></view><text class="record-brand">{{item.brandName || '自定义饮品'}} · {{item.sizeMl || '—'}} ml</text><text class="record-details">{{item.sweetness || '甜度未记'}} · {{item.ice || '冰度未记'}}</text><text class="record-nutrition">{{item.nutritionLabel}}</text></view></view>
+<view class="page-shell tab-page-shell">
+  <view class="eyebrow">YOUR DAILY LOG</view>
+  <view class="history-title-row"><text class="title">全部记录</text><view class="filter-toggle" bindtap="toggleFilter" aria-label="筛选条件"><view class="filter-glyph"><view class="filter-glyph-top"></view><view class="filter-glyph-stem"></view></view><view wx:if="{{hasActiveFilters}}" class="filter-active-dot"></view></view></view>
+  <text class="subtitle">饮品和每顿饭，按时间放在一起。</text>
+  <view wx:if="{{filterOpen}}" class="filter-panel">
+    <view class="filter-section-heading">时间范围</view>
+    <view class="filter-date-row"><picker mode="date" value="{{draftStartDate}}" bindchange="onStartDateChange"><view class="filter-date-value {{draftStartDate ? '' : 'filter-date-empty'}}">{{draftStartDate || '不限开始日期'}}</view></picker><text class="filter-date-separator">至</text><picker mode="date" value="{{draftEndDate}}" bindchange="onEndDateChange"><view class="filter-date-value {{draftEndDate ? '' : 'filter-date-empty'}}">{{draftEndDate || '不限结束日期'}}</view></picker></view>
+    <view class="filter-user-heading"><text class="filter-section-heading">记录类型</text><text class="filter-select-all" bindtap="selectAllFilterTypes">全选</text></view>
+    <view wx:if="{{filterTypes.length}}" class="filter-type-list"><view wx:for="{{filterTypes}}" wx:key="key" class="filter-type-option {{item.draftSelected ? 'selected' : ''}}" data-type-key="{{item.key}}" bindtap="toggleFilterType"><view class="filter-type-check">{{item.draftSelected ? '✓' : ''}}</view><text>{{item.label}}</text></view></view>
+    <text wx:else class="filter-no-options">暂无可筛选的记录类型</text>
+    <view class="filter-user-heading"><text class="filter-section-heading">登记用户</text><text class="filter-select-all" bindtap="selectAllFilterUsers">全选</text></view>
+    <view wx:if="{{filterUsers.length}}" class="filter-user-list"><view wx:for="{{filterUsers}}" wx:key="id" class="filter-user-option {{item.draftSelected ? 'selected' : ''}}" data-user-id="{{item.id}}" bindtap="toggleFilterUser"><view class="filter-user-check">{{item.draftSelected ? '✓' : ''}}</view><text>{{item.label}}</text></view></view>
+    <text wx:else class="filter-no-users">暂无可筛选的登记用户</text>
+    <view class="filter-actions"><text class="filter-reset" bindtap="resetFilterDraft">重置</text><button class="filter-apply" bindtap="applyFilters">应用筛选</button></view>
   </view>
-  <view wx:else class="empty-card"><text class="empty-icon">◌</text><text class="empty-title">还没有这一天的记录</text><text class="empty-copy">记录第一杯，让回忆有迹可循。</text><button class="secondary-button empty-add" bindtap="addDrink">记录一杯</button></view>
+  <view wx:if="{{hasRecords}}" class="timeline-list">
+    <view wx:for="{{records}}" wx:key="id" class="timeline-entry {{item.isLast ? 'last' : ''}}">
+      <view class="timeline-meta"><text wx:if="{{item.showDate}}" class="timeline-date">{{item.dateLabel}}</text><text class="timeline-time">{{item.timeLabel}}</text><text class="timeline-user">{{item.userName}}</text><view class="timeline-dot"></view></view>
+      <view wx:if="{{item.kind === 'meal'}}" class="timeline-row meal-timeline-row" data-id="{{item.id}}" bindtap="openRecord">
+        <view wx:if="{{item.photoCount}}" class="meal-dish-photos" style="width:{{item.photoStackWidth}}rpx;height:{{item.photoStackHeight}}rpx;flex-basis:{{item.photoStackWidth}}rpx;"><view wx:for="{{item.photoDishes}}" wx:for-item="dish" wx:for-index="photoIndex" wx:key="id" class="meal-dish-photo-cell" style="left:{{dish.stackLeft}}rpx;z-index:{{dish.stackZIndex}};" data-record-id="{{item.id}}" data-photo-index="{{photoIndex}}" catchtap="previewPhoto"><image class="meal-dish-thumb" src="{{dish.photoThumbnail || dish.photo}}" mode="aspectFill" lazy-load="{{true}}"/><text wx:if="{{photoIndex === 0 && item.photoCount > 1}}" class="meal-photo-count">{{item.photoCountLabel}}</text></view></view>
+        <view wx:else class="meal-dish-photos-empty placeholder">菜</view>
+        <view class="timeline-info"><view class="meal-header"><text class="record-name">{{item.storeName}}</text><text class="meal-kind">吃饭</text></view><view class="meal-dish-list"><text wx:for="{{item.dishes}}" wx:for-item="dish" wx:key="id" class="meal-dish-name">{{dish.name}}</text></view><text wx:if="{{item.locationAddress}}" class="record-location">⌖ {{item.locationAddress}}</text></view>
+      </view>
+      <view wx:elif="{{item.kind === 'drink'}}" class="timeline-row" data-id="{{item.id}}" bindtap="openRecord"><image wx:if="{{item.photo}}" class="timeline-thumb" src="{{item.photoThumbnail || item.photo}}" mode="aspectFill" lazy-load="{{true}}" data-photo="{{item.photo}}" catchtap="previewPhoto"/><view wx:else class="timeline-thumb placeholder">杯</view><view class="timeline-info"><view class="row"><text class="record-name">{{item.drinkName}}</text><text class="record-nutrition">{{item.nutritionLabel}}</text></view><text class="record-brand">{{item.brandName || '自定义饮品'}} · {{item.cupLabel}}</text><text class="record-details">{{item.sweetness || '甜度未记'}} · {{item.servingLabel}}</text><text wx:if="{{item.locationLabel}}" class="record-location">⌖ {{item.locationLabel}}</text></view></view>
+      <view wx:else class="timeline-row" data-id="{{item.id}}" bindtap="openRecord"><image wx:if="{{item.photo || item.photoThumbnail}}" class="timeline-thumb" src="{{item.photoThumbnail || item.photo}}" mode="aspectFill" lazy-load="{{true}}"/><view wx:else class="timeline-thumb placeholder">{{item.typeLabel}}</view><view class="timeline-info"><view class="meal-header"><text class="record-name">{{item.displayName}}</text><text class="meal-kind">{{item.typeLabel}}</text></view><text wx:if="{{item.displayDetails}}" class="record-details">{{item.displayDetails}}</text><text wx:if="{{item.locationAddress || item.location}}" class="record-location">⌖ {{item.locationAddress || item.location}}</text></view></view>
+    </view>
+  </view>
+  <view wx:else class="empty-card"><text class="empty-icon">◌</text><text class="empty-title">没有符合条件的记录</text><text class="empty-copy">可以调整记录类型、时间或登记用户。</text></view>
 </view>
-<view class="bottom-nav"><view class="nav-item" bindtap="openHome">◉<view>今天</view></view><view class="nav-item active">▤<view>记录</view></view><view class="nav-item" bindtap="openInsights">◒<view>摄入</view></view></view>

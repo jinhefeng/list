@@ -5,16 +5,30 @@
 .remove-photo { display: block; padding: 16rpx 0 2rpx; color: #9b5148; font-size: 22rpx; }
 .select-row { display: flex; align-items: center; min-height: 84rpx; border-bottom: 1rpx solid #eef0eb; }
 .select-row .field-label { flex: 0 0 140rpx; margin: 0; }
-.select-value { flex: 1; text-align: right; }
-.arrow { margin-left: 16rpx; color: #899083; font-size: 40rpx; }
+.select-value { flex: 1; min-width: 0; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.select-row .arrow { flex: 0 0 28rpx; margin-left: 16rpx; color: #899083; font-size: 40rpx; text-align: right; }
 .picker-box { margin-top: 12rpx; padding: 14rpx; border-radius: 18rpx; background: #f7f8f4; }
 .search-input { min-height: 72rpx; margin-bottom: 8rpx; background: #fff; }
 .picker-option { padding: 18rpx 10rpx; border-bottom: 1rpx solid #eaede7; }
 .catalog-note,.helper { display: block; margin-top: 14rpx; color: #8a9085; font-size: 21rpx; line-height: 1.6; }
+.catalog-status { color: #9b7544; font-size: 20rpx; }
 .custom-link { display: block; margin-top: 22rpx; color: #5f7b55; font-size: 23rpx; }
 .date-time-row,.nutrition-inputs { display: flex; gap: 18rpx; }
 .date-field,.nutrition-inputs>view { flex: 1; min-width: 0; }
 .picker-value { padding: 22rpx; border-radius: 16rpx; background: #f7f8f4; }
+.choice-list { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.choice-chip { padding: 14rpx 20rpx; border: 1rpx solid #e8ebe4; border-radius: 99rpx; color: #586151; background: #f7f8f4; font-size: 23rpx; }
+.choice-chip.selected { border-color: #5b7751; color: #fff; background: #5b7751; }
+.choice-hint,.field-hint { display: block; margin-top: 10rpx; color: #8a9085; font-size: 21rpx; line-height: 1.55; }
+.location-picker { display: flex; align-items: center; gap: 14rpx; min-height: 86rpx; padding: 14rpx 18rpx; border: 1rpx solid #e8ebe4; border-radius: 18rpx; background: #fbfcf9; }
+.location-pin { color: #5b7751; font-size: 34rpx; }
+.location-picker-text { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 4rpx; }
+.location-name { overflow: hidden; color: #334b35; font-size: 25rpx; text-overflow: ellipsis; white-space: nowrap; }
+.location-address { overflow: hidden; color: #8a9085; font-size: 20rpx; text-overflow: ellipsis; white-space: nowrap; }
+.location-arrow { color: #899083; font-size: 36rpx; }
 .notes-input { min-height: 150rpx; }
 .save-button { margin-top: 30rpx; }
+.form-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; }
+.form-heading-row>view { flex: 1; min-width: 0; }
+.cancel-edit { flex: none; margin-top: 18rpx; padding: 12rpx 4rpx; color: #5f7b55; font-size: 25rpx; }
 .delete-button { margin-top: 18rpx; padding: 22rpx; color: #9b5148; background: #f5eae7; }

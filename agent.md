@@ -22,7 +22,7 @@ The MVP is a personal daily drink log:
 - one user records their own drinks;
 - one record represents exactly one drink;
 - users can select a menu drink or create a custom drink;
-- a record can include time, photo, brand, drink style, sweetness, ice, toppings, location, and notes;
+- a record can include time, photo, brand, drink style, cup/size, sweetness, temperature, ice level, location, and notes; toppings are not recorded;
 - nutrition data prefers official data, otherwise it must be labeled as an estimate;
 - missing nutrition data must be shown as unavailable rather than presented as precise data.
 

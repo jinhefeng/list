@@ -1,0 +1,44 @@
+<view class="page-shell detail-shell">
+  <block wx:if="{{detail && mode === 'view'}}">
+    <view wx:if="{{moreOpen}}" class="more-dismiss-layer" catchtap="closeMore"></view>
+    <view class="detail-heading">
+      <view class="detail-heading-copy"><view class="eyebrow">RECORD DETAILS</view><text class="title">{{detail.title}}</text><text class="subtitle">{{detail.typeLabel}} · {{detail.date}} {{detail.time}}</text></view>
+      <view wx:if="{{canEdit}}" class="more-wrap"><view class="more-button" bindtap="toggleMore" aria-label="更多操作">···</view><view wx:if="{{moreOpen}}" class="more-menu"><text wx:if="{{detail.kind === 'drink' || detail.kind === 'meal'}}" class="more-edit-action" bindtap="editRecord">编辑记录</text><text class="more-delete-action" bindtap="deleteRecord">删除记录</text></view></view>
+    </view>
+    <view class="detail-owner"><text class="type-pill">{{detail.typeLabel}}</text><text>登记人：{{detail.userName}}</text></view>
+
+    <view wx:if="{{detail.kind === 'drink' && detail.heroPhoto}}" class="drink-photo-frame" data-index="0" bindtap="previewPhoto"><image class="drink-detail-photo" src="{{detail.heroPhoto}}" mode="widthFix" /></view>
+
+    <view wx:if="{{detail.photos.length && detail.kind !== 'drink' && detail.kind !== 'meal'}}" class="card detail-photo-card">
+      <view class="detail-photo-grid"><view wx:for="{{detail.photos}}" wx:key="id" class="detail-photo-cell" data-index="{{index}}" bindtap="previewPhoto"><image class="detail-photo" src="{{item.photoThumbnail || item.photo}}" mode="aspectFill"/><text wx:if="{{item.name}}" class="detail-photo-name">{{item.name}}</text></view></view>
+    </view>
+
+    <view wx:if="{{detail.hasDishes}}" class="meal-dishes-section">
+      <view class="meal-dishes-heading"><view class="meal-dishes-heading-copy"><text class="meal-dishes-eyebrow">DISHES</text><text class="meal-dishes-title">本餐菜品</text></view><view class="meal-dishes-count"><text class="meal-dishes-count-number">{{detail.dishCount}}</text><text class="meal-dishes-count-label">道</text></view></view>
+      <view class="meal-dish-list"><view wx:for="{{detail.dishes}}" wx:key="id" class="meal-dish-card">
+        <view wx:if="{{item.detailPhoto}}" class="meal-dish-photo-wrap" data-index="{{item.photoIndex}}" bindtap="previewPhoto"><image class="meal-dish-photo" src="{{item.detailPhoto}}" mode="aspectFill"/><view class="meal-dish-photo-shade"></view><text class="meal-dish-photo-number">{{item.dishNumber}}</text></view>
+        <view wx:else class="meal-dish-photo-wrap meal-dish-photo-empty"><view class="meal-dish-placeholder-mark"><view></view></view><text class="meal-dish-empty-label">暂无照片</text><text class="meal-dish-photo-number">{{item.dishNumber}}</text></view>
+        <view class="meal-dish-info"><text class="meal-dish-index">DISH {{item.dishNumber}}</text><text class="meal-dish-name">{{item.name || '未命名菜品'}}</text><view class="meal-dish-accent"></view></view>
+      </view></view>
+    </view>
+
+    <view wx:if="{{detail.fields.length}}" class="card detail-card"><text class="section-title">记录内容</text><view wx:for="{{detail.fields}}" wx:key="label" class="detail-field"><text class="detail-label">{{item.label}}</text><text class="detail-value">{{item.value}}</text></view></view>
+    <view wx:if="{{detail.location}}" class="card detail-location-card" bindtap="showLocation"><view class="detail-location-copy"><text class="detail-label">地点</text><text class="detail-location-name">{{detail.location.label}}</text><text wx:if="{{detail.location.address && detail.location.address !== detail.location.label}}" class="detail-location-address">{{detail.location.address}}</text></view><text wx:if="{{detail.location.canShowMap}}" class="detail-location-icon">⌖</text></view>
+    <view wx:if="{{!detail.heroPhoto && !detail.photos.length && !detail.hasDishes && !detail.fields.length && !detail.location}}" class="empty-card"><text class="empty-title">这条记录还没有更多内容</text></view>
+
+    <view wx:if="{{canEdit && detail.kind === 'other'}}" class="detail-actions"><button class="primary-button" bindtap="editRecord">编辑记录</button></view>
+    <view wx:elif="{{!canEdit}}" class="readonly-note">这条记录仅供查看</view>
+  </block>
+
+  <block wx:if="{{detail && mode === 'edit'}}">
+    <view class="detail-heading edit-heading"><view><view class="eyebrow">EDIT RECORD</view><text class="title">编辑记录</text></view><text class="cancel-edit" bindtap="cancelGenericEdit">取消</text></view>
+    <view class="card detail-card">
+      <view class="field"><text class="field-label">记录名称</text><input class="input" data-field="genericTitle" value="{{genericTitle}}" bindinput="updateGenericField" /></view>
+      <view class="field"><text class="field-label">说明</text><textarea class="input generic-notes" data-field="genericDescription" value="{{genericDescription}}" bindinput="updateGenericField" /></view>
+      <view class="field"><text class="field-label">记录时间</text><view class="date-time-row"><picker mode="date" value="{{date}}" bindchange="onDateChange"><view class="picker-value">{{date}}</view></picker><picker mode="time" value="{{time}}" bindchange="onTimeChange"><view class="picker-value">{{time}}</view></picker></view></view>
+      <view class="field"><text class="field-label">地点</text><input class="input" data-field="genericLocation" value="{{genericLocation}}" bindinput="updateGenericField" /></view>
+      <text class="generic-preserve-note">其他记录信息和照片会原样保留。</text>
+    </view>
+    <button class="primary-button save-button" bindtap="saveGeneric">保存修改</button>
+  </block>
+</view>

@@ -3,7 +3,38 @@
   "miniprogramRoot": "./",
   "compileType": "miniprogram",
   "libVersion": "3.4.0",
-  "appid": "touristappid",
+  "appid": "wx4ca522e08e96ed30",
   "projectname": "daily-drink-log",
-  "setting": { "urlCheck": false, "es6": true, "enhance": true, "postcss": true, "minified": true, "compileHotReLoad": true }
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "compileHotReLoad": true,
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  },
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "editorSetting": {}
 }

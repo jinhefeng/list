@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Daily Drink Log Catalog",
+  "type": "object",
+  "required": ["version", "generatedAt", "brands", "drinks"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "generatedAt": { "type": "string", "minLength": 1 },
+    "brands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "aliases", "active", "status"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "aliases": { "type": "array", "items": { "type": "string" } },
+          "category": { "type": "string" },
+          "active": { "type": "boolean" },
+          "status": { "enum": ["verified", "pending", "unavailable"] },
+          "updatedAt": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "drinks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "brandId", "name", "aliases", "active", "status", "cupTypes", "cupSizes", "sizesMl", "sweetnessOptions", "servingOptions", "nutritionVariants", "menuEntries"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "brandId": { "type": "string", "minLength": 1 },
+          "category": { "type": "string" },
+          "name": { "type": "string", "minLength": 1 },
+          "aliases": { "type": "array", "items": { "type": "string" } },
+          "active": { "type": "boolean" },
+          "status": { "enum": ["verified", "pending", "unavailable"] },
+          "cupTypes": { "type": "array", "items": { "type": "string" } },
+          "cupSizes": { "type": "array", "items": { "type": "object", "required": ["cupType"], "properties": { "cupType": { "type": "string", "minLength": 1 }, "sizeMl": { "type": "integer", "minimum": 1 } } } },
+          "sizesMl": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+          "sweetnessOptions": { "type": "array", "items": { "type": "string" } },
+          "servingOptions": { "type": "array", "items": { "type": "string" } },
+          "nutritionVariants": { "type": "array", "items": { "type": "object" } },
+          "nutritionPerUnit": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "number", "exclusiveMinimum": 0 },
+              "unit": { "enum": ["ml", "杯"] },
+              "sugarG": { "type": ["number", "null"], "minimum": 0 },
+              "energyKcal": { "type": ["number", "null"], "minimum": 0 },
+              "caffeineMg": { "type": ["number", "null"], "minimum": 0 },
+              "sourceType": { "enum": ["official", "estimated"] },
+              "source": { "type": "string" },
+              "updatedAt": { "type": "string" }
+            },
+            "required": ["amount", "unit", "sugarG", "energyKcal", "caffeineMg"]
+          },
+          "menuEntries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["scope", "status", "cupTypes", "cupSizes", "sizesMl", "sweetnessOptions", "servingOptions"],
+              "properties": {
+                "scope": { "enum": ["brand", "city", "store"] },
+                "city": { "type": "string" },
+                "storeId": { "type": "string" },
+                "storeName": { "type": "string" },
+                "status": { "enum": ["verified", "pending", "unavailable"] },
+                "sourceType": { "enum": ["official_brand", "public_menu", "authorized_platform", "manual_platform", "user_report", "pending"] },
+                "sourceName": { "type": "string" },
+                "sourceUrl": { "type": "string" },
+                "checkedAt": { "type": "string" },
+                "cupTypes": { "type": "array", "items": { "type": "string" } },
+                "cupSizes": { "type": "array", "items": { "type": "object", "required": ["cupType"], "properties": { "cupType": { "type": "string", "minLength": 1 }, "sizeMl": { "type": "integer", "minimum": 1 } } } },
+                "sizesMl": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+                "sweetnessOptions": { "type": "array", "items": { "type": "string" } },
+                "servingOptions": { "type": "array", "items": { "type": "string" } }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

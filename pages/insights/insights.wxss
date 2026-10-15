@@ -16,4 +16,3 @@
 .nutrition-drink { font-size: 26rpx; font-weight: 600; }
 .nutrition-brand,.nutrition-right { margin-top: 8rpx; color: #858b80; font-size: 21rpx; }
 .nutrition-right { text-align: right; }
-.empty-add { margin-top: 18rpx; }

@@ -1,0 +1,110 @@
+{
+  "asOf": "2026-10-15",
+  "scope": {
+    "targetBrandCount": 31,
+    "teaRanking": "2026 中国新式茶饮连锁品牌 15 强",
+    "coffeeRanking": "2026 中国咖啡连锁品牌 15 强",
+    "additionalBrands": ["星巴克"],
+    "additionalCityBrands": ["阿嬷手作"],
+    "cityCoreSampleAreas": ["杭州上城区", "常州天宁区", "上海黄浦区"],
+    "sources": [
+      "https://ranking.iimedia.cn/ranking/161",
+      "https://www.iimedia.cn/c880/112246.html"
+    ]
+  },
+  "interpretation": {
+    "sourceReportedInSaleItems": "A public source's own count, not a verified expected count for a Taobao Flash Sale store. Counts can change and some aggregators mix drinks with food or frozen desserts.",
+    "complete": "A brand is complete only after every current menu page has been reviewed, drink-only items have been reconciled to the source count or an explicit exception, and the source/date are recorded. None are marked complete yet.",
+    "storeAvailability": "Brand-level public menus and official store locators do not prove availability in a specific Taobao Flash Sale delivery menu. Store presence and platform item availability are tracked separately.",
+    "nationalLaunches": "Official brand launch notices add searchable product-name candidates. A launch notice does not prove that a product remains in stock or appears in a specific city/store delivery menu."
+  },
+  "cityStorePresence": [
+    {
+      "brandId": "brand-yidiandian",
+      "city": "常州",
+      "district": "天宁区",
+      "stores": ["常州弘阳广场店", "常州新世界店"],
+      "storeStatus": "official_locator_listed",
+      "storeSourceType": "official_brand",
+      "storeSourceUrl": "https://www.alittle-tea.com/storelocations/1/11/78/797/",
+      "checkedAt": "2026-10-15",
+      "platform": "淘宝闪购",
+      "platformMenuStatus": "pending",
+      "notes": "官网列有两家天宁区门店；配送范围、当前营业状态及在售饮品尚未在淘宝闪购门店页核对。"
+    },
+    {
+      "brandId": "brand-yidiandian",
+      "city": "杭州",
+      "district": "上城区",
+      "stores": ["平海店", "建国中路店", "定安店", "延安路店", "吴山广场店", "杭州来福士"],
+      "storeStatus": "official_locator_listed",
+      "storeSourceType": "official_brand",
+      "storeSourceUrl": "https://www.alittle-tea.com/en/storelocations/1/12/",
+      "checkedAt": "2026-10-15",
+      "platform": "淘宝闪购",
+      "platformMenuStatus": "pending",
+      "notes": "官网列有多家上城区门店；配送范围、当前营业状态及在售饮品尚未在淘宝闪购门店页核对。"
+    },
+    {
+      "brandId": "brand-yidiandian",
+      "city": "上海",
+      "district": "黄浦区",
+      "stores": ["局门店", "河南中路店", "老西门店", "8号桥店", "湖滨道店", "大林店", "西藏南路店", "外滩中心店", "福州路店", "悦荟广场店", "新世界店"],
+      "storeStatus": "official_locator_listed",
+      "storeSourceType": "official_brand",
+      "storeSourceUrl": "https://www.alittle-tea.com/en/storelocations/1/3/3/",
+      "checkedAt": "2026-10-15",
+      "platform": "淘宝闪购",
+      "platformMenuStatus": "pending",
+      "notes": "官网列有多家黄浦区门店；配送范围、当前营业状态及在售饮品尚未在淘宝闪购门店页核对。"
+    },
+    {
+      "brandId": "brand-amasha",
+      "city": "杭州",
+      "district": "上城区",
+      "stores": ["阿嬷手作·西湖天地店", "阿嬷手作（杭州万象城店）"],
+      "storeStatus": "publicly_reported",
+      "storeSourceType": "public_reporting",
+      "storeSourceUrl": "https://hznews.hangzhou.com.cn/jingji/content/2026-03/20/content_9193705.htm",
+      "productSourceUrl": "https://www.xinhuanet.com/ci/20260920/d577ffc5202d42d19c8eaf763e8e91e8/c.html",
+      "checkedAt": "2026-10-15",
+      "platform": "淘宝闪购",
+      "platformMenuStatus": "pending",
+      "notes": "杭州网报道万象城店在2026年3月活动期间外卖订单增长；新华网报道西湖天地店推出杭州限定桂花酒酿一米。两条报道均不证明该饮品当前可在淘宝闪购下单。"
+    }
+  ],
+  "brands": [
+    {"brandId":"brand-mixue","sourceUrl":"https://www.nckfhsm.com/brands/mi-xue-bing-cheng/menu/available?page=1","sourceReportedInSaleItems":161,"sourceReportedPages":9,"pagesReviewed":1,"status":"partial","notes":"仅收录了部分公开页名称；需逐页核对饮品、冰淇淋与甜品边界。"},
+    {"brandId":"brand-heytea","sourceUrl":"https://www.nckfhsm.com/zh-tw/brands/xi-cha/menu/available?page=1","sourceReportedInSaleItems":208,"sourceReportedPages":11,"pagesReviewed":1,"status":"partial","notes":"只检查到部分分页；排除周边、蛋糕等非饮品。"},
+    {"brandId":"brand-nayuki","sourceUrl":"https://www.nckfhsm.com/brands/nai-xue-de-cha/menu/available?page=2","sourceReportedInSaleItems":81,"sourceReportedPages":null,"pagesReviewed":1,"status":"partial","notes":"仅查看了第 2 页及部分常见名称。"},
+    {"brandId":"brand-starbucks","sourceUrl":"https://www.nckfhsm.com/zh-tw/brands/xing-ba-ke/menu/available","sourceReportedInSaleItems":230,"sourceReportedPages":12,"pagesReviewed":1,"status":"partial","notes":"本次打开页面自报 230 款、12 页；早前记录为 263 款、14 页，来源计数明显变化。只检查首屏，不能据此证明完整或代表具体门店。"},
+    {"brandId":"brand-chagee","sourceUrl":"https://www.nckfhsm.com/brands/ba-wang-cha-ji/menu/available","sourceReportedInSaleItems":207,"sourceReportedPages":11,"pagesReviewed":1,"status":"partial","notes":"只检查到部分分页。"},
+    {"brandId":"brand-luckin","sourceUrl":"https://www.lkcoffee.com/products","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":1,"status":"partial","notes":"官网当前页面展示的产品样本，不确认其动态分页及地区菜单已覆盖。"},
+    {"brandId":"brand-guming","sourceUrl":"https://www.nckfhsm.com/brands/gu-ming/menu/available?page=1","sourceReportedInSaleItems":117,"sourceReportedPages":6,"pagesReviewed":1,"status":"partial","notes":"只检查到首个菜单页。"},
+    {"brandId":"brand-chabaidao","sourceUrl":"https://www.nckfhsm.com/brands/cha-bai-dao/new-products","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":0,"status":"source_not_menu","notes":"当前来源是新品页，不是完整在售菜单。"},
+    {"brandId":"brand-manner","sourceUrl":"https://www.nckfhsm.com/brands/manner-coffee/menu/available","sourceReportedInSaleItems":179,"sourceReportedPages":9,"pagesReviewed":1,"status":"partial","notes":"只检查到首个菜单页。"},
+    {"brandId":"brand-cotti","sourceUrl":"https://www.nckfhsm.com/zh-tw/brands/ku-di-ka-fei/menu/available?page=2","sourceReportedInSaleItems":111,"sourceReportedPages":null,"pagesReviewed":1,"status":"partial","notes":"只检查到第 2 页；来源汇编的在售数会变化。"},
+    {"brandId":"brand-nowwa","sourceUrl":"https://www.nckfhsm.com/zh-tw/brands/nuo-wa-ka-fei/menu/available","sourceReportedInSaleItems":263,"sourceReportedPages":14,"pagesReviewed":1,"status":"partial","notes":"只检查到首个菜单页。"},
+    {"brandId":"brand-yidiandian","sourceUrl":"https://www.nckfhsm.com/brands/yi-dian-dian/menu/available","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":1,"status":"partial","notes":"新增16款官网2026全国上新名称，逐款链接保存在目录；它们仍是菜单候选，未核对三城淘宝闪购门店菜单。另有官网门店据点证据，见cityStorePresence。"},
+    {"brandId":"brand-hushangayi","sourceUrl":"https://www.nckfhsm.com/ja/brands/hu-shang-a-yi/menu/available","sourceReportedInSaleItems":297,"sourceReportedPages":15,"pagesReviewed":1,"status":"partial","notes":"当前公开菜单页显示297个饮品、15页；只核对首页并新增4个饮品候选，排除西红柿蛋花汤。第三方菜单不证明三城淘宝闪购门店在售。"},
+    {"brandId":"brand-amasha","sourceUrl":"https://www.xinhuanet.com/ci/20260920/d577ffc5202d42d19c8eaf763e8e91e8/c.html","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":1,"status":"source_not_menu","notes":"仅收录杭州城市限定新品桂花酒酿一米；报道不是完整菜单，也不证明当前淘宝闪购门店可点。"},
+    {"brandId":"brand-coco","sourceUrl":"https://www.nckfhsm.com/zh-tw/brands/coco-dou-ke/menu/available","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":1,"status":"partial","notes":"只检查到部分公开名称。"},
+    {"brandId":"brand-yihetang","sourceUrl":"https://www.nckfhsm.com/brands/yi-he-tang/menu/available?page=1","sourceReportedInSaleItems":186,"sourceReportedPages":10,"pagesReviewed":1,"status":"partial","notes":"只检查到首个菜单页。"},
+    {"brandId":"brand-chayan-yuese","sourceUrl":"https://www.nckfhsm.com/brands/cha-yan-yue-se/menu/available","sourceReportedInSaleItems":80,"sourceReportedPages":4,"pagesReviewed":1,"status":"partial","notes":"只检查到部分公开名称，未完成全部页核对。"},
+    {"brandId":"brand-molynb","sourceUrl":"https://www.nckfhsm.com/brands/mo-li-nai-bai/menu/available","sourceReportedInSaleItems":112,"sourceReportedPages":null,"pagesReviewed":1,"status":"partial","notes":"只检查到部分公开名称。"},
+    {"brandId":"brand-happy-sweet-potato","sourceUrl":"https://www.nckfhsm.com/brands/kuai-le-fan-shu/menu/available","sourceReportedInSaleItems":100,"sourceReportedPages":5,"pagesReviewed":1,"status":"partial","notes":"只检查到首个菜单页。"},
+    {"brandId":"brand-ye-ye-bu-pao-cha","sourceUrl":"https://www.yeyebpc.com/products/series/","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":0,"status":"source_not_menu","notes":"官网产品系列页没有证明这些产品都在三城或淘宝闪购门店在售。"},
+    {"brandId":"brand-shuyi","sourceUrl":"https://www.shuyisxc.com/home/product/index/id/13.html","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":1,"status":"partial","notes":"官网当前页面展示的产品样本，未确认是否包含完整菜单。"},
+    {"brandId":"brand-lucky-coffee","sourceUrl":"https://www.nckfhsm.com/brands/xing-yun-ka/menu/available","sourceReportedInSaleItems":135,"sourceReportedPages":7,"pagesReviewed":1,"status":"partial","notes":"已检查首个页面；排除冰淇淋碗、雪球等非饮品。"},
+    {"brandId":"brand-huka","sourceUrl":"https://www.nckfhsm.com/brands/hu-ka","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":0,"status":"source_not_menu","notes":"公开品牌简介报 12 个收录条目，但没有可读取的当前饮品分页；目录仅记少量名称线索。"},
+    {"brandId":"brand-mstand","sourceUrl":"https://www.nckfhsm.com/brands/m-stand/menu/available","sourceReportedInSaleItems":119,"sourceReportedPages":6,"pagesReviewed":1,"status":"partial","notes":"首个菜单页列出 19 款；其余 5 页尚未核对。"},
+    {"brandId":"brand-bestar","sourceUrl":"https://www.nckfhsm.com/zh-tw/brands/bestar-bi-xing-ka-fei/menu/available","sourceReportedInSaleItems":127,"sourceReportedPages":7,"pagesReviewed":1,"status":"partial","notes":"首个菜单页列出约 20 款；来源页面另一时点显示 128 款，计数有变化。"},
+    {"brandId":"brand-shangdao","sourceUrl":null,"sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":0,"status":"source_missing","notes":"本轮仍未找到可验证的中国大陆当前饮品菜单；搜索结果中的香港 UCC、日本/台湾上岛珈琲店菜单不代表大陆上岛咖啡。未推测或填入通用咖啡款。"},
+    {"brandId":"brand-lanwan","sourceUrl":null,"sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":0,"status":"source_missing","notes":"仍未找到大陆当前菜单；搜索结果中的 Blue Lane Coffee（印度尼西亚）为同名异牌，台湾外卖菜单也无法代表大陆品牌或三城门店。"},
+    {"brandId":"brand-dio","sourceUrl":null,"sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":0,"status":"source_missing","notes":"本轮仍未找到可验证的中国大陆当前饮品菜单；D'Oro 泰国、Dio International 和美国 Cafe Dio 为同名异牌或不同市场，未作菜单证据。"},
+    {"brandId":"brand-cat-shit-coffee","sourceUrl":"https://gs.ctrip.com/html5/you/foods/fooddetail/152/133588251.html","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":0,"status":"partial","notes":"只查到广州文化公园店的门店推荐样本；不是品牌完整菜单，也不代表杭州、常州或上海门店。"},
+    {"brandId":"brand-pacific-coffee","sourceUrl":null,"sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":0,"status":"source_missing","notes":"本轮仍未找到中国大陆当前饮品菜单；品牌官网可见的饮品页和配送单对应香港市场，不可用于三城或淘宝闪购大陆门店。"},
+    {"brandId":"brand-four-leaf-coffee","sourceUrl":"https://www.nckfhsm.com/products/jing-dian-mei-shi-48067","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":0,"status":"partial","notes":"只查到单品页，尚未找到完整品牌菜单页。"},
+    {"brandId":"brand-jueke","sourceUrl":"https://www.nckfhsm.com/brands/jue-ke-ka-fei/menu/available","sourceReportedInSaleItems":null,"sourceReportedPages":8,"pagesReviewed":1,"status":"source_contaminated","notes":"菜单页宣称 158 条在售记录，但同页混有大量餐食，不能拿该总数当饮品数；只收录本页明确为饮品的名称。"}
+  ]
+}

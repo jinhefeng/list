@@ -1,0 +1,84 @@
+<template name="catalogEditorHeading">
+  <view class="row editor-heading"><view><text class="section-title">{{editingIsNew ? '新增饮品' : '编辑饮品'}}</text><text class="editor-status">菜单状态：{{form.menuStatusLabel}}</text></view><text class="close-editor" bindtap="closeEditor">关闭</text></view>
+</template>
+
+<template name="catalogEditorFields">
+  <view class="field"><text class="field-label">品牌</text><picker range="{{brandOptions}}" value="{{form.brandIndex}}" bindchange="onBrandChange"><view class="picker-value">{{brandOptions[form.brandIndex] || '自定义品牌 / 其他'}}<text class="picker-arrow">⌄</text></view></picker></view>
+  <view wx:if="{{form.customBrand}}" class="field"><text class="field-label">品牌名称</text><input class="input" data-field="brandName" value="{{form.brandName}}" placeholder="填写品牌或店铺名称" bindinput="onFormInput" /></view>
+  <view class="field"><text class="field-label">饮品名称</text><input class="input" data-field="name" value="{{form.name}}" placeholder="例如：桂花乌龙拿铁" bindinput="onFormInput" /></view>
+  <view class="field"><text class="field-label">种类 · 可选</text><input class="input" data-field="category" value="{{form.category}}" placeholder="例如：咖啡、新茶饮、果茶" bindinput="onFormInput" /></view>
+  <view class="field"><text class="field-label">搜索别名 · 可选</text><input class="input" data-field="aliasesText" value="{{form.aliasesText}}" placeholder="用逗号分隔，例如：桂花拿铁，Osmanthus Latte" bindinput="onFormInput" /></view>
+
+  <view class="nutrition-section"><text class="section-title">营养数据 · 可选</text><text class="helper">以下营养数值统一按每 100 ml 填写。记录时系统按全局杯型设置中的容量折算；已有精确规格数据优先使用。</text></view>
+  <view wx:if="{{form.legacyCupNutrition}}" class="legacy-nutrition-note">
+    <text class="legacy-note-title">保留了一条旧的“每杯”数据</text>
+    <text class="helper">{{form.legacyNutritionLabel || '旧数据没有填写营养值'}}。因为目录中有多个或未知杯型，系统无法可靠换算；不填写新数据会原样保留。</text>
+    <text class="helper">如需改成标准基准，请根据可靠资料填写对应的每 100 ml 数值。</text>
+  </view>
+  <view class="field"><text class="field-label">含糖量（g）</text><input class="input" type="digit" data-field="sugarG" value="{{form.sugarG}}" placeholder="暂无数据可留空" bindinput="onFormInput" /></view>
+  <view class="nutrition-row"><view class="field"><text class="field-label">能量（kcal）</text><input class="input" type="digit" data-field="energyKcal" value="{{form.energyKcal}}" placeholder="选填" bindinput="onFormInput" /></view><view class="field"><text class="field-label">咖啡因（mg）</text><input class="input" type="digit" data-field="caffeineMg" value="{{form.caffeineMg}}" placeholder="选填" bindinput="onFormInput" /></view></view>
+  <view class="field"><text class="field-label">数据依据</text><picker range="{{sourceTypeOptions}}" value="{{form.nutritionSourceTypeIndex}}" bindchange="onNutritionSourceTypeChange"><view class="picker-value">{{sourceTypeOptions[form.nutritionSourceTypeIndex]}}<text class="picker-arrow">⌄</text></view></picker></view>
+  <view class="field"><text class="field-label">数据来源</text><input class="input" data-field="nutritionSource" value="{{form.nutritionSource}}" placeholder="官方数据请填写来源；估算数据可写备注" bindinput="onFormInput" /></view>
+  <view class="field active-field"><text class="field-label">在饮品清单中显示</text><switch checked="{{form.active}}" color="#5b7751" bindchange="onActiveChange" /></view>
+  <view class="preserve-note">原有糖度选项、营养变体、菜单来源及核验状态会保留。新增饮品默认标记为“待核验”。</view>
+</template>
+
+<template name="catalogEditorActions">
+  <view class="editor-actions"><button class="secondary-button" bindtap="closeEditor">取消</button><button class="primary-button" bindtap="saveDrink">保存饮品</button></view>
+</template>
+
+<view class="page-shell catalog-shell">
+  <view class="eyebrow">DRINK CATALOG</view>
+  <view class="row page-title-row"><view><text class="title">饮品清单</text><text class="subtitle">维护品牌、种类和单位营养数据。</text></view><button class="add-button" bindtap="addDrink">＋ 新增</button></view>
+
+  <view class="card catalog-summary"><view class="summary-content"><text class="summary-number">{{totalCount}}</text><text class="summary-copy">款饮品 · 找不到的名称可以新增</text></view><button wx:if="{{!showAllCatalog}}" class="show-all-button" bindtap="showAllDrinks">展示全部</button></view>
+
+  <view class="card cup-settings-card">
+    <view class="row cup-settings-heading"><view><text class="section-title">全局杯型与容量</text><text class="helper">所有饮品共用这套杯型；容量用于营养折算，只在此处设置。</text></view><text class="cup-settings-toggle" bindtap="toggleCupSettings">{{showCupSettings ? '收起' : '设置'}}</text></view>
+    <view wx:if="{{showCupSettings}}" class="cup-settings-body">
+      <view wx:for="{{globalCupSizes}}" wx:key="index" class="cup-size-row">
+        <input class="input cup-type-input" placeholder="杯型名称" value="{{item.cupType}}" data-index="{{index}}" data-field="cupType" bindinput="onGlobalCupSizeInput" />
+        <input class="input cup-capacity-input" type="number" placeholder="容量 ml" value="{{item.sizeMl}}" data-index="{{index}}" data-field="sizeMl" bindinput="onGlobalCupSizeInput" />
+        <text class="remove-cup-size" data-index="{{index}}" bindtap="removeGlobalCupType">移除</text>
+      </view>
+      <view class="row cup-settings-actions"><text class="add-cup-size" bindtap="addGlobalCupType">＋ 添加全局杯型</text><button class="save-cup-settings-button" bindtap="saveGlobalCupSizes">保存设置</button></view>
+      <text class="helper cup-settings-note">容量可暂时留空；未配置容量的杯型仍可记录，但无法按每 100 ml 数据折算单杯营养。</text>
+    </view>
+  </view>
+
+  <view class="filter-row">
+    <picker range="{{brandFilterOptions}}" value="{{brandFilterIndex}}" bindchange="onBrandFilterChange"><view class="filter-picker">{{brandFilterOptions[brandFilterIndex]}}<text>⌄</text></view></picker>
+    <picker range="{{categoryFilterOptions}}" value="{{categoryFilterIndex}}" bindchange="onCategoryFilterChange"><view class="filter-picker">{{categoryFilterOptions[categoryFilterIndex]}}<text>⌄</text></view></picker>
+  </view>
+  <view class="search-card"><text class="search-icon">⌕</text><input class="search-input" placeholder="搜索饮品、品牌或别名" value="{{query}}" bindinput="onSearch" /></view>
+  <view wx:if="{{showAllCatalog}}" class="all-catalog-hint">全部饮品已展开，列表按每批 30 款加载。</view>
+
+  <view wx:if="{{showEditor && editingIsNew}}" class="card editor-card editor-inline">
+    <template is="catalogEditorHeading" data="{{editingIsNew: editingIsNew, form: form}}" />
+    <template is="catalogEditorFields" data="{{form: form, brandOptions: brandOptions, sourceTypeOptions: sourceTypeOptions}}" />
+    <template is="catalogEditorActions" />
+  </view>
+
+  <view wx:if="{{showEditor && !editingIsNew}}" class="editor-modal-mask" catchtouchmove="noop">
+    <view class="card editor-modal">
+      <template is="catalogEditorHeading" data="{{editingIsNew: editingIsNew, form: form}}" />
+      <scroll-view class="editor-modal-scroll" scroll-y="true" enhanced="true">
+        <template is="catalogEditorFields" data="{{form: form, brandOptions: brandOptions, sourceTypeOptions: sourceTypeOptions}}" />
+      </scroll-view>
+      <template is="catalogEditorActions" />
+    </view>
+  </view>
+
+  <view wx:if="{{visibleDrinks.length}}" class="drink-list">
+    <view wx:for="{{visibleDrinks}}" wx:key="id" class="card drink-card">
+      <view class="row drink-top"><text class="drink-brand">{{item.displayBrand}} · {{item.displayCategory}}</text><text class="drink-active {{item.activeClass}}">{{item.activeLabel}}</text></view>
+      <text class="drink-name">{{item.name}}</text>
+      <view class="drink-bottom"><view class="drink-meta"><text class="sugar-label">{{item.sugarLabel}}</text><text class="menu-status">菜单{{item.menuStatusLabel}}</text></view><view class="drink-actions"><button class="edit-button" data-id="{{item.id}}" bindtap="editDrink">编辑</button><button class="delete-drink-button" data-id="{{item.id}}" bindtap="deleteDrink">删除</button></view></view>
+    </view>
+  </view>
+  <view wx:if="{{matchedCount}}" class="result-count">当前显示 {{displayCount}} / {{matchedCount}} 款</view>
+  <button wx:if="{{canLoadMore}}" class="load-more-button" bindtap="loadMore">加载更多（剩余 {{remainingCount}} 款）</button>
+  <view wx:if="{{!hasSearchContext}}" class="empty-card"><text class="empty-title">从搜索或筛选开始</text><text class="empty-copy">输入品牌、饮品名称或别名，也可以选择品牌或种类。</text></view>
+  <view wx:elif="{{!matchedCount}}" class="empty-card"><text class="empty-title">没有匹配的饮品</text><text class="empty-copy">试试其他关键词，或新增这款饮品。</text><button class="secondary-button empty-add" bindtap="addDrink">＋ 新增饮品</button></view>
+  <view class="local-note">记录页新增的自定义饮品会自动加入本清单，之后可再次选择；清单修改保存在本机。</view>
+</view>

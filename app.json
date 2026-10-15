@@ -2,15 +2,25 @@
   "pages": [
     "pages/index/index",
     "pages/record/record",
+    "pages/catalog/catalog",
+    "pages/meal/meal",
+    "pages/meal-preview/meal-preview",
     "pages/history/history",
+    "pages/record-detail/record-detail",
     "pages/insights/insights"
   ],
   "window": {
-    "navigationBarTitleText": "今日喝什么",
+    "navigationBarTitleText": "今日记录",
     "navigationBarBackgroundColor": "#f6f7f2",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f6f7f2"
   },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于选择饮品或用餐记录地点。"
+    }
+  },
+  "requiredPrivateInfos": ["getLocation", "chooseLocation"],
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }

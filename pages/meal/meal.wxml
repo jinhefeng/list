@@ -1,0 +1,35 @@
+<view class="page-shell">
+  <view class="form-heading-row"><view><view class="eyebrow">A MEAL TO REMEMBER</view><text class="title">{{editing ? '编辑这顿饭' : '记下这顿饭'}}</text><text class="subtitle">先留下地址和店名，再把每道菜记下来。</text></view><text wx:if="{{editing && fromDetail}}" class="cancel-edit" bindtap="cancelEdit">取消</text></view>
+
+  <view class="card">
+    <text class="section-title">用餐地点</text>
+    <view class="field">
+      <text class="field-label">地址</text>
+      <view class="location-picker" bindtap="choosePlace"><text class="location-pin">⌖</text><view class="location-picker-text"><text class="location-name">{{locationAddress || '点选地图上的地址'}}</text></view><text class="location-arrow">›</text></view>
+      <text class="field-hint">{{locationHint}}</text>
+    </view>
+    <view class="field"><text class="field-label">店名</text><input class="input" placeholder="地图选点后可自动带入，也可修改" data-field="storeName" value="{{storeName}}" bindinput="updateField" /></view>
+    <view class="field"><text class="field-label">用餐时间</text><view class="date-time-row"><view class="date-field"><picker mode="date" value="{{date}}" bindchange="onDateChange"><view class="picker-value">{{date}}</view></picker></view><view class="date-field"><picker mode="time" value="{{time}}" bindchange="onTimeChange"><view class="picker-value">{{time}}</view></picker></view></view><text class="field-hint">{{timeHint}}</text></view>
+  </view>
+
+  <view class="card">
+    <view class="section-heading"><text class="section-title">菜品</text><text class="dish-count">{{dishes.length}} 道</text></view>
+    <view wx:for="{{dishes}}" wx:for-index="index" wx:key="id" class="dish-sort-item {{dragIndex === index ? 'dragging' : ''}}">
+      <view class="dish-card">
+      <view class="dish-photo-box" data-id="{{item.id}}" bindtap="chooseDishPhoto">
+        <image wx:if="{{item.photo}}" class="dish-photo" src="{{item.photoThumbnail || item.photo}}" mode="aspectFill" catchtap="previewPhoto" data-id="{{item.id}}" />
+        <view wx:elif="{{item.photoPending}}" class="dish-photo-empty"><text>正在保存照片…</text></view>
+        <view wx:else class="dish-photo-empty"><text class="dish-photo-plus">＋</text><text>添加照片</text></view>
+      </view>
+      <view class="dish-fields"><view class="dish-fields-header"><text class="field-label">菜品名称</text><view class="dish-drag-handle" data-index="{{index}}" catchtouchstart="startDishDrag" catchtouchmove="moveDishDrag" catchtouchend="endDishDrag" catchtouchcancel="endDishDrag"><text class="dish-drag-glyph">⠿</text><text>拖动排序</text></view></view><input class="input" placeholder="例如：招牌红烧肉" data-id="{{item.id}}" value="{{item.name}}" bindinput="updateDishName" /><text class="dish-remove" data-id="{{item.id}}" bindtap="removeDish">移除这道菜</text></view>
+      </view>
+    </view>
+    <view class="add-dish" bindtap="addDish"><text class="add-dish-plus">＋</text><text>添加一道菜</text></view>
+    <text class="field-hint">每道菜可以单独添加照片；按住右侧拖动柄可调整顺序。</text>
+  </view>
+
+  <view class="card"><view class="field"><text class="field-label">备注 · 可选</text><textarea class="input notes-input" placeholder="记录口味、同行的人或当时的心情" data-field="notes" value="{{notes}}" bindinput="updateField" /></view></view>
+  <button class="primary-button save-button" bindtap="save">{{editing ? '保存修改' : '保存这顿饭'}}</button>
+  <button wx:if="{{editing && !fromDetail}}" class="delete-button" bindtap="deleteRecord">删除记录</button>
+</view>
+<canvas type="2d" id="mealThumbnailCanvas" class="thumbnail-canvas" aria-hidden="true"></canvas>

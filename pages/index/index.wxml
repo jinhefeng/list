@@ -1,7 +1,7 @@
-<view class="page-shell">
-  <view class="eyebrow">DRINK JOURNAL · {{dateLabel}}</view>
-  <text class="title">今天喝了什么？</text>
-  <text class="subtitle">记下这一杯，也记下当时的心情。</text>
+<view class="page-shell tab-page-shell">
+  <view class="home-header"><view class="eyebrow">DAILY FOOD LOG · {{dateLabel}}</view><view class="catalog-entry" bindtap="openCatalog" aria-label="饮品清单维护"><view class="catalog-glyph"><view class="catalog-glyph-line"></view><view class="catalog-glyph-line short"></view><view class="catalog-glyph-line"></view></view></view></view>
+  <text class="title">今天记录了什么？</text>
+  <text class="subtitle">饮品和每顿饭，都可以留在这里。</text>
 
   <view class="hero-card">
     <view class="hero-top"><view><text class="hero-kicker">今天的饮品</text><text class="hero-number">{{summary.drinkCount || 0}}<text class="hero-unit"> 杯</text></text></view><view class="cup-art">☕</view></view>
@@ -11,13 +11,24 @@
 
   <view class="row section-heading"><text class="section-title">今日记录</text><text class="more" bindtap="openHistory">全部记录 →</text></view>
   <view wx:if="{{hasRecords}}" class="record-list">
-    <view wx:for="{{records}}" wx:key="id" class="record-card" data-id="{{item.id}}" bindtap="editRecord">
-      <image wx:if="{{item.photo}}" class="record-thumb" src="{{item.photo}}" mode="aspectFill" />
-      <view wx:else class="record-thumb placeholder">杯</view>
-      <view class="record-info"><view class="row"><text class="record-name">{{item.drinkName}}</text><text class="record-time">{{item.timeLabel}}</text></view><text class="record-brand">{{item.brandName || '自定义饮品'}} · {{item.sizeMl || '—'}} ml</text><text class="record-details">{{item.sweetness || '甜度未记'}} · {{item.ice || '冰度未记'}}</text><text class="record-nutrition">{{item.nutritionLabel}}</text></view>
-    </view>
+    <block wx:for="{{records}}" wx:key="id">
+      <view wx:if="{{item.kind === 'meal'}}" class="record-card" data-id="{{item.id}}" bindtap="openRecord">
+        <view wx:if="{{item.photoCount}}" class="meal-record-photos" style="width:{{item.photoStackWidth}}rpx;height:{{item.photoStackHeight}}rpx;"><view wx:for="{{item.photoDishes}}" wx:for-item="dish" wx:for-index="photoIndex" wx:key="id" class="meal-record-photo-cell" style="left:{{dish.stackLeft}}rpx;z-index:{{dish.stackZIndex}};" data-record-id="{{item.id}}" data-photo-index="{{photoIndex}}" catchtap="previewPhoto"><image class="meal-record-thumb" src="{{dish.photoThumbnail || dish.photo}}" mode="aspectFill" lazy-load="{{true}}" /><text wx:if="{{photoIndex === 0 && item.photoCount > 1}}" class="meal-photo-count">{{item.photoCountLabel}}</text></view></view>
+        <view wx:else class="meal-record-photos-empty placeholder">菜</view>
+        <view class="record-info"><view class="row"><text class="record-name">{{item.storeName}}</text><text class="record-time">{{item.timeLabel}}</text></view><text class="record-brand meal-dish-names">{{item.dishCount}} 道菜 · {{item.dishNames}}</text><text class="record-details">⌖ {{item.locationAddress}}</text></view>
+      </view>
+      <view wx:elif="{{item.kind === 'drink'}}" class="record-card" data-id="{{item.id}}" bindtap="openRecord">
+        <image wx:if="{{item.photo}}" class="record-thumb" src="{{item.photoThumbnail || item.photo}}" mode="aspectFill" lazy-load="{{true}}" />
+        <view wx:else class="record-thumb placeholder">杯</view>
+        <view class="record-info"><view class="row"><text class="record-name">{{item.drinkName}}</text><text class="record-time">{{item.timeLabel}}</text></view><text class="record-brand">{{item.brandName || '自定义饮品'}} · {{item.cupLabel}}</text><text class="record-details">{{item.sweetness || '甜度未记'}} · {{item.servingLabel || '冰度未记'}}</text><text class="record-nutrition">{{item.nutritionLabel}}</text><text wx:if="{{item.locationLabel}}" class="record-location">⌖ {{item.locationLabel}}</text></view>
+      </view>
+      <view wx:else class="record-card" data-id="{{item.id}}" bindtap="openRecord">
+        <image wx:if="{{item.photo || item.photoThumbnail}}" class="record-thumb" src="{{item.photoThumbnail || item.photo}}" mode="aspectFill" lazy-load="{{true}}" />
+        <view wx:else class="record-thumb placeholder">记</view>
+        <view class="record-info"><view class="row"><text class="record-name">{{item.displayName}}</text><text class="record-time">{{item.timeLabel}}</text></view><text wx:if="{{item.displayDetails}}" class="record-details">{{item.displayDetails}}</text><text wx:if="{{item.locationAddress || item.location}}" class="record-location">⌖ {{item.locationAddress || item.location}}</text></view>
+      </view>
+    </block>
   </view>
-  <view wx:else class="empty-card"><text class="empty-icon">◌</text><text class="empty-title">今天还没有记录</text><text class="empty-copy">第一杯饮品，值得被记下来。</text></view>
-  <button class="primary-button add-button" bindtap="addDrink">＋ 记录一杯</button>
+  <view wx:else class="empty-card"><text class="empty-icon">◌</text><text class="empty-title">今天还没有记录</text><text class="empty-copy">记下一杯饮品，或留住一顿饭。</text></view>
+  <view class="add-actions"><button class="primary-button" bindtap="addDrink">＋ 记录饮品</button><button class="secondary-button" bindtap="addMeal">＋ 记录吃饭</button></view>
 </view>
-<view class="bottom-nav"><view class="nav-item active" bindtap="refresh">◉<view>今天</view></view><view class="nav-item" bindtap="openHistory">▤<view>记录</view></view><view class="nav-item" bindtap="openInsights">◒<view>摄入</view></view></view>

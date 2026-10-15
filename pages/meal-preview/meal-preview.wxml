@@ -1,0 +1,21 @@
+<view class="viewer-page">
+  <view class="viewer-header">
+    <view class="viewer-close" bindtap="closeViewer" aria-label="关闭图片">×</view>
+    <text class="viewer-index">{{currentIndex + 1}} / {{photos.length}}</text>
+    <view class="viewer-close-placeholder"></view>
+  </view>
+  <view wx:if="{{photos.length}}" class="viewer-image-area">
+    <swiper class="viewer-swiper" current="{{currentIndex}}" duration="220" bindchange="onSwiperChange">
+      <swiper-item wx:for="{{photos}}" wx:key="id" class="viewer-slide">
+        <image class="viewer-photo" src="{{item.photo}}" mode="aspectFit" />
+      </swiper-item>
+    </swiper>
+  </view>
+  <text wx:if="{{currentPhoto}}" class="viewer-caption">{{currentPhoto.name}}</text>
+  <scroll-view wx:if="{{photos.length > 1}}" class="viewer-thumbnails" scroll-x="true" scroll-into-view="{{activeThumbId}}" show-scrollbar="false">
+    <view wx:for="{{photos}}" wx:key="id" id="{{item.thumbId}}" class="viewer-thumb-item {{currentIndex === index ? 'active' : ''}}" data-index="{{index}}" bindtap="selectPhoto">
+      <image class="viewer-thumb" src="{{item.thumbnail}}" mode="aspectFill" />
+      <text class="viewer-thumb-name">{{item.name}}</text>
+    </view>
+  </scroll-view>
+</view>

@@ -13,14 +13,12 @@ Page({
     const date = this.data.date || dayKey();
     const userId = getApp().globalData.userId;
     const { drinks } = Store.catalog();
-    const records = Domain.listRecords(Store.getRecords(), userId, date).map((record) => {
-      const nutrition = Domain.nutritionForRecord(record, Domain.findDrink(drinks, record.drinkId));
+    const cupSizes = Store.getCupSizes();
+    const records = Domain.listRecords(Store.getRecords(), userId, date).filter(Domain.isDrinkRecord).map((record) => {
+      const nutrition = Domain.nutritionForRecord(record, Domain.findDrink(drinks, record.drinkId), cupSizes);
       return { ...record, timeLabel: record.consumedAt.slice(11, 16), nutrition };
     });
-    this.setData({ date, summary: Domain.dailySummary(Store.getRecords(), drinks, date, userId), records, hasRecords: records.length > 0 });
+    this.setData({ date, summary: Domain.dailySummary(Store.getRecords(), drinks, date, userId, cupSizes), records, hasRecords: records.length > 0 });
   },
-  onDateChange(event) { this.setData({ date: event.detail.value }); this.refresh(); },
-  openHistory() { wx.navigateTo({ url: '/pages/history/history' }); },
-  openHome() { wx.reLaunch({ url: '/pages/index/index' }); },
-  addDrink() { wx.navigateTo({ url: '/pages/record/record' }); }
+  onDateChange(event) { this.setData({ date: event.detail.value }); this.refresh(); }
 });

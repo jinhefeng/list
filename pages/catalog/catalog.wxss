@@ -1,0 +1,80 @@
+.catalog-shell { padding-bottom: 80rpx; }
+.page-title-row { align-items: flex-end; gap: 18rpx; }
+.page-title-row .title { display: block; }
+.page-title-row .subtitle { display: block; }
+.add-button { flex: none; padding: 18rpx 22rpx; border-radius: 18rpx; color: #fff; background: #304d35; font-size: 23rpx; }
+.catalog-summary { display: flex; align-items: center; gap: 14rpx; padding-top: 22rpx; padding-bottom: 22rpx; }
+.summary-content { display: flex; flex: 1; min-width: 0; align-items: baseline; gap: 12rpx; }
+.summary-number { color: #304d35; font-size: 38rpx; font-weight: 700; }
+.summary-copy { flex: 1; min-width: 0; color: #7e857a; font-size: 22rpx; line-height: 1.4; }
+.cup-settings-card { padding-top: 21rpx; padding-bottom: 21rpx; }
+.cup-settings-heading { align-items: flex-start; gap: 14rpx; }
+.cup-settings-heading .helper { margin-top: 6rpx; }
+.cup-settings-toggle { flex: none; padding: 4rpx 0 4rpx 12rpx; color: #526f48; font-size: 22rpx; }
+.cup-settings-body { margin-top: 16rpx; padding-top: 4rpx; border-top: 1rpx solid #eef0eb; }
+.filter-row { display: flex; gap: 14rpx; margin-top: 20rpx; }
+.filter-row picker { flex: 1; min-width: 0; }
+.filter-picker,.picker-value { display: flex; min-height: 78rpx; box-sizing: border-box; align-items: center; justify-content: space-between; padding: 0 20rpx; border: 1rpx solid #e8ebe4; border-radius: 17rpx; color: #354331; background: #fff; font-size: 23rpx; }
+.search-card { display: flex; align-items: center; gap: 12rpx; margin-top: 18rpx; padding: 8rpx 20rpx; border-radius: 18rpx; background: #fff; }
+.search-icon { color: #69805f; font-size: 40rpx; }
+.search-input { flex: 1; min-width: 0; height: 72rpx; font-size: 24rpx; }
+.editor-card { border: 2rpx solid #dbe5d5; }
+.editor-inline { margin-top: 18rpx; }
+.editor-modal-mask { position: fixed; z-index: 1000; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 24rpx; background: rgba(24, 31, 24, .48); }
+.editor-modal { display: flex; width: 100%; height: 88vh; max-height: calc(100vh - 48rpx); box-sizing: border-box; flex-direction: column; overflow: hidden; margin: 0; padding: 24rpx; border: 2rpx solid #dbe5d5; box-shadow: 0 18rpx 70rpx rgba(20, 30, 20, .18); }
+.editor-modal-scroll { flex: 1; height: 1rpx; min-height: 0; margin-top: 8rpx; }
+.editor-heading { align-items: flex-start; }
+.editor-heading .section-title { margin-bottom: 6rpx; }
+.editor-status { display: block; color: #9b7544; font-size: 21rpx; }
+.close-editor { color: #75806f; font-size: 22rpx; }
+.picker-arrow { margin-left: 16rpx; color: #8b9385; }
+.field { margin-top: 22rpx; }
+.nutrition-section { margin-top: 32rpx; padding-top: 24rpx; border-top: 1rpx solid #eef0eb; }
+.nutrition-section .section-title { margin-bottom: 8rpx; }
+.add-cup-size,.remove-cup-size { flex: none; color: #5b7751; font-size: 21rpx; }
+.cup-size-row { display: flex; align-items: center; gap: 12rpx; margin-top: 14rpx; }
+.cup-size-row .input { min-width: 0; padding: 18rpx 14rpx; font-size: 22rpx; }
+.cup-type-input { flex: 1; }
+.cup-capacity-input { flex: 0 0 190rpx; }
+.remove-cup-size { color: #9b5148; }
+.cup-settings-actions { align-items: center; justify-content: space-between; gap: 14rpx; margin-top: 18rpx; }
+.save-cup-settings-button { flex: none; margin: 0; padding: 12rpx 22rpx; border-radius: 99rpx; color: #fff; background: #304d35; font-size: 21rpx; line-height: 1.5; }
+.cup-settings-note { margin-top: 12rpx; }
+.show-all-button { flex: none; width: auto; margin: 0; padding: 14rpx 18rpx; border-radius: 99rpx; color: #526f48; background: #e9efe5; font-size: 20rpx; line-height: 1.4; white-space: nowrap; }
+.all-catalog-hint { margin: 17rpx 8rpx 4rpx; color: #858b80; font-size: 20rpx; text-align: center; }
+.helper { display: block; color: #8a9085; font-size: 21rpx; line-height: 1.55; }
+.nutrition-row { display: flex; gap: 16rpx; }
+.nutrition-row>.field { flex: 1; min-width: 0; }
+.legacy-nutrition-note { margin-top: 20rpx; padding: 18rpx; border-radius: 16rpx; background: #f6f7f2; }
+.legacy-note-title { display: block; margin-bottom: 6rpx; color: #6c694d; font-size: 22rpx; font-weight: 600; }
+.active-field { display: flex; align-items: center; justify-content: space-between; }
+.active-field .field-label { margin-bottom: 0; }
+.preserve-note,.local-note { display: block; color: #8a9085; font-size: 20rpx; line-height: 1.55; }
+.preserve-note { margin-top: 20rpx; padding: 16rpx; border-radius: 14rpx; background: #f6f7f2; }
+.editor-actions { display: flex; gap: 14rpx; margin-top: 22rpx; }
+.editor-actions button { flex: 1; padding: 20rpx 14rpx; font-size: 24rpx; }
+.drink-list { margin-top: 8rpx; }
+.drink-card { padding: 23rpx; }
+.drink-top { align-items: center; }
+.drink-brand { overflow: hidden; color: #75806f; font-size: 21rpx; text-overflow: ellipsis; white-space: nowrap; }
+.drink-active { color: #5b7751; font-size: 20rpx; }
+.drink-active.inactive { color: #9b5148; }
+.drink-name { display: block; margin-top: 12rpx; color: #29382a; font-size: 28rpx; font-weight: 650; }
+.drink-bottom { margin-top: 18rpx; }
+.drink-meta { min-width: 0; }
+.sugar-label,.menu-status { display: block; font-size: 21rpx; }
+.sugar-label { color: #52674b; }
+.menu-status { margin-top: 6rpx; color: #9a8060; font-size: 19rpx; }
+.drink-actions { display: flex; justify-content: flex-end; gap: 12rpx; margin-top: 16rpx; padding-top: 15rpx; border-top: 1rpx solid #f0f1ed; }
+.drink-actions button { flex: none; width: 132rpx; min-width: 0; box-sizing: border-box; margin: 0; padding: 13rpx 12rpx; border: 0; border-radius: 99rpx; font-size: 21rpx; line-height: 1.45; }
+.drink-actions button::after { border: 0; }
+.edit-button { color: #304d35; background: #e9efe5; }
+.delete-drink-button { color: #9b5148; background: #f5eae7; }
+.empty-card { margin-top: 24rpx; padding: 40rpx 24rpx; border-radius: 24rpx; background: #fff; text-align: center; }
+.empty-title,.empty-copy { display: block; }
+.empty-title { font-weight: 650; }
+.empty-copy { margin-top: 10rpx; color: #858b80; font-size: 22rpx; }
+.empty-add { margin-top: 20rpx; }
+.result-count { margin: 24rpx 0 10rpx; color: #858b80; font-size: 20rpx; text-align: center; }
+.load-more-button { margin-top: 12rpx; padding: 17rpx; border-radius: 17rpx; color: #526f48; background: #e9efe5; font-size: 22rpx; }
+.local-note { margin: 24rpx 10rpx 0; text-align: center; }
