@@ -160,7 +160,8 @@ function buildDetail(record, currentUserId) {
     addField(fields, '杯型', Domain.formatCupLabel(record));
     addField(fields, '甜度', record.sweetness);
     addField(fields, '冰量 / 温度', Domain.formatServingLabel(record));
-    addField(fields, '营养信息', Domain.nutritionForRecord(record, Domain.findDrink(Store.catalog().drinks, record.drinkId), Store.getCupSizes()).label);
+    const nutrition = Domain.nutritionForRecord(record, Domain.findDrink(Store.catalog().drinks, record.drinkId), Store.getCupSizes());
+    addField(fields, '营养摄入', Domain.formatNutritionAmounts(nutrition));
     addField(fields, '备注', record.notes);
     location = drinkMapLocation(record);
     heroPhoto = record.photo || record.photoThumbnail || '';

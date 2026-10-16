@@ -16,7 +16,8 @@ Page({
     const cupSizes = Store.getCupSizes();
     const records = Domain.listRecords(Store.getRecords(), userId, date).filter(Domain.isDrinkRecord).map((record) => {
       const nutrition = Domain.nutritionForRecord(record, Domain.findDrink(drinks, record.drinkId), cupSizes);
-      return { ...record, timeLabel: record.consumedAt.slice(11, 16), nutrition };
+      return { ...record, timeLabel: record.consumedAt.slice(11, 16), nutrition,
+        nutritionAmountsLabel: Domain.formatNutritionAmounts(nutrition) };
     });
     this.setData({ date, summary: Domain.dailySummary(Store.getRecords(), drinks, date, userId, cupSizes), records, hasRecords: records.length > 0 });
   },

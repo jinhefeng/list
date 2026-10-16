@@ -145,23 +145,108 @@ function deleteRecord(records, recordId, userId) {
   return records.filter((record) => !(record.id === recordId && record.userId === userId));
 }
 
+// Intentional broad defaults for personal intake awareness, not brand recipe data.
+const ROUGH_NUTRITION_PROFILES = {
+  water: { label: '无糖水饮', baseEnergyKcal: 0, baseSugarG: 0, addedSugarG: 0, caffeineMg: 0 },
+  blackTea: { label: '纯茶', baseEnergyKcal: 0, baseSugarG: 0, addedSugarG: 7, caffeineMg: 15 },
+  fruitTea: { label: '果茶', baseEnergyKcal: 10, baseSugarG: 2, addedSugarG: 7, caffeineMg: 10 },
+  milkTea: { label: '奶茶', baseEnergyKcal: 38, baseSugarG: 5, addedSugarG: 6, caffeineMg: 12 },
+  blackCoffee: { label: '黑咖啡', baseEnergyKcal: 2, baseSugarG: 0, addedSugarG: 2, caffeineMg: 35 },
+  milkCoffee: { label: '奶咖', baseEnergyKcal: 45, baseSugarG: 4, addedSugarG: 3, caffeineMg: 18 },
+  smoothie: { label: '奶昔/冰沙', baseEnergyKcal: 50, baseSugarG: 7, addedSugarG: 4, caffeineMg: 0 },
+  other: { label: '其他饮品', baseEnergyKcal: 25, baseSugarG: 3, addedSugarG: 5, caffeineMg: 10 }
+};
+
+function roughDrinkProfile(record, drink) {
+  const name = String((record && record.drinkName) || (drink && drink.name) || '');
+  const brandName = String((record && record.brandName) || (drink && drink.brandName) || '');
+  const category = String((drink && drink.category) || '');
+  const brandCategory = String((drink && drink.brandCategory) || '');
+  const productText = `${name} ${category}`.toLowerCase();
+  const coffeeContext = /(咖啡|coffee)/i.test(`${brandName} ${category} ${brandCategory}`);
+  const explicitCoffee = /(咖啡|coffee|美式|冷萃|浓缩|espresso|americano|black coffee|摩卡|卡布奇诺|馥芮白|dirty)/i.test(productText);
+  const coffeeLatte = /(拿铁|latte)/i.test(productText) && coffeeContext;
+
+  if (/(矿泉水|纯净水|白开水|饮用水|无糖苏打|无糖气泡水)/i.test(productText)) return ROUGH_NUTRITION_PROFILES.water;
+  if (/(美式|冷萃|浓缩|espresso|americano|black coffee)/i.test(productText)) return ROUGH_NUTRITION_PROFILES.blackCoffee;
+  if (explicitCoffee || coffeeLatte) return ROUGH_NUTRITION_PROFILES.milkCoffee;
+  if (/(冰沙|奶昔|果昔|沙冰|smoothie|酸奶)/i.test(productText)) return ROUGH_NUTRITION_PROFILES.smoothie;
+  if (/(奶茶|奶盖|奶绿|奶青|鲜奶|牛乳|厚乳|珍珠|波霸|芋泥|椰乳|椰奶|芝士)/i.test(productText)) return ROUGH_NUTRITION_PROFILES.milkTea;
+  if (/(果茶|柠檬|杨枝甘露|百香果|葡萄|青提|芒果|草莓|西瓜|蜜桃|桃子|橙子|凤梨|果汁)/i.test(productText)) return ROUGH_NUTRITION_PROFILES.fruitTea;
+  if (/(纯茶|原叶|乌龙|茉莉|龙井|红茶|绿茶|普洱|大红袍|岩茶|单丛|茶)/i.test(productText)) return ROUGH_NUTRITION_PROFILES.blackTea;
+  if (coffeeContext) return ROUGH_NUTRITION_PROFILES.milkCoffee;
+  return ROUGH_NUTRITION_PROFILES.other;
+}
+
+function roughSweetnessFactor(value) {
+  const sweetness = String(value || '').trim().toLowerCase().replace(/\s/g, '');
+  if (!sweetness) return 0.5;
+  if (/(不另外加糖|不加糖|无糖|零糖|0糖)/.test(sweetness)) return 0;
+  if (/(三分|3分|少糖|微糖)/.test(sweetness)) return 0.3;
+  if (/(五分|5分|半糖)/.test(sweetness)) return 0.5;
+  if (/(七分|7分)/.test(sweetness)) return 0.7;
+  if (/(全糖|正常糖|标准糖)/.test(sweetness)) return 1;
+  return 0.5;
+}
+
+function roughCupSizeMl(record, drink, cupSizes) {
+  const knownSize = resolveCupSizeMl(record, cupSizes);
+  if (knownSize !== null && knownSize > 0) return { sizeMl: knownSize, assumed: false };
+
+  const cupType = String((record && record.cupType) || '').trim();
+  const legacySizes = ((drink && drink.cupSizes) || [])
+    .filter((item) => item && item.cupType === cupType)
+    .map((item) => numericOrNull(item.sizeMl))
+    .filter((size) => size !== null && size > 0);
+  const uniqueLegacySizes = Array.from(new Set(legacySizes));
+  if (uniqueLegacySizes.length === 1) return { sizeMl: uniqueLegacySizes[0], assumed: false };
+
+  if (/(超大|特大|加大)/.test(cupType)) return { sizeMl: 750, assumed: true };
+  if (/小/.test(cupType)) return { sizeMl: 350, assumed: true };
+  if (/大/.test(cupType)) return { sizeMl: 650, assumed: true };
+  if (/中/.test(cupType)) return { sizeMl: 500, assumed: true };
+  return { sizeMl: 500, assumed: true };
+}
+
+function roughNutritionForRecord(record, drink, cupSizes) {
+  const profile = roughDrinkProfile(record, drink);
+  const capacity = roughCupSizeMl(record, drink, cupSizes);
+  const multiplier = capacity.sizeMl / 100;
+  const addedSugarG = profile.addedSugarG * roughSweetnessFactor(record && record.sweetness);
+  return {
+    energyKcal: (profile.baseEnergyKcal + addedSugarG * 4) * multiplier,
+    sugarG: (profile.baseSugarG + addedSugarG) * multiplier,
+    caffeineMg: profile.caffeineMg * multiplier,
+    profileLabel: profile.label,
+    sizeMl: capacity.sizeMl,
+    sizeAssumed: capacity.assumed,
+    sweetnessAssumed: !(record && record.sweetness)
+  };
+}
+
 function nutritionForRecord(record, drink, cupSizes) {
   const snapshot = record && record.nutritionSnapshot;
   const keys = ['energyKcal', 'sugarG', 'caffeineMg'];
+  const rough = roughNutritionForRecord(record, drink, cupSizes);
   if (snapshot && snapshot.complete) {
-    const values = keys.map((key) => numericOrNull(snapshot[key]));
+    const snapshotValues = keys.map((key) => numericOrNull(snapshot[key]));
+    const roughUsed = snapshotValues.some((value) => value === null || value < 0);
+    const hasSavedValues = snapshotValues.some((value) => value !== null && value >= 0);
+    const values = snapshotValues.map((value, index) => value !== null && value >= 0 ? value : rough[keys[index]]);
     if (!values.some((value) => value !== null && value >= 0)) {
       return { status: 'unavailable', label: '暂无数据', energyKcal: null, sugarG: null, caffeineMg: null };
     }
-    const status = snapshot.sourceType === 'official' ? 'official' : 'estimated';
+    const status = roughUsed ? 'rough' : snapshot.sourceType === 'official' ? 'official' : 'estimated';
     return {
       status,
-      label: status === 'official' ? '官方数据' : '估算值',
+      label: status === 'official' ? '官方数据' : status === 'rough' ? (hasSavedValues ? '含粗估' : '粗估') : '估算值',
       energyKcal: values[0] !== null && values[0] >= 0 ? values[0] : null,
       sugarG: values[1] !== null && values[1] >= 0 ? values[1] : null,
       caffeineMg: values[2] !== null && values[2] >= 0 ? values[2] : null,
-      source: snapshot.source || '',
-      updatedAt: snapshot.updatedAt || ''
+      source: roughUsed ? [snapshot.source || '', '按饮品类别、甜度和杯型粗估'].filter(Boolean).join('；') : (snapshot.source || ''),
+      updatedAt: snapshot.updatedAt || '',
+      roughEstimate: roughUsed,
+      assumptions: roughUsed ? roughAssumptions(rough) : ''
     };
   }
   const variants = (drink && drink.nutritionVariants) || [];
@@ -197,19 +282,53 @@ function nutritionForRecord(record, drink, cupSizes) {
     }
     return perUnit && perUnit[key] !== null ? perUnit[key] : null;
   });
-  if (!used.some((item) => item && item.value !== null && item.value >= 0)) {
+  let roughUsed = false;
+  const completed = used.map((item, index) => {
+    if (item && item.value !== null && item.value >= 0) return item;
+    roughUsed = true;
+    return { value: rough[keys[index]], sourceType: 'rough', source: '按饮品类别、甜度和杯型粗估', updatedAt: '' };
+  });
+  if (!completed.some((item) => item && item.value !== null && item.value >= 0)) {
     return { status: 'unavailable', label: '暂无数据', energyKcal: null, sugarG: null, caffeineMg: null };
   }
-  const status = used.some((item) => item && item.sourceType === 'estimated') ? 'estimated' : 'official';
+  const status = roughUsed ? 'rough' : completed.some((item) => item && item.sourceType === 'estimated') ? 'estimated' : 'official';
   return {
     status,
-    label: status === 'official' ? '官方数据' : '估算值',
-    energyKcal: used[0] && used[0].value !== null ? used[0].value : null,
-    sugarG: used[1] && used[1].value !== null ? used[1].value : null,
-    caffeineMg: used[2] && used[2].value !== null ? used[2].value : null,
-    source: Array.from(new Set(used.filter(Boolean).map((item) => item.source).filter(Boolean))).join('；'),
-    updatedAt: (used.filter(Boolean).map((item) => item.updatedAt).filter(Boolean).sort().slice(-1)[0]) || ''
+    label: status === 'official' ? '官方数据' : status === 'rough'
+      ? (completed.some((item) => item && item.sourceType !== 'rough') ? '含粗估' : '粗估') : '估算值',
+    energyKcal: completed[0] && completed[0].value !== null ? completed[0].value : null,
+    sugarG: completed[1] && completed[1].value !== null ? completed[1].value : null,
+    caffeineMg: completed[2] && completed[2].value !== null ? completed[2].value : null,
+    source: Array.from(new Set(completed.filter(Boolean).map((item) => item.source).filter(Boolean))).join('；'),
+    updatedAt: (completed.filter(Boolean).map((item) => item.updatedAt).filter(Boolean).sort().slice(-1)[0]) || '',
+    roughEstimate: roughUsed,
+    assumptions: roughUsed ? roughAssumptions(rough) : ''
   };
+}
+
+function roughAssumptions(rough) {
+  const sizeLabel = rough.sizeAssumed ? `容量按约 ${rough.sizeMl} ml` : `${rough.sizeMl} ml`;
+  const sweetnessLabel = rough.sweetnessAssumed ? '甜度未记录，按五分糖' : '按记录甜度';
+  return `${rough.profileLabel}类，${sizeLabel}，${sweetnessLabel}`;
+}
+
+function formatNutritionAmounts(nutrition) {
+  if (!nutrition) return '';
+  const approximate = nutrition.status === 'rough' || nutrition.status === 'estimated';
+  const roundTo = (value, step) => Math.round(Number(value) / step) * step;
+  const parts = [];
+  if (nutrition.energyKcal !== null && nutrition.energyKcal !== undefined) {
+    parts.push(`${roundTo(nutrition.energyKcal, approximate ? 10 : 1)} kcal`);
+  }
+  if (nutrition.sugarG !== null && nutrition.sugarG !== undefined) {
+    const sugar = approximate ? roundTo(nutrition.sugarG, 5) : Math.round(nutrition.sugarG * 10) / 10;
+    parts.push(`${sugar}g 糖`);
+  }
+  if (nutrition.caffeineMg !== null && nutrition.caffeineMg !== undefined) {
+    parts.push(`${roundTo(nutrition.caffeineMg, approximate ? 10 : 1)}mg 咖啡因`);
+  }
+  if (!parts.length) return '暂无数据';
+  return parts.join(' · ');
 }
 
 function resolveCupSizeMl(record, cupSizes) {
@@ -283,12 +402,13 @@ function dailySummary(records, drinks, date, userId, cupSizes) {
   const rows = (records || []).filter((record) => String(record.consumedAt).slice(0, 10) === date
     && (!userId || record.userId === userId) && isDrinkRecord(record));
   const byId = new Map((drinks || []).map((drink) => [drink.id, drink]));
-  const summary = { drinkCount: rows.length, energyKcal: 0, sugarG: 0, caffeineMg: 0, officialCount: 0, estimatedCount: 0, unavailableCount: 0,
+  const summary = { drinkCount: rows.length, energyKcal: 0, sugarG: 0, caffeineMg: 0, officialCount: 0, estimatedCount: 0, roughCount: 0, unavailableCount: 0,
     energyCount: 0, sugarCount: 0, caffeineCount: 0 };
   rows.forEach((record) => {
     const data = nutritionForRecord(record, byId.get(record.drinkId), cupSizes);
     if (data.status === 'official') summary.officialCount += 1;
     else if (data.status === 'estimated') summary.estimatedCount += 1;
+    else if (data.status === 'rough') summary.roughCount += 1;
     else summary.unavailableCount += 1;
     ['energyKcal', 'sugarG', 'caffeineMg'].forEach((key) => {
       if (data[key] !== null) {
@@ -297,10 +417,14 @@ function dailySummary(records, drinks, date, userId, cupSizes) {
       }
     });
   });
-  summary.energyLabel = summary.energyCount ? String(Math.round(summary.energyKcal)) : '—';
-  summary.sugarLabel = summary.sugarCount ? `${Math.round(summary.sugarG * 10) / 10}g` : '—';
-  summary.caffeineLabel = summary.caffeineCount ? `${Math.round(summary.caffeineMg)}mg` : '—';
+  const hasRoughValues = summary.roughCount > 0 || summary.estimatedCount > 0;
+  summary.energyLabel = summary.energyCount
+    ? String(hasRoughValues ? Math.round(summary.energyKcal / 10) * 10 : Math.round(summary.energyKcal)) : '—';
+  summary.sugarLabel = summary.sugarCount
+    ? `${hasRoughValues ? Math.round(summary.sugarG / 5) * 5 : Math.round(summary.sugarG * 10) / 10}g` : '—';
+  summary.caffeineLabel = summary.caffeineCount
+    ? `${hasRoughValues ? Math.round(summary.caffeineMg / 10) * 10 : Math.round(summary.caffeineMg)}mg` : '—';
   return summary;
 }
 
-module.exports = { createRecord, createMealRecord, isMealRecord, isDrinkRecord, listRecords, searchBrands, searchDrinks, findDrink, formatCupLabel, createCustomDrink, updateRecord, deleteRecord, resolveTemperatureIce, formatServingLabel, resolveCupSizeMl, nutritionForRecord, dailySummary };
+module.exports = { createRecord, createMealRecord, isMealRecord, isDrinkRecord, listRecords, searchBrands, searchDrinks, findDrink, formatCupLabel, createCustomDrink, updateRecord, deleteRecord, resolveTemperatureIce, formatServingLabel, resolveCupSizeMl, nutritionForRecord, formatNutritionAmounts, dailySummary };

@@ -279,7 +279,7 @@ Page({
     energyKcal: '', sugarG: '', caffeineMg: '', showBrandPicker: false, showDrinkPicker: false,
     cupOptions: cupTypeOptions(''), sweetnessOptions: sweetnessOptions(null, ''),
     servingOptions: choiceOptions(null, '', COMMON_SERVING_OPTIONS),
-    timeHint: '默认使用填写时的时间；可手动调整', locationHint: '正在尝试读取当前位置；可搜索并确认地图地点，或留空'
+    timeHint: '默认使用填写时的时间；可手动调整', locationHint: '可搜索并确认地图地点，也可以留空'
   },
   onLoad(query) {
     this.setData({ fromDetail: query.fromDetail === '1' });
@@ -290,7 +290,6 @@ Page({
     if (query.id) this.loadRecord(query.id);
     else {
       this.setData(currentDateTime());
-      this.requestCurrentLocation();
     }
     this.refreshCatalog();
   },
@@ -428,23 +427,6 @@ Page({
     const serving = Domain.resolveTemperatureIce({ servingOption });
     this.setData({ servingOption, temperature: serving.temperature, ice: serving.ice,
       servingOptions: choiceOptions(this.data.selectedDrink && this.data.selectedDrink.servingOptions, servingOption, COMMON_SERVING_OPTIONS) });
-  },
-  requestCurrentLocation() {
-    if (!wx.getLocation) {
-      this.setData({ locationHint: '可搜索并确认地图地点，也可以留空' });
-      return;
-    }
-    try {
-      wx.getLocation({ type: 'gcj02', success: (result) => {
-        this.currentMapCenter = { latitude: result.latitude, longitude: result.longitude };
-        if (this.locationEdited || this.locationFromPhoto) return;
-        this.setData({ locationHint: '已获取当前位置；搜索并确认地点后即可保存' });
-      }, fail: () => {
-        if (!this.locationEdited && !this.locationFromPhoto) this.setData({ locationHint: '可搜索并确认地图地点，也可以留空' });
-      } });
-    } catch (error) {
-      this.setData({ locationHint: '可搜索并确认地图地点，也可以留空' });
-    }
   },
   choosePlace() {
     if (!wx.chooseLocation) {

@@ -5,8 +5,7 @@
 
   <view class="hero-card">
     <view class="hero-top"><view><text class="hero-kicker">今天的饮品</text><text class="hero-number">{{summary.drinkCount || 0}}<text class="hero-unit"> 杯</text></text></view><view class="cup-art">☕</view></view>
-    <view class="hero-stats"><view><text class="hero-stat-value">{{summary.energyLabel || '—'}}</text><text class="hero-stat-label">已知能量 kcal</text></view><view><text class="hero-stat-value">{{summary.sugarLabel || '—'}}</text><text class="hero-stat-label">已知糖量</text></view><view><text class="hero-stat-value">{{summary.caffeineLabel || '—'}}</text><text class="hero-stat-label">已知咖啡因</text></view></view>
-    <text class="hero-foot">官方 {{summary.officialCount || 0}} · 估算 {{summary.estimatedCount || 0}} · 暂无 {{summary.unavailableCount || 0}}</text>
+    <view class="hero-stats"><view><text class="hero-stat-value">{{summary.energyLabel || '—'}}</text><text class="hero-stat-label">能量 kcal</text></view><view><text class="hero-stat-value">{{summary.sugarLabel || '—'}}</text><text class="hero-stat-label">糖量</text></view><view><text class="hero-stat-value">{{summary.caffeineLabel || '—'}}</text><text class="hero-stat-label">咖啡因</text></view></view>
   </view>
 
   <view class="row section-heading"><text class="section-title">今日记录</text><text class="more" bindtap="openHistory">全部记录 →</text></view>

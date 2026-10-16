@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-10-15",
+  "asOf": "2026-10-16",
   "scope": {
     "targetBrandCount": 31,
     "teaRanking": "2026 中国新式茶饮连锁品牌 15 强",
@@ -74,15 +74,15 @@
     }
   ],
   "brands": [
-    {"brandId":"brand-mixue","sourceUrl":"https://www.nckfhsm.com/brands/mi-xue-bing-cheng/menu/available?page=1","sourceReportedInSaleItems":161,"sourceReportedPages":9,"pagesReviewed":1,"status":"partial","notes":"仅收录了部分公开页名称；需逐页核对饮品、冰淇淋与甜品边界。"},
-    {"brandId":"brand-heytea","sourceUrl":"https://www.nckfhsm.com/zh-tw/brands/xi-cha/menu/available?page=1","sourceReportedInSaleItems":208,"sourceReportedPages":11,"pagesReviewed":1,"status":"partial","notes":"只检查到部分分页；排除周边、蛋糕等非饮品。"},
+    {"brandId":"brand-mixue","sourceUrl":"https://www.nckfhsm.com/brands/mi-xue-bing-cheng/menu/available?page=1","sourceReportedInSaleItems":174,"sourceReportedPages":9,"pagesReviewed":9,"status":"partial","notes":"已人工检查第1–9页并筛选饮品，本轮从第2–9页新增117个名称候选；排除圣代、冰淇淋等甜品，并合并杯型重复名称。不同页自报161、173、174款，来源列表有跨页重复，未能与来源总数完全对齐。第三方菜单不证明三城淘宝闪购门店在售。"},
+    {"brandId":"brand-heytea","sourceUrl":"https://www.nckfhsm.com/zh-tw/brands/xi-cha/menu/available?page=1","sourceReportedInSaleItems":207,"sourceReportedPages":11,"pagesReviewed":11,"status":"partial","notes":"已人工检查第1–11页并筛选饮品，本轮新增109个名称候选；排除蛋糕、组合套餐、酸奶冰淇淋等甜品。不同页自报207/11页、208/11页、222/12页；第10页指向的第12页目前无法读取，因此仍未完成全菜单核验。第三方菜单不证明三城淘宝闪购门店在售。"},
     {"brandId":"brand-nayuki","sourceUrl":"https://www.nckfhsm.com/brands/nai-xue-de-cha/menu/available?page=2","sourceReportedInSaleItems":81,"sourceReportedPages":null,"pagesReviewed":1,"status":"partial","notes":"仅查看了第 2 页及部分常见名称。"},
-    {"brandId":"brand-starbucks","sourceUrl":"https://www.nckfhsm.com/zh-tw/brands/xing-ba-ke/menu/available","sourceReportedInSaleItems":230,"sourceReportedPages":12,"pagesReviewed":1,"status":"partial","notes":"本次打开页面自报 230 款、12 页；早前记录为 263 款、14 页，来源计数明显变化。只检查首屏，不能据此证明完整或代表具体门店。"},
+    {"brandId":"brand-starbucks","sourceUrl":"https://www.nckfhsm.com/brands/xing-ba-ke/menu/available?page=1","sourceReportedInSaleItems":272,"sourceReportedPages":14,"pagesReviewed":14,"status":"partial","notes":"已逐页检查第1–14页，当前来源自报272款；目录合并后有270个品牌饮品名。排除布丁、杯装谷物酸奶等4项非饮品，并将来源分页中2个疑似乱码名称留在目录外。来源计数会变化，菜单含门店限定及季节款；第三方页不证明三城淘宝闪购门店在售。"},
     {"brandId":"brand-chagee","sourceUrl":"https://www.nckfhsm.com/brands/ba-wang-cha-ji/menu/available","sourceReportedInSaleItems":207,"sourceReportedPages":11,"pagesReviewed":1,"status":"partial","notes":"只检查到部分分页。"},
-    {"brandId":"brand-luckin","sourceUrl":"https://www.lkcoffee.com/products","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":1,"status":"partial","notes":"官网当前页面展示的产品样本，不确认其动态分页及地区菜单已覆盖。"},
-    {"brandId":"brand-guming","sourceUrl":"https://www.nckfhsm.com/brands/gu-ming/menu/available?page=1","sourceReportedInSaleItems":117,"sourceReportedPages":6,"pagesReviewed":1,"status":"partial","notes":"只检查到首个菜单页。"},
+    {"brandId":"brand-luckin","sourceUrl":"https://www.nckfhsm.com/brands/rui-xing-ka-fei/menu/available?page=1","sourceReportedInSaleItems":200,"sourceReportedPages":10,"pagesReviewed":10,"status":"partial","notes":"已逐页检查第1–10页，第三方公开菜单当前自报200款；合并官网产品页保留的12个官方来源名称后，目录有202个品牌饮品名。排除苹果派、柠檬挞两项食品；分页包含季节款、杯型款及门店限定。官网产品页存在动态加载，第三方汇编不证明具体城市或淘宝闪购门店在售。"},
+    {"brandId":"brand-guming","sourceUrl":"https://www.nckfhsm.com/brands/gu-ming/menu/available?page=1","sourceReportedInSaleItems":117,"sourceReportedPages":6,"pagesReviewed":6,"status":"partial","notes":"已人工检查第1–6页，本轮新增95个独立饮品名称候选；第2、5页有同名重复，已合并；来源自报117款，目录既有样本与该分页快照不完全一致。第三方菜单不证明三城淘宝闪购门店在售，仍标记为部分覆盖。"},
     {"brandId":"brand-chabaidao","sourceUrl":"https://www.nckfhsm.com/brands/cha-bai-dao/new-products","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":0,"status":"source_not_menu","notes":"当前来源是新品页，不是完整在售菜单。"},
-    {"brandId":"brand-manner","sourceUrl":"https://www.nckfhsm.com/brands/manner-coffee/menu/available","sourceReportedInSaleItems":179,"sourceReportedPages":9,"pagesReviewed":1,"status":"partial","notes":"只检查到首个菜单页。"},
+    {"brandId":"brand-manner","sourceUrl":"https://www.nckfhsm.com/brands/manner-coffee/menu/available?page=1","sourceReportedInSaleItems":186,"sourceReportedPages":10,"pagesReviewed":10,"status":"partial","notes":"已逐页检查第1–10页，第三方公开菜单当前自报186款；按品牌去重后目录有186个饮品名。将3个带英文别名的基础款和3个咖啡豆产区款名称归并到现有名称，并保留原始标签作别名。页面含不同产区SOE、Dirty及限定产品；第三方页不证明三城淘宝闪购门店在售。"},
     {"brandId":"brand-cotti","sourceUrl":"https://www.nckfhsm.com/zh-tw/brands/ku-di-ka-fei/menu/available?page=2","sourceReportedInSaleItems":111,"sourceReportedPages":null,"pagesReviewed":1,"status":"partial","notes":"只检查到第 2 页；来源汇编的在售数会变化。"},
     {"brandId":"brand-nowwa","sourceUrl":"https://www.nckfhsm.com/zh-tw/brands/nuo-wa-ka-fei/menu/available","sourceReportedInSaleItems":263,"sourceReportedPages":14,"pagesReviewed":1,"status":"partial","notes":"只检查到首个菜单页。"},
     {"brandId":"brand-yidiandian","sourceUrl":"https://www.nckfhsm.com/brands/yi-dian-dian/menu/available","sourceReportedInSaleItems":null,"sourceReportedPages":null,"pagesReviewed":1,"status":"partial","notes":"新增16款官网2026全国上新名称，逐款链接保存在目录；它们仍是菜单候选，未核对三城淘宝闪购门店菜单。另有官网门店据点证据，见cityStorePresence。"},

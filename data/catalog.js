@@ -1,8 +1,31 @@
-const updatedAt = '2026-10-15';
-const checkedAt = '2026-10-15';
+const updatedAt = '2026-10-16';
+const checkedAt = '2026-10-16';
 // Increment this when the bundled brand or drink list changes. The store uses
 // it to refresh cached catalogs on existing installations without clearing records.
-const version = '2026-10-15.1';
+const version = '2026-10-16.4';
+
+const publicMenuCandidates = require('./catalog-public-menus');
+
+const heyteaPageItems = (page, names) => names.map((name) => ({
+  name,
+  sourceType: 'public_menu',
+  sourceName: `咖啡奶茶喝什么公开菜单汇编（喜茶第${page}页）`,
+  sourceUrl: `https://www.nckfhsm.com/brands/xi-cha/menu/available?page=${page}`
+}));
+
+const mixuePageItems = (page, names) => names.map((name) => ({
+  name,
+  sourceType: 'public_menu',
+  sourceName: `咖啡奶茶喝什么公开菜单汇编（蜜雪冰城第${page}页）`,
+  sourceUrl: `https://www.nckfhsm.com/brands/mi-xue-bing-cheng/menu/available?page=${page}`
+}));
+
+const gumingPageItems = (page, names) => names.map((name) => ({
+  name,
+  sourceType: 'public_menu',
+  sourceName: `咖啡奶茶喝什么公开菜单汇编（古茗第${page}页）`,
+  sourceUrl: `https://www.nckfhsm.com/brands/gu-ming/menu/available?page=${page}`
+}));
 
 // Public menus help broaden name search, but do not prove availability at a
 // particular Taobao Flash Sale store. Keep every imported reference pending.
@@ -11,13 +34,71 @@ const catalogSources = [
     id: 'brand-mixue', name: '蜜雪冰城', aliases: ['蜜雪', 'MXBC'], category: '茶饮',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/mi-xue-bing-cheng/menu/available?page=1',
-    products: ['冰鲜柠檬水', '珍珠奶茶', '棒打鲜橙', '蜜桃四季春', '柠檬红茶', '满杯百香果', '抹茶摇摇奶昔', '满杯玉米', '芝士奶盖玉米', '蜜瓜摇摇冰', '雪王雪顶龙井', '黑糖全冰美式', '黑糖珍珠鲜牛乳', '好柿多多', '好柿椰椰', '牛油果酸奶', '牛油果甘露', '草莓奶麻薯', '芒果奶麻薯', '黄桃果霸']
+    products: [
+      '冰鲜柠檬水', '珍珠奶茶', '棒打鲜橙', '蜜桃四季春', '柠檬红茶', '满杯百香果', '抹茶摇摇奶昔', '满杯玉米', '芝士奶盖玉米', '蜜瓜摇摇冰', '雪王雪顶龙井', '黑糖全冰美式', '黑糖珍珠鲜牛乳', '好柿多多', '好柿椰椰', '牛油果酸奶', '牛油果甘露', '草莓奶麻薯', '芒果奶麻薯', '黄桃果霸',
+      ...mixuePageItems(2, [
+        '芝士葡萄', '香柠龙井霸气桶', '香柠蓝莓霸气桶', '黑糖珍珠撞奶', '黄桃燕麦酸奶', '粉荔甜心拿铁'
+      ]),
+      ...mixuePageItems(3, [
+        '草莓桃桃', '黄皮百香果', '黄皮香柠茶', '西瓜椰椰', '西瓜啵啵', '羽衣甘蓝香柠', '羽衣甘蓝酸奶', '荔枝啵啵', '荔枝椰椰', '羽衣甘蓝葡萄', '冰橘美式', '冰柚柠檬茶', '草莓香蕉撞奶', '香柠橘子茶', '经典美式', '鲜奶拿铁', '加浓美式', '茉莉鲜奶拿铁', '青芒酸奶'
+      ]),
+      ...mixuePageItems(4, [
+        '青芒冰茶', '蜜雪奶茶', '芭乐奶绿', '芭乐茉莉', '薄荷奶绿', '雪王雪顶咖啡(薄荷味)', '菠萝香柠红茶', '大桔果粒茶', '大桔撞奶', '甜醅子奶绿', '龙井冰椰', '春日龙井', '大橘果粒茶', '大橘撞奶', '大橘奶盖', '港式杨枝甘露(芋圆版)', '葡萄酸奶', '杨梅香柠茶', '龙井拿铁', '龙井轻乳茶'
+      ]),
+      ...mixuePageItems(5, [
+        '青团椰椰', '真橙美式', '真橙拿铁', '雪王雪顶咖啡(蜜瓜味)', '香蕉拿铁', '香蕉酸奶', '香蕉撞奶', '沙棘百香果', '香柠乌龙茶', '金桔香柠霸气桶', '黑糖拿铁', '黑糖珍珠奶茶', '雪王雪顶咖啡(升级版)', '芋圆葡萄', '桑葚莓莓', '三拼霸霸奶茶', '双拼奶茶', '布丁奶茶', '杨枝甘露'
+      ]),
+      ...mixuePageItems(6, [
+        '雪王雪顶咖啡', '茉莉拿铁咖啡', '拿铁咖啡', '美式咖啡', '春日龙井茶', '白桃摇摇咖', '芋泥好暖椰', '厚芋泥奶茶', '红豆奶布丁', '雪王雪顶杨梅', '菠萝百香果(新)', '芒果啵啵', '芋圆奶绿', '蜜雪原叶红茶', '芝士奶盖红茶'
+      ]),
+      ...mixuePageItems(7, [
+        '柠檬红茶霸气桶', '糯香香柠茶', '香柠红茶', '苹果桃桃', '柚子轻乳茶', '爆汁柠柚咖', '柚子香柠茶', '生椰拿铁', '港式杨枝甘露', '葡萄冰美式', '四季春轻乳茶', '桑葚摇摇奶昔(升级版)', '香芋摇摇奶昔'
+      ]),
+      ...mixuePageItems(8, [
+        '草莓摇摇奶昔', '芝士奶盖葡萄', '芝士奶盖四季春', '原味奶茶', '富桂糯糯茶', '红豆奶茶', '菠萝甜心橙', '蓝莓果粒茶', '菠萝百香果', '桃喜芒芒', '草莓啵啵', '香柠百香果', '杨梅啵啵', '苹果冰美式', '苹果奶绿'
+      ]),
+      ...mixuePageItems(9, [
+        '柠檬奶咖啡', '芝士奶盖绿茶', '蜜桃甘露', '芋圆奶茶', '柠檬绿茶', '高山四季春茶', '香柠绿茶', '椰果奶茶', '茉莉奶绿', '茉莉绿茶'
+      ])
+    ]
   },
   {
     id: 'brand-heytea', name: '喜茶', aliases: ['HEYTEA', '喜茶'], category: '新茶饮',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/zh-tw/brands/xi-cha/menu/available?page=1',
-    products: ['多肉葡萄', '芝芝莓莓', '烤黑糖波波牛乳', '酷黑莓桑', '满杯红柚', '芒芒甘露', '青柠生乳希腊酸奶手炒冰', '芋泥波波牛乳2018', '芋泥波波牛乳茶2018', '热芋泥波波牛乳2018', '热芋泥波波牛乳茶2018', '爆芋泥生椰手炒冰', '雪毫茉王芭乐', '喜柿多多喜拉朵', '超多肉椰椰芒芒']
+    products: [
+      '多肉葡萄', '芝芝莓莓', '烤黑糖波波牛乳', '酷黑莓桑', '满杯红柚', '芒芒甘露', '青柠生乳希腊酸奶手炒冰', '芋泥波波牛乳2018', '芋泥波波牛乳茶2018', '热芋泥波波牛乳2018', '热芋泥波波牛乳茶2018', '爆芋泥生椰手炒冰', '雪毫茉王芭乐', '喜柿多多喜拉朵', '超多肉椰椰芒芒',
+      ...heyteaPageItems(2, [
+        '雪毫桂花龙眼', '椰山龙眼冰', '椰椰龙眼手炒冰', '橙打·白露栀子', '金菠萝手炒冰', '羽衣纤体瓶PLUS', '去火*纤体瓶PLUS', '薄荷柠打·茉王', '微醺黄皮葡', '茉王网纹瓜', '奇香黄皮桃'
+      ]),
+      ...heyteaPageItems(3, [
+        '多肉黄皮葡', '金韵苹果人参果', '西多士波波港奶', '苦巧·苦橙'
+      ]),
+      ...heyteaPageItems(4, [
+        '芭乐莓手炒冰', '芒芒甘露手炒冰', '多肉葡萄手炒冰', '三倍厚抹手炒冰'
+      ]),
+      ...heyteaPageItems(5, [
+        '岩兰·崇明米酿', '岩兰 7', '岩兰 2'
+      ]),
+      ...heyteaPageItems(6, [
+        '岩兰 3', '柠打·九窨茉王', '酸特调·茉王', '烤焦糖苹果', '柠打·梅里香', '山青柚子苹果', '九窨茉王黄皮', '茉王芭乐雪花梨', '茉王草莓云朵', '苦巧·现磨榛子', '苦抹·现打抹茶', '苦抹·白露栀子', '山青乌龙·轻乳', '九窨茉王·轻乳', '碎银子·轻乳', '白露栀子·轻乳', '工夫红茶·云朵茶拿铁', '碎银子·云朵茶拿铁'
+      ]),
+      ...heyteaPageItems(7, [
+        '纯山青乌龙', '纯白露栀子', '纯九窨茉王', '热苦巧·现磨榛子', '热工夫红茶·云朵茶拿铁', '热碎银子·云朵茶拿铁', '热山青乌龙·轻乳', '热九窨茉王·轻乳', '热苦抹·现打抹茶', '轻酵黄皮康普茶', '雪域·糌粑酥油茶', '热雪域·糌粑酥油茶', '多肉桃李', '爆汁杨梅', '轻芝杨梅', '江边里·芝芝柑普', '杨桃三重甘', '南姜甘草芭乐瓶', '奇兰芭乐莲雾'
+      ]),
+      ...heyteaPageItems(8, [
+        '奇兰粉芭乐', '樱花芭乐白桃', '樱花青乳茶', '咸酪龙井', '金韵酸木瓜枇杷', '烤木薯双拼牛乳茶', '烤木薯双拼水牛乳', '龙井糯糯', '荞麦龙井牛乳茶', '苦巧·咸酪（不含茶）', '奇兰苹果杏（无柠檬叶版）', '热苦巧·咸酪（不含茶）', '空气马斯卡彭·英红', '苦巧·咸酪碎银子', '热苦巧·咸酪碎银子', '英红牛乳茶', '奇兰苹果杏特调', '英红糯糯', '奇兰红颜莓莓', '提拉米苏·浓巧'
+      ]),
+      ...heyteaPageItems(9, [
+        '热提拉米苏·浓巧', '提拉米苏·英红', '热提拉米苏·英红', '咸酪碎银子', '热咸酪碎银子', '雪毫茉王牛乳茶', '茶坊苦抹·浓', '茶坊苦抹·清', '碎银子牛乳茶', '碎银子黑糖波波', '热碎银子牛乳茶', '热碎银子黑糖波波', '奇兰苹果杏', '热嫣红牛乳茶', '热碎银子糯糯', '碎银子糯糯', '热小奶茉', '热芝芝抹茶', '热咸酪厚抹'
+      ]),
+      ...heyteaPageItems(10, [
+        '热三倍厚抹', '热烤黑糖波波牛乳', '热烤黑糖波波牛乳茶', '热雪域·牦牛乳恰安莫', '嫣红牛乳茶'
+      ]),
+      ...heyteaPageItems(11, [
+        '烤黑糖波波牛乳茶', '清爽芭乐提（红芭乐）', '三倍厚抹', '羽衣纤体瓶', '去火*纤体瓶', '雪域·牦牛乳恰安莫'
+      ])
+    ]
   },
   {
     id: 'brand-nayuki', name: '奈雪的茶', aliases: ['奈雪', 'NAIXUE'], category: '新茶饮',
@@ -39,7 +120,7 @@ const catalogSources = [
   },
   {
     id: 'brand-luckin', name: '瑞幸咖啡', aliases: ['瑞幸', 'Luckin', 'Luckin Coffee'], category: '咖啡',
-    sourceType: 'official_brand', sourceName: '瑞幸咖啡官网产品页',
+    sourceType: 'official_brand', sourceName: '瑞幸官网产品页官方样本；分页菜单候选见单品来源',
     sourceUrl: 'https://www.lkcoffee.com/products',
     products: ['生椰拿铁', '茉莉花香拿铁', '拿铁', '冰吸生椰拿铁', '小黄油拿铁', '生椰三重奏拿铁', '轻椰茉莉拿铁', '丝绒拿铁', '钱塘龙井拿铁', '海盐焦糖拿铁', '绿沙沙拿铁', '桂花米酿拿铁']
   },
@@ -47,7 +128,27 @@ const catalogSources = [
     id: 'brand-guming', name: '古茗', aliases: ['古茗奶茶', 'Guming'], category: '新茶饮',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/gu-ming/menu/available?page=1',
-    products: ['芝士乌龙', '珍珠奶茶', '大叔奶茶', '茉莉奶绿', '杨枝甘露轻盈版', '金桂酒酿拿铁', '云雾栀子', '大柚糯米酸奶', '大柚冰奶', 'HPP·奇兰乌龙', 'HPP·茉莉银针', '三重抹茶慕斯', '红颜石榴汁', '满杯红玉石榴', '红玉石榴葡萄', '苹果油柑美式', '苹果杨桃油柑', '苹果大红袍', '盐奶油美式', '超大杯冰美式', '泰橘美式', '马上有米拿铁', '甜心芭乐葡']
+    products: [
+      '芝士乌龙', '珍珠奶茶', '大叔奶茶', '茉莉奶绿', '杨枝甘露轻盈版', '金桂酒酿拿铁', '云雾栀子', '大柚糯米酸奶', '大柚冰奶', 'HPP·奇兰乌龙', 'HPP·茉莉银针', '三重抹茶慕斯', '红颜石榴汁', '满杯红玉石榴', '红玉石榴葡萄', '苹果油柑美式', '苹果杨桃油柑', '苹果大红袍', '盐奶油美式', '超大杯冰美式', '泰橘美式', '马上有米拿铁', '甜心芭乐葡',
+      ...gumingPageItems(1, [
+        '超A芝士葡萄', '大柚作为拿铁', '荔枝冰椰（瓶装）', '直火乌龙Pro'
+      ]),
+      ...gumingPageItems(2, [
+        '咸奶油大红袍', '胡萝卜果蔬', '咸奶油美式', '泰橘糯米酸奶', '泰橘冰茶', '全冰有米美式', '咸乳酪泰有米', '芭乐冰奶', '苦尽柑来拿铁', '桃桃糯米酸奶', '鲜叶糯米酸奶', '7重果蔬汁', '桃桃冰冰李', '李子冰茶', '青橘芦荟冰冰茶'
+      ]),
+      ...gumingPageItems(3, [
+        '香椰泰茶', '咸乳酪泰奶', '桃桃乌龙冰', '超A芝士桃桃', '香草籽雪芙拿铁', '冰摇大瓜椰', '西瓜椰椰', '西瓜冰椰', '古茗·泡鲁达', '生椰芒芒白雪', '荔枝冰椰拿铁', '荔枝冰奶', '荔枝冰椰', '一抹茉莉椰', '椰椰冰淇淋拿铁', '冰咖小黄柠', '100%鲜榨西瓜汁', '维A*果蔬鲜橙', '青山*果蔬爆柠', '四季青山'
+      ]),
+      ...gumingPageItems(4, [
+        '抹茶四季春', '四季沁春', '超A多肉葡萄', '冰咖小苹果', '小苹果拿铁', '苹果金凤梨', '香草籽维也纳', '树番茄鲜果杯', '树番茄维C*果蔬瓶', '加浓美式', '泰橘汁·100%HPP', '马斯卡彭芝士拿铁', '西子龙井春', '一抹龙井春', '龙井香青团', '黑桑凤梨', '黑桑莓莓', '花开向阳拿铁', '初春山茶', '春橙山茶'
+      ]),
+      ...gumingPageItems(5, [
+        '芝士莓莓', '苦尽柑来拿铁', '大橘美式', '爆汁鲜果杯', '手剥粒粒大橘', '芝士多重莓果', '满杯多重莓果', '羽衣甘蓝果蔬汁', '100%苹果汁', '莓莓麻薯', '提拉米苏拿铁', '芋泥麻薯炖奶', '桃胶木薯炖奶', '生椰芋泥芒芒', '芋泥牛乳小丸子', '卡美罗焦糖拿铁', '黑糖珍珠牛乳', '曲香茉莉', '鲜活柠檬水', '布丁西米露'
+      ]),
+      ...gumingPageItems(6, [
+        '布蕾脆脆奶芙', '古茗奶茶', '双重芝士抹茶', '百香双重奏', '青橘柠檬水', '轻体*果蔬瓶', '十里江南桂', '云岭茉莉', '早安鲜牛奶', '美式咖啡', '柠C美式', '鲜奶拿铁', '桂花拿铁', '生椰拿铁', '生椰抹茶麻薯', '云深幽兰', '桂花酒酿小丸子'
+      ])
+    ]
   },
   {
     id: 'brand-chabaidao', name: '茶百道', aliases: ['茶百道奶茶', 'ChaPanda'], category: '新茶饮',
@@ -237,6 +338,10 @@ const catalogSources = [
   }
 ];
 
+catalogSources.find((brand) => brand.id === 'brand-starbucks').products.push(...publicMenuCandidates.starbucks);
+catalogSources.find((brand) => brand.id === 'brand-manner').products.push(...publicMenuCandidates.manner);
+catalogSources.find((brand) => brand.id === 'brand-luckin').products.push(...publicMenuCandidates.luckin);
+
 const brands = catalogSources.map((item) => ({
   id: item.id,
   name: item.name,
@@ -262,7 +367,7 @@ const drinks = catalogSources.flatMap((brand) => Array.from(new Map(brand.produc
     brandId: brand.id,
     brandName: brand.name,
     name: product.name,
-    aliases: [],
+    aliases: product.aliases || [],
     category: brand.category,
     active: true,
     source,

@@ -121,7 +121,7 @@ Page({
         const nutrition = Domain.nutritionForRecord(record, Domain.findDrink(drinks, record.drinkId), cupSizes);
         const servingLabel = Domain.formatServingLabel(record) || '未选择';
         const locationLabel = isCoordinateLabel(record.location) ? '' : (record.location || '');
-        return { ...common, kind: 'drink', nutritionLabel: nutrition.label, servingLabel,
+        return { ...common, kind: 'drink', nutritionAmountsLabel: Domain.formatNutritionAmounts(nutrition), servingLabel,
           cupLabel: Domain.formatCupLabel(record), locationLabel };
       }
       return { ...common, kind: 'other', displayName: record.title || record.name || typeLabel,

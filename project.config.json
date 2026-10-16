@@ -3,7 +3,7 @@
   "miniprogramRoot": "./",
   "compileType": "miniprogram",
   "libVersion": "3.4.0",
-  "appid": "wx4ca522e08e96ed30",
+  "appid": "wx35e876aa29e15664",
   "projectname": "daily-drink-log",
   "setting": {
     "urlCheck": false,
@@ -22,7 +22,7 @@
     "localPlugins": false,
     "disableUseStrict": false,
     "useCompilerPlugins": false,
-    "condition": false,
+    "condition": true,
     "swc": false,
     "disableSWC": true,
     "babelSetting": {
@@ -31,10 +31,34 @@
       "outputPath": ""
     }
   },
-  "simulatorPluginLibVersion": {},
+  "simulatorPluginLibVersion": {
+    "wxext14566970e7e9f62": "2.27.3"
+  },
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "file",
+        "value": "assets/mini-program-avatar.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/mini-program-avatar-v2.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/mini-program-intro-cover.png"
+      },
+      {
+        "type": "folder",
+        "value": "scripts"
+      },
+      {
+        "type": "folder",
+        "value": "tests"
+      }
+    ],
     "include": []
   },
-  "editorSetting": {}
+  "editorSetting": {},
+  "projectArchitecture": "multiPlatform"
 }

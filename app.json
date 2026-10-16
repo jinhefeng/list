@@ -20,7 +20,8 @@
       "desc": "用于选择饮品或用餐记录地点。"
     }
   },
-  "requiredPrivateInfos": ["getLocation", "chooseLocation"],
+  "requiredPrivateInfos": ["chooseLocation"],
   "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
   "sitemapLocation": "sitemap.json"
 }

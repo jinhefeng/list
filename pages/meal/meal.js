@@ -74,14 +74,13 @@ Page({
     editing: false, fromDetail: false, recordId: '', ...currentDateTime(), storeName: '', locationAddress: '',
     locationLatitude: '', locationLongitude: '', dishes: [], notes: '', dragIndex: -1,
     timeHint: '默认使用打开记录页时的时间；可手动调整',
-    locationHint: '请在地图中搜索并确认用餐地址'
+    locationHint: '可搜索并确认地图地址'
   },
   onLoad(query) {
     this.setData({ fromDetail: query.fromDetail === '1' });
     if (query.id) this.loadRecord(query.id);
     else {
       this.setData(currentDateTime());
-      this.requestCurrentLocation();
     }
   },
   loadRecord(id) {
@@ -105,16 +104,6 @@ Page({
     if (mealEditSnapshot(this.data) === this.editSnapshot) return leave();
     wx.showModal({ title: '放弃修改？', content: '尚未保存的内容会丢失。', confirmText: '放弃修改', confirmColor: '#9b5148',
       success: (result) => { if (result.confirm) leave(); } });
-  },
-  requestCurrentLocation() {
-    if (!wx.getLocation) return;
-    try {
-      wx.getLocation({ type: 'gcj02', success: (result) => {
-        this.currentMapCenter = { latitude: result.latitude, longitude: result.longitude };
-      } });
-    } catch (error) {
-      // Map search remains available without an initial center.
-    }
   },
   choosePlace() {
     if (!wx.chooseLocation) {

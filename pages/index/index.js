@@ -50,7 +50,8 @@ Page({
         const locationLabel = isCoordinateLabel(record.location)
           ? (record.locationAddress || '')
           : (record.location || record.locationAddress || '');
-        return { ...record, kind: 'drink', timeLabel, cupLabel: Domain.formatCupLabel(record), servingLabel, nutritionLabel: nutrition.label, locationLabel };
+        return { ...record, kind: 'drink', timeLabel, cupLabel: Domain.formatCupLabel(record), servingLabel,
+          nutritionLabel: Domain.formatNutritionAmounts(nutrition), locationLabel };
       }
       return { ...record, kind: 'other', timeLabel,
         displayName: record.title || record.name || record.displayName || record.typeLabel || record.type || '记录',
