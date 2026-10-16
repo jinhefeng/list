@@ -49,6 +49,34 @@
         "value": "assets/mini-program-intro-cover.png"
       },
       {
+        "type": "file",
+        "value": "assets/mini-program-avatar-luxury-blue-v2.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/mini-program-avatar-luxury-blue.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/mini-program-avatar-luxury-red-v2.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/mini-program-avatar-luxury-red.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/mini-program-avatar-starbucks-style.png"
+      },
+      {
+        "type": "file",
+        "value": ".DS_Store"
+      },
+      {
+        "type": "file",
+        "value": "assets/.DS_Store"
+      },
+      {
         "type": "folder",
         "value": "scripts"
       },
