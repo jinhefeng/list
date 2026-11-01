@@ -1,5 +1,6 @@
 const Domain = require('../../utils/domain');
 const Store = require('../../utils/store');
+const PhotoStorage = require('../../utils/photo-storage');
 
 function today() {
   const d = new Date();
@@ -23,19 +24,6 @@ const COMMON_CUP_TYPES = ['小杯', '中杯', '大杯', '超大杯'];
 const COMMON_SWEETNESS = ['不另外加糖', '三分糖', '五分糖', '七分糖', '全糖'];
 const COMMON_SERVING_OPTIONS = ['正常冰', '少冰', '多冰', '去冰', '常温', '热饮'];
 const PHOTO_THUMBNAIL_SIZE = 360;
-
-function saveLocalFile(tempFilePath) {
-  return new Promise((resolve) => {
-    try {
-      const fileSystemManager = wx.getFileSystemManager();
-      if (!fileSystemManager || !fileSystemManager.saveFile) return resolve('');
-      fileSystemManager.saveFile({ tempFilePath,
-        success: (result) => resolve(result.savedFilePath || ''), fail: () => resolve('') });
-    } catch (error) {
-      resolve('');
-    }
-  });
-}
 
 function createPhotoThumbnail(page, filePath) {
   return new Promise((resolve) => {
@@ -465,8 +453,12 @@ Page({
       this.photoBusy = true;
       this.setData({ photoPending: true });
       const previousThumbnail = this.thumbnailQueue || Promise.resolve('');
-      const photoWork = readPhotoExif(tempFilePath).then((metadata) => {
+      let selection;
+      let stage = '读取照片信息';
+      const photoWork = Promise.all([readPhotoExif(tempFilePath), PhotoStorage.inspectSelection(tempFile, '饮品照片')]).then(([metadata, selected]) => {
         if (this.photoToken !== photoToken) return null;
+        selection = selected;
+        PhotoStorage.rememberSelection(selection);
         const updates = {};
         if (metadata.timestamp && !this.timeEdited) Object.assign(updates, metadata.timestamp);
         if (metadata.locationCoordinates && !this.locationEdited) {
@@ -476,30 +468,38 @@ Page({
         }
         if (metadata.timestamp && !this.timeEdited) updates.timeHint = '已优先读取照片拍摄时间；可自行修改';
         if (Object.keys(updates).length) this.setData(updates);
-        return saveLocalFile(tempFilePath);
+        stage = '保存原图';
+        return PhotoStorage.saveLocalFile(tempFilePath);
       }).then((photo) => {
         if (this.photoToken !== photoToken) return null;
         if (!photo) throw new Error('photo-save-failed');
+        stage = '生成缩略图';
         const thumbnailWork = previousThumbnail.then(() => createPhotoThumbnail(this, photo));
         this.thumbnailQueue = thumbnailWork.then(() => '', () => '');
-        return thumbnailWork.then((path) => path ? saveLocalFile(path) : '')
+        return thumbnailWork.then((path) => path ? PhotoStorage.saveLocalFile(path).catch((error) => {
+          if (this.photoToken === photoToken) PhotoStorage.reportFailure(error, { stage: '保存缩略图', selection, originalSaved: true });
+          return '';
+        }) : '')
           .then((thumbnail) => ({ photo, photoThumbnail: thumbnail || photo }));
       }).then((result) => {
         if (this.photoToken !== photoToken || !result) return result;
         this.photoBusy = false;
         this.setData({ ...result, photoPending: false });
         return result;
-      }).catch(() => {
+      }).catch((error) => {
         if (this.photoToken === photoToken) {
           this.photoBusy = false;
           this.setData({ photoPending: false });
-          wx.showToast({ title: '照片保存失败，请重试', icon: 'none' });
+          PhotoStorage.reportFailure(error, { stage, selection });
         }
         return null;
       });
       this.photoWork = photoWork;
+    }, fail: (error) => {
+      if (!String(error.errMsg || '').includes('cancel')) PhotoStorage.reportFailure(error, { stage: '选择饮品照片' });
     } });
   },
+  openStorage() { PhotoStorage.openStorage(); },
   removePhoto() {
     this.photoToken = `${Date.now()}-removed`;
     this.photoBusy = false;

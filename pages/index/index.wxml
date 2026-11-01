@@ -30,4 +30,5 @@
   </view>
   <view wx:else class="empty-card"><text class="empty-icon">◌</text><text class="empty-title">今天还没有记录</text><text class="empty-copy">记下一杯饮品，或留住一顿饭。</text></view>
   <view class="add-actions"><button class="primary-button" bindtap="addDrink">＋ 记录饮品</button><button class="secondary-button" bindtap="addMeal">＋ 记录吃饭</button></view>
+  <navigator class="storage-entry" url="/pages/storage/storage">本地存储 ›</navigator>
 </view>

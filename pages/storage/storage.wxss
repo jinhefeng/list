@@ -1,0 +1,9 @@
+.storage-page { padding-bottom: 64rpx; }
+.helper,.status-text { display: block; margin-top: 14rpx; color: #858b80; font-size: 23rpx; line-height: 1.6; }
+.error-text { display: block; margin-top: 14rpx; color: #9b5148; font-size: 24rpx; line-height: 1.65; word-break: break-all; }
+.raw-error { display: block; margin-top: 16rpx; padding: 18rpx; border-radius: 14rpx; color: #65554e; background: #f9f4f1; font-size: 23rpx; line-height: 1.65; word-break: break-all; white-space: pre-wrap; }
+.metric { align-items: flex-start; gap: 20rpx; font-size: 25rpx; line-height: 1.6; }
+.metric text:last-child { text-align: right; }
+.refresh-button { margin-top: 30rpx; }
+.copy-button { margin-top: 16rpx; }
+.updated-at { display: block; margin-top: 18rpx; color: #858b80; font-size: 21rpx; text-align: center; }

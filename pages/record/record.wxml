@@ -8,6 +8,8 @@
     <text wx:if="{{photo}}" class="remove-photo" catchtap="removePhoto">移除照片</text>
   </view>
 
+  <view class="storage-entry" bindtap="openStorage">本地存储 · 查看照片占用与错误 ›</view>
+
   <view class="card">
     <text class="section-title">喝的是什么</text>
     <view wx:if="{{!custom}}">

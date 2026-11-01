@@ -26,6 +26,7 @@
     </view>
     <view class="add-dish" bindtap="addDish"><text class="add-dish-plus">＋</text><text>添加一道菜</text></view>
     <text class="field-hint">每道菜可以单独添加照片；按住右侧拖动柄可调整顺序。</text>
+    <view class="storage-entry" bindtap="openStorage">本地存储 · 查看照片占用与错误 ›</view>
   </view>
 
   <view class="card"><view class="field"><text class="field-label">备注 · 可选</text><textarea class="input notes-input" placeholder="记录口味、同行的人或当时的心情" data-field="notes" value="{{notes}}" bindinput="updateField" /></view></view>

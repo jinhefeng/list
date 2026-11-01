@@ -1,5 +1,6 @@
 const Domain = require('../../utils/domain');
 const Store = require('../../utils/store');
+const PhotoStorage = require('../../utils/photo-storage');
 
 function currentDateTime() {
   const d = new Date();
@@ -7,19 +8,6 @@ function currentDateTime() {
     date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
     time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   };
-}
-
-function saveLocalFile(tempFilePath) {
-  return new Promise((resolve) => {
-    try {
-      const fileSystemManager = wx.getFileSystemManager();
-      if (!fileSystemManager || !fileSystemManager.saveFile) return resolve('');
-      fileSystemManager.saveFile({ tempFilePath,
-        success: (result) => resolve(result.savedFilePath || ''), fail: () => resolve('') });
-    } catch (error) {
-      resolve('');
-    }
-  });
 }
 
 function createThumbnail(page, filePath) {
@@ -187,25 +175,41 @@ Page({
       if (!this.photoTokens) this.photoTokens = {};
       this.photoTokens[id] = token;
       this.setData({ dishes: this.data.dishes.map((dish) => dish.id === id ? { ...dish, photoPending: true } : dish) });
-      const work = saveLocalFile(tempFile.tempFilePath).then((photo) => {
+      let selection;
+      let stage = '读取照片信息';
+      const work = PhotoStorage.inspectSelection(tempFile, '菜品照片').then((selected) => {
+        if (this.photoTokens[id] !== token) return null;
+        selection = selected;
+        PhotoStorage.rememberSelection(selection);
+        stage = '保存原图';
+        return PhotoStorage.saveLocalFile(tempFile.tempFilePath);
+      }).then((photo) => {
+        if (this.photoTokens[id] !== token) return null;
         if (!photo) throw new Error('photo-save-failed');
+        stage = '生成缩略图';
         const previous = this.thumbnailQueue || Promise.resolve('');
         const thumbnailWork = previous.then(() => createThumbnail(this, photo));
         this.thumbnailQueue = thumbnailWork.then(() => '', () => '');
-        return thumbnailWork.then((path) => path ? saveLocalFile(path) : '').then((thumbnail) => ({ photo, photoThumbnail: thumbnail || photo }));
+        return thumbnailWork.then((path) => path ? PhotoStorage.saveLocalFile(path).catch((error) => {
+          if (this.photoTokens[id] === token) PhotoStorage.reportFailure(error, { stage: '保存缩略图', selection, originalSaved: true });
+          return '';
+        }) : '').then((thumbnail) => ({ photo, photoThumbnail: thumbnail || photo }));
       }).then((savedPhoto) => {
-        if (this.photoTokens[id] !== token) return;
+        if (this.photoTokens[id] !== token || !savedPhoto) return;
         this.setData({ dishes: this.data.dishes.map((dish) => dish.id === id
           ? { ...dish, ...savedPhoto, photoPending: false } : dish) });
-      }).catch(() => {
+      }).catch((error) => {
         if (this.photoTokens[id] !== token) return;
         this.setData({ dishes: this.data.dishes.map((dish) => dish.id === id ? { ...dish, photoPending: false } : dish) });
-        wx.showToast({ title: '照片保存失败，请重试', icon: 'none' });
+        PhotoStorage.reportFailure(error, { stage, selection });
       });
       if (!this.photoWorks) this.photoWorks = [];
       this.photoWorks.push(work);
+    }, fail: (error) => {
+      if (!String(error.errMsg || '').includes('cancel')) PhotoStorage.reportFailure(error, { stage: '选择菜品照片' });
     } });
   },
+  openStorage() { PhotoStorage.openStorage(); },
   removeDishPhoto(event) {
     const id = event.currentTarget.dataset.id;
     if (this.photoTokens) this.photoTokens[id] = `${Date.now()}-removed`;

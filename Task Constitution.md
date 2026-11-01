@@ -46,8 +46,9 @@ Build a local drink-and-meal logging mini program with a searchable, maintainabl
 - Status: 进行中
 - Objective: Add meal records while keeping drink entry separate and sharing one chronological history.
 - Output: A meal entry page, map-confirmed addresses, drag-reorderable multi-dish records, mixed timeline rendering, and drink-only nutrition summaries.
-- Acceptance: Users can save and edit a meal with a map-confirmed address, store name, time, and named dishes with individual photos; record cards show their map location last when available; one drink-style meal card shows every dish name, a fully visible first photo, clearly offset later photos exposed on the right, and a “共 X 张” badge; opening a meal photo shows all photos in that record with swipe navigation and tappable bottom thumbnails; meal and drink records sort together by time; the History page shows each date once for consecutive same-day records and supports multi-select record-type filters discovered from stored records, including unknown future type keys; new types are included by default and legacy records without a type remain drinks; nutrition counts remain drink-only; create-entry buttons appear on Today, not History or Intake; Today shows only the All Records link plus a small catalog icon, with no Intake link or fixed bottom navigation.
+- Acceptance: Users can save and edit a meal with a map-confirmed address, store name, time, and named dishes with individual photos; record cards show their map location last when available; one drink-style meal card shows every dish name, a fully visible first photo, clearly offset later photos exposed on the right, and a “共 X 张” badge; opening a meal photo shows all photos in that record with swipe navigation and tappable bottom thumbnails; meal and drink records sort together by time; the History page shows each date once for consecutive same-day records and supports multi-select record-type filters discovered from stored records, including unknown future type keys; new types are included by default and legacy records without a type remain drinks; nutrition counts remain drink-only; create-entry buttons appear on Today, not History or Intake; Today links to All Records, catalog and local-storage diagnostics, with no Intake link or fixed bottom navigation.
 - Depends on: Existing local record storage, native map selection, and local photo persistence.
+- Diagnostics: 17 tests + 18 quota-model checks; device pending. See docs/photo-storage-whitebox.md.
 - Next action: Check date grouping, content scrolling, and navigation through Today links and native back; review the photo stack and viewer in WeChat Developer Tools, then verify map selection and dish ordering on device.
 
 ## 4. Current Focus
@@ -87,6 +88,7 @@ Build a local drink-and-meal logging mini program with a searchable, maintainabl
 ## 7. Change History
 | Date | Change | Reason | Affected tasks |
 |---|---|---|---|
+| 2026-10-26 | Added read-only photo/cache diagnostics and exact photo errors. | User approved diagnosis; device check pending. | T5 |
 | 2026-10-14 | Created initial task tree for the catalog expansion and update work. | User approved the catalog foundation and three-city verification approach. | T1–T3 |
 | 2026-10-15 | Corrected platform source references and recorded the Taobao Flash Sale page-access blocker. | User clarified that current research must use Taobao Flash Sale. | T2 |
 | 2026-10-15 | Added 15 brands and public menu reference products with source links; all stay pending. | User requested public online menu research after direct Taobao access was unavailable. | T2 |
@@ -131,3 +133,4 @@ Build a local drink-and-meal logging mini program with a searchable, maintainabl
 ## 10. Technical Debt Queue
 | ID | Discovered in | Debt | Why deferred | Trigger / target round | Priority | Status |
 |---|---|---|---|---|---|---|
+| D-001 | T5 | 6 pre-existing test failures; see tests/mvp.test.md. | Outside photo diagnostics. | Test maintenance | P2 | queued |
