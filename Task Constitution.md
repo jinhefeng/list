@@ -1,7 +1,7 @@
 # Task Constitution
 
 ## 1. Mission
-Build a local drink-and-meal logging mini program with a searchable, maintainable beverage catalog, starting with popular drinks in Hangzhou, Changzhou, and Shanghai, with clear source and verification status.
+Build the meal-logging product, with the current release direction as the native iOS app “干饭手册”: local-first drink and meal records, user-selected iCloud Drive backup, and no historical-data migration.
 
 ## 2. Success Criteria
 - [ ] Menu data has a stable structure for brands, drinks, city/store availability, options, nutrition variants, sources, and verification dates.
@@ -13,8 +13,43 @@ Build a local drink-and-meal logging mini program with a searchable, maintainabl
 - [ ] Drink and meal records have separate entry points and appear together in one time-ordered history.
 - [ ] Meal records save an address, store name, automatic time, and multiple named dishes with individual photos.
 - [ ] Drink nutrition summaries exclude meal records; existing local drink records remain readable.
+- [ ] The iOS app starts with an empty local library, saves records and photos on-device, and can back up to and restore from a user-selected iCloud Drive folder.
+- [ ] The iOS app reproduces the Mini Program's nine page and data behaviors, applies the approved Logo and visual language, and keeps the first release single-user while retaining stable-ID/versioned-data seams for a future shared list.
 
 ## 3. Task Tree
+### T6 — Native iOS app「干饭手册」
+- Status: 进行中（品牌及九页部分代码已接入；全功能和页面/设备验收仍待完成）
+- Objective: Deliver a branded, local-first iPhone app reproducing all nine Mini Program pages and their data behavior, without importing Mini Program history; preserve the user's existing iOS records and keep a bounded extension path for future shared lists.
+- Acceptance: Nine pages/data contracts are mapped and accepted; offline records/photos, menu, history, nutrition insights, diagnostics, and backup/restore work; iOS data survives upgrades; no login/sharing in v1; stable IDs and versioned boundaries support future architecture work.
+- Details: `docs/ios-development-plan.md`; page/data map `docs/ios-miniprogram-parity-map.md`; core checks in `tests/mvp.test.md` sections G–I and full parity checks in section J.
+- Current result: Native SwiftUI target includes local-first drink/meal flows, selected-folder backup/restore, the approved Logo/AppIcon, all nine page shells, and the first drink-data parity increment. Temperature/ice fields are backward-decodable; nutrition variants and per-unit baselines preserve confidence and source URL. Catalog overrides and global cup settings are now included in versioned backup snapshots, with legacy-snapshot compatibility; drink and meal forms support MapKit selection and manual address fallback. Swift core automation passes 54/54, and unsigned iOS/device-SDK and simulator builds succeed. The latest iPhone 18 Pro simulator screenshot confirms one visible brand title, an in-content search field, and a compact drink-count/cup/nutrition summary. Full page interaction/visual parity, physical iPhone launch (previous attempt stopped at the untrusted Developer App certificate), and actual iCloud delivery remain unverified.
+- Next action: Continue page-by-page interaction and visual checks, then verify the selected-folder backup flow and empty-library restore on the physical iPhone after its developer certificate is trusted.
+
+#### T6.1 — 页面/数据基线与品牌视觉
+- Status: 进行中（九页映射、Logo/AppIcon 和共享品牌组件已接入；模拟器首页已做局部视觉检查，其余页面仍待对照）
+- Objective: Establish the nine-page parity baseline and shared iOS brand system.
+- Acceptance: Page map covers current iOS state, target behavior and data; IOS-3-01/02 are implemented and visually reviewed against the Mini Program.
+- Depends on: T6 approval
+- Evidence: `docs/ios-miniprogram-parity-map.md`; `tests/mvp.test.md` J-01/J-02.
+
+#### T6.2 — 数据契约与本机仓储边界
+- Status: 进行中（记录温度/冰量、营养计算和来源兼容、菜单/杯型设置备份兼容已实现；本机仓储抽象和全量兼容验收仍待完成）
+- Objective: Complete the catalog/nutrition/local override contract and isolate local persistence behind a replaceable boundary, with versioned IDs and backup compatibility.
+- Acceptance: Domain tests cover catalog, nutrition provenance, custom overrides and stable record/photo IDs; existing iOS data stays readable; no account, membership or online sync is introduced.
+- Depends on: T6.1
+
+#### T6.3 — 九页功能与数据补齐
+- Status: 进行中（九页首轮代码已接入；饮品/用餐地图选择、手动地点回退和菜品排序代码已具备，页面交互与视觉验收仍待完成）
+- Objective: Complete Today, drink entry, catalog, meal entry, photo preview, storage diagnostics, history, record detail and nutrition insights.
+- Acceptance: IOS-3-02–15 pass their behavior and page gates; single-user navigation and filtering match the agreed scope.
+- Depends on: T6.1, T6.2
+
+#### T6.4 — 集成与设备验收
+- Status: 规划中
+- Objective: Verify visual parity, data preservation, offline behavior, selected-folder backup and empty-library restore on the target iPhone.
+- Acceptance: IOS-3-16/17 and relevant real-device checks pass; build, automation, UI runtime and cloud sync evidence remain distinct.
+- Depends on: T6.1–T6.3
+
 ### T1 — Catalog structure, maintenance, and update foundation
 - Status: 进行中
 - Objective: Define the catalog contract, in-app maintenance flow, batch import, and safe mini-program update path.
@@ -46,16 +81,16 @@ Build a local drink-and-meal logging mini program with a searchable, maintainabl
 - Status: 进行中
 - Objective: Add meal records while keeping drink entry separate and sharing one chronological history.
 - Output: A meal entry page, map-confirmed addresses, drag-reorderable multi-dish records, mixed timeline rendering, and drink-only nutrition summaries.
-- Acceptance: Users can save and edit a meal with a map-confirmed address, store name, time, and named dishes with individual photos; record cards show their map location last when available; one drink-style meal card shows every dish name, a fully visible first photo, clearly offset later photos exposed on the right, and a “共 X 张” badge; opening a meal photo shows all photos in that record with swipe navigation and tappable bottom thumbnails; meal and drink records sort together by time; the History page shows each date once for consecutive same-day records and supports multi-select record-type filters discovered from stored records, including unknown future type keys; new types are included by default and legacy records without a type remain drinks; nutrition counts remain drink-only; create-entry buttons appear on Today, not History or Intake; Today links to All Records, catalog and local-storage diagnostics, with no Intake link or fixed bottom navigation.
+- Acceptance: Users can save and edit a meal with a map-confirmed address, store name, time, and named dishes with individual photos; record cards show their map location last when available; one drink-style meal card shows every dish name, a fully visible first photo, clearly offset later photos exposed on the right, and a “共 X 张” badge; opening a meal photo shows all photos in that record with swipe navigation and tappable bottom thumbnails; meal and drink records sort together by time; the History page shows each date once for consecutive same-day records and supports multi-select record-type filters discovered from stored records, including unknown future type keys; new types are included by default and legacy records without a type remain drinks; nutrition counts remain drink-only; create-entry buttons appear on Today, not History or Intake; Today links to All Records, catalog and local-storage diagnostics; the native iOS app has four bottom tabs (Today, History, Insights, Menu), with local-storage diagnostics reachable from Menu and no Intake tab.
 - Depends on: Existing local record storage, native map selection, and local photo persistence.
 - Diagnostics: 17 tests + 18 quota-model checks; device pending. See docs/photo-storage-whitebox.md.
 - Next action: Check date grouping, content scrolling, and navigation through Today links and native back; review the photo stack and viewer in WeChat Developer Tools, then verify map selection and dish ordering on device.
 
 ## 4. Current Focus
-- Task: T2
-- Parent path: T2
-- Objective: Expand three-city drink candidates and separately reconcile current Taobao Flash Sale store menus.
-- Next action: Continue reviewing remaining pages of partially covered public-menu brands, beginning with brands whose page counts are already known; record exclusions and source-count drift. Then check sample delivery menus in Hangzhou Shangcheng, Changzhou Tianning, and Shanghai Huangpu, recording the store, item, source, and check date. All public-menu names remain pending for store availability.
+- Task: T6.3
+- Parent path: T6 → T6.3
+- Objective: Complete and verify the nine iOS page flows against the Mini Program's behavior and data contracts.
+- Next action: Continue simulator review of drink and meal forms, map selection/manual fallback, meal dish ordering, and navigation; keep each page gate TODO until its full behavior and visual criteria are checked.
 
 ## 5. Decision Log
 | Date | Decision | Rationale | Impact |
@@ -72,6 +107,7 @@ Build a local drink-and-meal logging mini program with a searchable, maintainabl
 | 2026-10-15 | Keep meal and drink creation buttons on Today; keep History and Intake focused on review. | The user asked to show drink locations on Today and remove create buttons from the other two tabs. | Drink and meal cards display map locations last when available; History and Intake have no add-entry buttons. |
 | 2026-10-15 | Match Today drink-card information order to History and place location last. | The user reported inconsistent field order and excessive bottom whitespace hiding page content. | The three pages use compact bottom-safe-area spacing; fixed navigation was later removed. |
 | 2026-10-15 | Remove the fixed bottom navigation and show a date only on the first record for each day. | The user asked to remove the bottom bar and reduce repeated dates in the History timeline. | Today links to All Records; catalog maintenance uses a header icon; secondary pages return through native back navigation. |
+| 2026-11-13 | Replace the earlier iOS no-tab layout with four bottom tabs: Today, History, Insights, and Menu. | The user provided a revised home-screen reference and asked to optimize the overall layout to match it. | This supersedes the 2026-10-15 iOS bottom-navigation decision; the Mini Program is unchanged. Storage diagnostics remains accessible from Menu. |
 | 2026-10-15 | Keep only the All Records link on Today and represent catalog maintenance with an icon. | The user asked to remove the Intake link and replace the catalog text entry with a simple icon. | The catalog page remains reachable from the header icon. |
 | 2026-10-15 | Build History record-type options dynamically from saved records; treat missing legacy types as drinks and auto-select newly observed types. | The user asked for type filtering that can grow with future record categories. | Known types have friendly labels; unknown types remain filterable by their stored key. |
 | 2026-10-15 | Added an in-app beverage list page for searching, adding, and editing brand, category, aliases, and per-unit nutrition. | The user needs drink data to be maintainable in the Mini Program so missing items and nutrition can be added. | Unit nutrition is a labeled fallback; edits are stored locally and preserved during configured catalog refresh. |
@@ -81,7 +117,7 @@ Build a local drink-and-meal logging mini program with a searchable, maintainabl
 | 2026-10-15 | Moved cup names and capacities to one shared setting, added a button to expose the full catalog in 30-item batches, and separated card actions into a stable bottom row. | The user wants global cup sizes, explicit full-list access, and a clearer catalog card. | Existing record sizes and snapshots remain intact; all new record and summary calculations read the global mapping. |
 
 ## 6. Knowledge Context
-- Constraints: Existing app changes are uncommitted; preserve them. No catalog backend or endpoint is configured. Records and photos stay on-device. Do not claim sample or pending menu items are verified.
+- Constraints: Preserve existing Mini Program changes. The iOS app starts empty, stores its working library on-device, and writes backup copies to a user-selected directory that may be in iCloud Drive; no historical migration is needed. Do not claim sample or pending menu items are verified.
 - Dependencies: A future HTTPS host must be added to WeChat's request domain allowlist before remote refresh works in production.
 - Relevant files: `data/catalog.js`, `utils/store.js`, `pages/record/record.js`, `README.md`.
 
@@ -89,6 +125,12 @@ Build a local drink-and-meal logging mini program with a searchable, maintainabl
 | Date | Change | Reason | Affected tasks |
 |---|---|---|---|
 | 2026-10-26 | Added read-only photo/cache diagnostics and exact photo errors. | User approved diagnosis; device check pending. | T5 |
+| 2026-11-13 | Started native iOS app “干饭手册” as a fresh local-first product with selected-folder iCloud Drive backups; no historical-data migration. | User approved the iOS direction and development plan. | T6 |
+| 2026-11-13 | Implemented the first local-record UI/core and advanced T6 to backup/restore; 21 Swift core tests pass and iOS/Simulator SDK builds succeed, with device runtime gates still pending. | Continued the approved implementation plan and kept automated evidence separate from device acceptance. | T6 |
+| 2026-11-13 | Implemented versioned file snapshots, original-photo verification, automatic/manual backup triggers, snapshot listing, and transactional restore to an empty SwiftData library; 38 Swift core tests pass and both SDK builds succeed. | Continued T6 through the backup/restore code package while preserving device gates for real iCloud behavior. | T6 |
+| 2026-11-13 | Expanded the approved iOS scope to all nine Mini Program pages and data behaviors, retained single-user v1, and recorded future shared-list constraints without enabling collaboration; added the parity map and IOS-3 acceptance cases. | User requested eventual full page/data reproduction, Logo use and future multi-person extensibility, then approved the iteration plan. | T6, T6.1–T6.4 |
+| 2026-11-13 | Added backward-compatible drink temperature/ice fields, legacy serving normalization, nutrition variant/per-unit calculation with provenance, and form/detail display; 51 core tests and the latest iOS SDK build pass. | Continued the approved nine-page iOS implementation and filled an identified drink-data gap. | T6.2, T6.3 |
+| 2026-11-13 | Added menu/cup settings to versioned backup restore, MapKit selection and manual address fallback to drink/meal forms, map display in details, and Home title/search/summary-card refinements; 54 core tests pass and the latest iPhone 18 Pro simulator screenshot was reviewed. | Continued the approved page-parity iteration while keeping physical-device, iCloud-delivery, and remaining page gates distinct. | T6.1–T6.3 |
 | 2026-10-14 | Created initial task tree for the catalog expansion and update work. | User approved the catalog foundation and three-city verification approach. | T1–T3 |
 | 2026-10-15 | Corrected platform source references and recorded the Taobao Flash Sale page-access blocker. | User clarified that current research must use Taobao Flash Sale. | T2 |
 | 2026-10-15 | Added 15 brands and public menu reference products with source links; all stay pending. | User requested public online menu research after direct Taobao access was unavailable. | T2 |
@@ -120,7 +162,7 @@ Build a local drink-and-meal logging mini program with a searchable, maintainabl
 
 ## 8. Detail Pointers
 - Format: v1 single-file
-- Active branch detail: none
+- iOS plan: docs/ios-development-plan.md
 - History: recent changes retained here
 
 ## 9. Current Round

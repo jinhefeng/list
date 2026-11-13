@@ -1,0 +1,106 @@
+import Foundation
+
+public enum MenuCatalogRepositoryError: Error, Equatable {
+    case invalidSavedState
+    case emptyBrandIdentifier
+    case emptyDrinkIdentifier
+    case emptyDrinkName
+    case duplicateIdentifier(String)
+    case invalidCupSize(String)
+}
+
+public struct MenuCatalogUserState: Codable, Equatable, Sendable {
+    public let brands: [MenuBrand]
+    public let drinks: [MenuDrink]
+    public let deletedDrinkIDs: Set<String>
+    public let globalCupSizes: [MenuCupSize]
+
+    public init(
+        brands: [MenuBrand] = [],
+        drinks: [MenuDrink] = [],
+        deletedDrinkIDs: Set<String> = [],
+        globalCupSizes: [MenuCupSize] = Self.defaultCupSizes
+    ) {
+        self.brands = brands
+        self.drinks = drinks
+        self.deletedDrinkIDs = deletedDrinkIDs
+        self.globalCupSizes = globalCupSizes
+    }
+
+    public static let defaultCupSizes = ["小杯", "中杯", "大杯", "超大杯"].map { MenuCupSize(cupType: $0) }
+
+    public func validate() throws {
+        try MenuCatalogRepository.validate(self)
+    }
+}
+
+/// Owns the local catalog overlay. A future shared-list repository can replace this boundary without changing menu consumers.
+public final class MenuCatalogRepository {
+    private static let stateKey = "ganfan-handbook.catalog-user-state.v1"
+    private let userDefaults: UserDefaults
+
+    public init(userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
+    }
+
+    public func loadUserState() throws -> MenuCatalogUserState {
+        guard let data = userDefaults.data(forKey: Self.stateKey) else {
+            return MenuCatalogUserState()
+        }
+        do {
+            return try JSONDecoder().decode(MenuCatalogUserState.self, from: data)
+        } catch {
+            throw MenuCatalogRepositoryError.invalidSavedState
+        }
+    }
+
+    public func saveUserState(_ state: MenuCatalogUserState) throws {
+        try Self.validate(state)
+        userDefaults.set(try JSONEncoder().encode(state), forKey: Self.stateKey)
+    }
+
+    public var savedStateByteCount: Int? {
+        userDefaults.data(forKey: Self.stateKey)?.count
+    }
+
+    public func catalog(from bundled: MenuCatalog) throws -> MenuCatalog {
+        let state = try loadUserState()
+        return bundled.merging(
+            localBrands: state.brands,
+            localDrinks: state.drinks,
+            deletedDrinkIDs: state.deletedDrinkIDs
+        )
+    }
+
+    public static func validate(_ state: MenuCatalogUserState) throws {
+        var brandIDs = Set<String>()
+        for brand in state.brands {
+            guard !brand.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw MenuCatalogRepositoryError.emptyBrandIdentifier
+            }
+            guard brandIDs.insert(brand.id).inserted else {
+                throw MenuCatalogRepositoryError.duplicateIdentifier(brand.id)
+            }
+        }
+
+        var drinkIDs = Set<String>()
+        for drink in state.drinks {
+            guard !drink.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw MenuCatalogRepositoryError.emptyDrinkIdentifier
+            }
+            guard !drink.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw MenuCatalogRepositoryError.emptyDrinkName
+            }
+            guard drinkIDs.insert(drink.id).inserted else {
+                throw MenuCatalogRepositoryError.duplicateIdentifier(drink.id)
+            }
+        }
+
+        for size in state.globalCupSizes {
+            let type = size.cupType.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !type.isEmpty, size.sizeML == nil || size.sizeML! > 0 else {
+                throw MenuCatalogRepositoryError.invalidCupSize(type)
+            }
+        }
+    }
+}

@@ -6,6 +6,7 @@
   "scripts": {
     "catalog:import": "node scripts/import-catalog.js",
     "catalog:coverage": "node scripts/catalog-coverage.js",
+    "catalog:export-ios": "node scripts/export-ios-catalog.js",
     "test": "node --test tests/*.test.js"
   }
 }

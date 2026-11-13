@@ -1,0 +1,7 @@
+# Local build output
+/.build/
+/DerivedData/
+
+# macOS and Xcode user-specific files
+.DS_Store
+**/xcuserdata/

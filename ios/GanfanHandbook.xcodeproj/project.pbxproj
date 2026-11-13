@@ -1,0 +1,340 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* GanfanHandbook/GanfanHandbookApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* GanfanHandbook/GanfanHandbookApp.swift */; };
+		A10000000000000000000002 /* GanfanHandbook/StageZeroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* GanfanHandbook/StageZeroView.swift */; };
+		A10000000000000000000003 /* Sources/GanfanCore/JournalModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* Sources/GanfanCore/JournalModels.swift */; };
+		A10000000000000000000004 /* Sources/GanfanCore/LocalFolderProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* Sources/GanfanCore/LocalFolderProbe.swift */; };
+		A10000000000000000000005 /* Sources/GanfanCore/LocalPhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* Sources/GanfanCore/LocalPhotoStore.swift */; };
+		A10000000000000000000006 /* Sources/GanfanCore/StoredJournalRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* Sources/GanfanCore/StoredJournalRecord.swift */; };
+		A10000000000000000000007 /* GanfanHandbook/JournalHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* GanfanHandbook/JournalHomeView.swift */; };
+		A10000000000000000000008 /* GanfanHandbook/RecordForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* GanfanHandbook/RecordForms.swift */; };
+		A10000000000000000000009 /* GanfanHandbook/Resources/catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* GanfanHandbook/Resources/catalog.json */; };
+		A10000000000000000000010 /* Sources/GanfanCore/MenuCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* Sources/GanfanCore/MenuCatalog.swift */; };
+		A10000000000000000000011 /* GanfanHandbook/MenuPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* GanfanHandbook/MenuPickerView.swift */; };
+		A10000000000000000000012 /* Sources/GanfanCore/BackupDirectoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* Sources/GanfanCore/BackupDirectoryStore.swift */; };
+		A10000000000000000000013 /* Sources/GanfanCore/JournalLibraryRestoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* Sources/GanfanCore/JournalLibraryRestoreService.swift */; };
+		A10000000000000000000014 /* Sources/GanfanCore/BackupChangeTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* Sources/GanfanCore/BackupChangeTracker.swift */; };
+		A10000000000000000000015 /* Sources/GanfanCore/JournalRecordCommitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* Sources/GanfanCore/JournalRecordCommitService.swift */; };
+		A10000000000000000000016 /* GanfanHandbook/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* GanfanHandbook/Assets.xcassets */; };
+		A10000000000000000000017 /* Sources/GanfanCore/MenuCatalogRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* Sources/GanfanCore/MenuCatalogRepository.swift */; };
+		A10000000000000000000018 /* GanfanHandbook/BrandSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* GanfanHandbook/BrandSystem.swift */; };
+		A10000000000000000000019 /* GanfanHandbook/CatalogManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* GanfanHandbook/CatalogManagementView.swift */; };
+		A10000000000000000000020 /* Sources/GanfanCore/DailyNutritionSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* Sources/GanfanCore/DailyNutritionSummary.swift */; };
+		A10000000000000000000021 /* Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift */; };
+		A10000000000000000000022 /* Sources/GanfanCore/DrinkNutritionCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* Sources/GanfanCore/DrinkNutritionCalculator.swift */; };
+		A10000000000000000000023 /* GanfanHandbook/LocationPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* GanfanHandbook/LocationPickerView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* GanfanHandbook/GanfanHandbookApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanfanHandbook/GanfanHandbookApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* GanfanHandbook/StageZeroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanfanHandbook/StageZeroView.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* GanfanHandbook/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = GanfanHandbook/Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000005 /* GanfanHandbook.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GanfanHandbook.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000006 /* Sources/GanfanCore/JournalModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/JournalModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* Sources/GanfanCore/LocalFolderProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/LocalFolderProbe.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* Sources/GanfanCore/LocalPhotoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/LocalPhotoStore.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* Sources/GanfanCore/StoredJournalRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/StoredJournalRecord.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* GanfanHandbook/JournalHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanfanHandbook/JournalHomeView.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* GanfanHandbook/RecordForms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanfanHandbook/RecordForms.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* GanfanHandbook/Resources/catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = GanfanHandbook/Resources/catalog.json; sourceTree = "<group>"; };
+		A20000000000000000000013 /* Sources/GanfanCore/MenuCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/MenuCatalog.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* GanfanHandbook/MenuPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanfanHandbook/MenuPickerView.swift; sourceTree = "<group>"; };
+		A20000000000000000000015 /* Sources/GanfanCore/BackupDirectoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/BackupDirectoryStore.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* Sources/GanfanCore/JournalLibraryRestoreService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/JournalLibraryRestoreService.swift; sourceTree = "<group>"; };
+		A20000000000000000000017 /* Sources/GanfanCore/BackupChangeTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/BackupChangeTracker.swift; sourceTree = "<group>"; };
+		A20000000000000000000018 /* Sources/GanfanCore/JournalRecordCommitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/JournalRecordCommitService.swift; sourceTree = "<group>"; };
+		A20000000000000000000019 /* GanfanHandbook/Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = GanfanHandbook/Assets.xcassets; sourceTree = "<group>"; };
+		A20000000000000000000020 /* Sources/GanfanCore/MenuCatalogRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/MenuCatalogRepository.swift; sourceTree = "<group>"; };
+		A20000000000000000000021 /* GanfanHandbook/BrandSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanfanHandbook/BrandSystem.swift; sourceTree = "<group>"; };
+		A20000000000000000000022 /* GanfanHandbook/CatalogManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanfanHandbook/CatalogManagementView.swift; sourceTree = "<group>"; };
+		A20000000000000000000023 /* Sources/GanfanCore/DailyNutritionSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/DailyNutritionSummary.swift; sourceTree = "<group>"; };
+		A20000000000000000000024 /* Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift; sourceTree = "<group>"; };
+		A20000000000000000000025 /* Sources/GanfanCore/DrinkNutritionCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/DrinkNutritionCalculator.swift; sourceTree = "<group>"; };
+		A20000000000000000000026 /* GanfanHandbook/LocationPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanfanHandbook/LocationPickerView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* GanfanHandbook/GanfanHandbookApp.swift */,
+				A20000000000000000000002 /* GanfanHandbook/StageZeroView.swift */,
+				A20000000000000000000006 /* Sources/GanfanCore/JournalModels.swift */,
+				A20000000000000000000007 /* Sources/GanfanCore/LocalFolderProbe.swift */,
+				A20000000000000000000008 /* Sources/GanfanCore/LocalPhotoStore.swift */,
+				A20000000000000000000009 /* Sources/GanfanCore/StoredJournalRecord.swift */,
+				A20000000000000000000010 /* GanfanHandbook/JournalHomeView.swift */,
+				A20000000000000000000011 /* GanfanHandbook/RecordForms.swift */,
+				A20000000000000000000012 /* GanfanHandbook/Resources/catalog.json */,
+				A20000000000000000000013 /* Sources/GanfanCore/MenuCatalog.swift */,
+				A20000000000000000000014 /* GanfanHandbook/MenuPickerView.swift */,
+				A20000000000000000000015 /* Sources/GanfanCore/BackupDirectoryStore.swift */,
+				A20000000000000000000016 /* Sources/GanfanCore/JournalLibraryRestoreService.swift */,
+				A20000000000000000000017 /* Sources/GanfanCore/BackupChangeTracker.swift */,
+				A20000000000000000000018 /* Sources/GanfanCore/JournalRecordCommitService.swift */,
+				A20000000000000000000019 /* GanfanHandbook/Assets.xcassets */,
+				A20000000000000000000020 /* Sources/GanfanCore/MenuCatalogRepository.swift */,
+				A20000000000000000000021 /* GanfanHandbook/BrandSystem.swift */,
+				A20000000000000000000022 /* GanfanHandbook/CatalogManagementView.swift */,
+				A20000000000000000000023 /* Sources/GanfanCore/DailyNutritionSummary.swift */,
+				A20000000000000000000024 /* Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift */,
+				A20000000000000000000025 /* Sources/GanfanCore/DrinkNutritionCalculator.swift */,
+				A20000000000000000000026 /* GanfanHandbook/LocationPickerView.swift */,
+				A20000000000000000000004 /* GanfanHandbook/Info.plist */,
+				A40000000000000000000002 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000000000000000000002 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000005 /* GanfanHandbook.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000000000000000000001 /* GanfanHandbook */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A80000000000000000000002 /* Build configuration list for PBXNativeTarget "GanfanHandbook" */;
+			buildPhases = (
+				A30000000000000000000001 /* Frameworks */,
+				A60000000000000000000001 /* Sources */,
+				A60000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GanfanHandbook;
+			productName = GanfanHandbook;
+			productReference = A20000000000000000000005 /* GanfanHandbook.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A70000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 2720;
+				TargetAttributes = {
+					A50000000000000000000001 = {
+						CreatedOnToolsVersion = 27.2;
+					};
+				};
+			};
+			buildConfigurationList = A80000000000000000000001 /* Build configuration list for PBXProject "GanfanHandbook" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = zh_CN;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				zh_CN,
+				en,
+				Base,
+			);
+			mainGroup = A40000000000000000000001;
+			productRefGroup = A40000000000000000000002 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000000000000000000001 /* GanfanHandbook */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A60000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000009 /* GanfanHandbook/Resources/catalog.json in Resources */,
+				A10000000000000000000016 /* GanfanHandbook/Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A60000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* GanfanHandbook/GanfanHandbookApp.swift in Sources */,
+				A10000000000000000000002 /* GanfanHandbook/StageZeroView.swift in Sources */,
+				A10000000000000000000003 /* Sources/GanfanCore/JournalModels.swift in Sources */,
+				A10000000000000000000004 /* Sources/GanfanCore/LocalFolderProbe.swift in Sources */,
+				A10000000000000000000005 /* Sources/GanfanCore/LocalPhotoStore.swift in Sources */,
+				A10000000000000000000006 /* Sources/GanfanCore/StoredJournalRecord.swift in Sources */,
+				A10000000000000000000007 /* GanfanHandbook/JournalHomeView.swift in Sources */,
+				A10000000000000000000008 /* GanfanHandbook/RecordForms.swift in Sources */,
+				A10000000000000000000010 /* Sources/GanfanCore/MenuCatalog.swift in Sources */,
+				A10000000000000000000011 /* GanfanHandbook/MenuPickerView.swift in Sources */,
+				A10000000000000000000012 /* Sources/GanfanCore/BackupDirectoryStore.swift in Sources */,
+				A10000000000000000000013 /* Sources/GanfanCore/JournalLibraryRestoreService.swift in Sources */,
+				A10000000000000000000014 /* Sources/GanfanCore/BackupChangeTracker.swift in Sources */,
+				A10000000000000000000015 /* Sources/GanfanCore/JournalRecordCommitService.swift in Sources */,
+				A10000000000000000000017 /* Sources/GanfanCore/MenuCatalogRepository.swift in Sources */,
+				A10000000000000000000018 /* GanfanHandbook/BrandSystem.swift in Sources */,
+				A10000000000000000000019 /* GanfanHandbook/CatalogManagementView.swift in Sources */,
+				A10000000000000000000020 /* Sources/GanfanCore/DailyNutritionSummary.swift in Sources */,
+				A10000000000000000000021 /* Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift in Sources */,
+				A10000000000000000000022 /* Sources/GanfanCore/DrinkNutritionCalculator.swift in Sources */,
+				A10000000000000000000023 /* GanfanHandbook/LocationPickerView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A90000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A90000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		A90000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LU67V2HW4W;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = GanfanHandbook/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.GanfanHandbook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A90000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LU67V2HW4W;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = GanfanHandbook/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.GanfanHandbook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A80000000000000000000001 /* Build configuration list for PBXProject "GanfanHandbook" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000001 /* Debug */,
+				A90000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A80000000000000000000002 /* Build configuration list for PBXNativeTarget "GanfanHandbook" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000003 /* Debug */,
+				A90000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A70000000000000000000001 /* Project object */;
+}
