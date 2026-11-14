@@ -10,6 +10,7 @@ public struct DailyNutritionSummary: Equatable, Sendable {
     public let drinkCount: Int
     public let officialCount: Int
     public let estimatedCount: Int
+    public let roughCount: Int
     public let unavailableCount: Int
     public let energyKcal: NutritionMetricTotal
     public let sugarGrams: NutritionMetricTotal
@@ -33,7 +34,8 @@ public struct DailyNutritionSummary: Equatable, Sendable {
         return DailyNutritionSummary(
             drinkCount: drinks.count,
             officialCount: qualities.filter { $0 == .official }.count,
-            estimatedCount: qualities.filter { $0 == .estimated || $0 == .rough }.count,
+            estimatedCount: qualities.filter { $0 == .estimated }.count,
+            roughCount: qualities.filter { $0 == .rough }.count,
             unavailableCount: qualities.filter { $0 == .unavailable }.count,
             energyKcal: Self.total(drinks) { $0.energyKcal },
             sugarGrams: Self.total(drinks) { $0.sugarGrams },
