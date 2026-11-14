@@ -22,6 +22,8 @@
 	<string>1</string>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>用于在地图选点时定位到您当前的位置。</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

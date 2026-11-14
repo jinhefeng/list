@@ -3,9 +3,25 @@ import SwiftData
 import SwiftUI
 import UIKit
 
+private enum DrinkRecordFocusedField: Hashable {
+    case drinkName
+    case brandName
+    case notes
+}
+
+private struct DrinkNameFieldFrameKey: PreferenceKey {
+    static var defaultValue: CGRect { .zero }
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
 struct DrinkRecordForm: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @FocusState private var focusedField: DrinkRecordFocusedField?
+    @State private var drinkNameFieldFrame = CGRect.zero
 
     private let storedRecord: StoredJournalRecord?
     private let originalRecord: DrinkRecord?
@@ -19,11 +35,11 @@ struct DrinkRecordForm: View {
     @State private var temperature: String
     @State private var ice: String
     @State private var globalCupSizes: [MenuCupSize]
+    @State private var menuCatalog: MenuCatalog?
     @State private var locationName: String
     @State private var locationAddress: String
     @State private var locationLatitude: Double?
     @State private var locationLongitude: Double?
-    @State private var confirmedMapAddress: String
     @State private var isSelectingLocation = false
     @State private var notes: String
     @State private var isSelectingMenuDrink = false
@@ -48,40 +64,40 @@ struct DrinkRecordForm: View {
                 ? originalRecord?.servingOption
                 : nil
         )
+        let menuCatalog = Self.loadBundledCatalog()
+        let selectedMenuDrink: MenuDrink?
+        if let drinkID = originalRecord?.drinkID, !drinkID.isEmpty {
+            selectedMenuDrink = menuCatalog?.drinks.first(where: { $0.id == drinkID })
+        } else {
+            selectedMenuDrink = nil
+        }
 
         _drinkName = State(initialValue: originalRecord?.drinkName ?? "")
         _brandName = State(initialValue: originalRecord?.brandName ?? "")
         _consumedAt = State(initialValue: originalRecord?.consumedAt ?? .now)
         _cupType = State(initialValue: originalRecord?.cupType ?? "")
-        _sweetness = State(initialValue: originalRecord?.sweetness ?? "")
+        _sweetness = State(initialValue: Self.normalizedSweetness(originalRecord?.sweetness ?? ""))
         _temperature = State(initialValue: servingSelection.temperature)
         _ice = State(initialValue: servingSelection.ice)
         _globalCupSizes = State(initialValue: Self.loadGlobalCupSizes())
-        _selectedMenuDrink = State(initialValue: Self.catalogDrink(for: originalRecord?.drinkID))
+        _menuCatalog = State(initialValue: menuCatalog)
+        _selectedMenuDrink = State(initialValue: selectedMenuDrink)
         _locationName = State(initialValue: originalRecord?.locationName ?? "")
         _locationAddress = State(initialValue: originalRecord?.locationAddress ?? "")
         _locationLatitude = State(initialValue: originalRecord?.latitude)
         _locationLongitude = State(initialValue: originalRecord?.longitude)
-        _confirmedMapAddress = State(initialValue: originalRecord?.latitude != nil ? originalRecord?.locationAddress ?? "" : "")
         _notes = State(initialValue: originalRecord?.notes ?? "")
     }
 
     var body: some View {
-        let hasPhoto = selectedPhotoData != nil || savedPhotoData != nil
-
         Form {
             Section {
-                PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                    Label(hasPhoto ? "更换饮品照片" : "添加饮品照片", systemImage: "photo")
-                }
-
-                if let image = previewImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 190)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
+                PhotoPickerWell(
+                    selection: $selectedPhoto,
+                    image: previewImage,
+                    title: previewImage == nil ? "添加饮品照片" : "更换饮品照片",
+                    detail: "留下一张这杯饮品的照片"
+                )
 
                 if selectedPhotoData != nil || savedPhotoData != nil {
                     Button("移除照片", role: .destructive) {
@@ -97,56 +113,106 @@ struct DrinkRecordForm: View {
             }
 
             Section("喝的是什么") {
-                Button {
-                    isSelectingMenuDrink = true
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(selectedMenuDrink == nil ? "从饮品目录选择" : "已选目录饮品")
-                                .foregroundStyle(.primary)
-                            if let selectedMenuDrink {
-                                Text("\(selectedMenuDrink.brandName) · \(selectedMenuDrink.name)")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            } else {
-                                Text("也可以手动填写品牌和饮品名称")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                TextField("输入名称，自动匹配目录", text: $drinkName)
+                    .textContentType(.none)
+                    .focused($focusedField, equals: .drinkName)
+                    .background {
+                        GeometryReader { geometry in
+                            Color.clear.preference(
+                                key: DrinkNameFieldFrameKey.self,
+                                value: geometry.frame(in: .named("drinkRecordForm"))
+                            )
+                        }
+                    }
+                    .onChange(of: drinkName) { _, newValue in
+                        guard let selectedMenuDrink,
+                              newValue.trimmingCharacters(in: .whitespacesAndNewlines) != selectedMenuDrink.name else { return }
+                        self.selectedMenuDrink = nil
+                    }
+
+                if let selectedMenuDrink {
+                    Label("已关联菜单：\(selectedMenuDrink.brandName)", systemImage: "checkmark.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(GanfanPalette.forest)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if focusedField == .drinkName,
+                          !drinkName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if drinkSuggestions.isEmpty {
+                        Label("目录中没有匹配项，可直接按此名称记录自定义饮品", systemImage: "pencil.and.outline")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("匹配的菜单饮品")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.bottom, 6)
+
+                            ForEach(drinkSuggestions) { drink in
+                                Button {
+                                    chooseMenuDrink(drink)
+                                } label: {
+                                    HStack(alignment: .center, spacing: 10) {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(drink.name)
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(.primary)
+                                            Text(drink.brandName)
+                                                .font(.footnote)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer(minLength: 8)
+                                        Text(drink.status == "verified" ? "已核验" : "菜单")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
+                                    .padding(.vertical, 8)
+                                }
+                                .buttonStyle(.plain)
+                                if drink.id != drinkSuggestions.last?.id {
+                                    Divider()
+                                }
                             }
                         }
-                        Spacer(minLength: 8)
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(GanfanPalette.forest)
+                        .padding(12)
+                        .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                 }
-                .buttonStyle(.plain)
 
-                TextField("品牌 / 店铺", text: $brandName)
+                TextField("品牌（可选）", text: $brandName)
                     .textContentType(.organizationName)
-                TextField("饮品名称", text: $drinkName)
-                    .textContentType(.none)
+                    .focused($focusedField, equals: .brandName)
+                    .onChange(of: brandName) { _, newValue in
+                        guard let selectedMenuDrink, newValue != selectedMenuDrink.brandName else { return }
+                        self.selectedMenuDrink = nil
+                    }
 
                 if let selectedMenuDrink {
                     LabeledContent("菜单状态", value: selectedMenuDrink.status == "verified" ? "已核验" : "待核验")
                 }
+
+                Button("浏览完整饮品目录", systemImage: "list.bullet") {
+                    isSelectingMenuDrink = true
+                }
+                .font(.subheadline)
             }
 
             Section("这一杯的细节") {
-                Picker("杯型", selection: $cupType) {
-                    Text("未选择").tag("")
-                    ForEach(cupTypeOptions, id: \.self) { Text($0).tag($0) }
-                }
+                OptionChipPicker(title: "杯型", options: [""] + cupTypeOptions, selection: $cupType)
                 if !cupType.isEmpty {
                     LabeledContent("容量", value: cupSizeLabel)
                 }
                 OptionChipPicker(title: "甜度", options: [""] + sweetnessOptions, selection: $sweetness)
                 OptionChipPicker(title: "温度", options: [""] + temperatureOptions, selection: $temperature)
-                OptionChipPicker(title: "冰量", options: [""] + iceOptions, selection: $ice)
-                    .disabled(temperature == "热饮" || temperature == "常温")
+                if temperature == "冰饮" {
+                    OptionChipPicker(title: "冰量", options: [""] + iceOptions, selection: $ice)
+                }
             }
 
-            Section("营养快照") {
+            Section {
                 DisclosureGroup("本次摄入") {
                     let nutrition = calculatedNutrition
                     LabeledContent("状态", value: nutrition.confidence.displayName)
@@ -160,29 +226,32 @@ struct DrinkRecordForm: View {
                         LabeledContent("来源链接", value: sourceURL)
                     }
                 }
+            } header: {
+                Text("营养快照")
+            } footer: {
+                Text("营养资料随目录自动计算；自定义饮品可以先保存记录。")
             }
 
             Section("时间与地点") {
                 DatePicker("饮用时间", selection: $consumedAt, displayedComponents: [.date, .hourAndMinute])
-                TextField("店名或地点", text: $locationName)
                 Button {
                     isSelectingLocation = true
                 } label: {
-                    Label(locationLatitude == nil ? "地图选地址" : "重新选择地图地址", systemImage: "map")
+                    Label(locationLatitude == nil ? "从地图选择地点" : "重新选择地图地点", systemImage: "map")
                 }
-                TextField("地址（地图不可用时可手填）", text: $locationAddress, axis: .vertical)
-                    .onChange(of: locationAddress) { _, newValue in
-                        if newValue != confirmedMapAddress {
-                            locationLatitude = nil
-                            locationLongitude = nil
-                        }
-                    }
+                if !locationName.isEmpty {
+                    LabeledContent("地点", value: locationName)
+                }
+                if !locationAddress.isEmpty {
+                    LabeledContent("地址", value: locationAddress)
+                }
                 if locationLatitude != nil, locationLongitude != nil {
                     Label("已保存地图坐标", systemImage: "location.fill")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 TextField("备注（可选）", text: $notes, axis: .vertical)
+                    .focused($focusedField, equals: .notes)
                     .accessibilityHint("记录这杯饮品的口味或当时的心情")
             }
         }
@@ -191,6 +260,16 @@ struct DrinkRecordForm: View {
         .tint(GanfanPalette.forest)
         .navigationTitle(storedRecord == nil ? "记录饮品" : "编辑饮品")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .coordinateSpace(name: "drinkRecordForm")
+        .onPreferenceChange(DrinkNameFieldFrameKey.self) { drinkNameFieldFrame = $0 }
+        .simultaneousGesture(
+            SpatialTapGesture().onEnded { value in
+                if focusedField == .drinkName, !drinkNameFieldFrame.contains(value.location) {
+                    focusedField = nil
+                }
+            }
+        )
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("取消") { dismiss() }
@@ -208,38 +287,27 @@ struct DrinkRecordForm: View {
             await loadSavedPhoto()
         }
         .onChange(of: temperature) { _, newValue in
-            if newValue == "热饮" || newValue == "常温" {
+            if newValue != "冰饮" {
                 ice = ""
             }
         }
         .sheet(isPresented: $isSelectingMenuDrink) {
             NavigationStack {
-                MenuPickerView(catalog: Self.loadBundledCatalog()) { drink in
-                    selectedMenuDrink = drink
-                    brandName = drink.brandName
-                    drinkName = drink.name
-                    if cupType.isEmpty, let menuCup = drink.cupTypes.first, cupTypeOptions.contains(menuCup) {
-                        cupType = menuCup
-                    }
+                MenuPickerView(catalog: menuCatalog) { drink in
+                    chooseMenuDrink(drink)
                 }
             }
         }
         .sheet(isPresented: $isSelectingLocation) {
             NavigationStack {
-                MapLocationPickerView(
-                    initialAddress: locationAddress,
-                    initialLatitude: locationLatitude,
-                    initialLongitude: locationLongitude
-                ) { selection in
-                    if locationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        locationName = selection.storeName
-                    }
-                    confirmedMapAddress = selection.address
+                MapLocationPickerView { selection in
+                    locationName = selection.storeName
                     locationAddress = selection.address
                     locationLatitude = selection.latitude
                     locationLongitude = selection.longitude
                 }
             }
+            .presentationDetents([.large])
         }
         .alert("未能保存饮品记录", isPresented: Binding(
             get: { errorMessage != nil },
@@ -256,6 +324,22 @@ struct DrinkRecordForm: View {
         if let selectedPhotoData, let image = UIImage(data: selectedPhotoData) { return image }
         if let savedPhotoData { return UIImage(data: savedPhotoData) }
         return nil
+    }
+
+    private var drinkSuggestions: [MenuDrink] {
+        let query = drinkName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty, selectedMenuDrink == nil, let menuCatalog else { return [] }
+        return Array(menuCatalog.searchDrinks(query: query).prefix(5))
+    }
+
+    private func chooseMenuDrink(_ drink: MenuDrink) {
+        focusedField = nil
+        selectedMenuDrink = drink
+        brandName = drink.brandName
+        drinkName = drink.name
+        if cupType.isEmpty, let menuCup = drink.cupTypes.first, cupTypeOptions.contains(menuCup) {
+            cupType = menuCup
+        }
     }
 
     private var cupTypeOptions: [String] {
@@ -287,10 +371,18 @@ struct DrinkRecordForm: View {
     }
 
     private var sweetnessOptions: [String] {
-        var options = selectedMenuDrink?.sweetnessOptions.filter { !$0.isEmpty } ?? []
-        if options.isEmpty { options = ["无糖", "微糖", "三分糖", "五分糖", "七分糖", "全糖"] }
+        var options = selectedMenuDrink?.sweetnessOptions
+            .filter { !$0.isEmpty }
+            .map(Self.normalizedSweetness) ?? []
+        if options.isEmpty { options = ["不另外加糖", "微糖", "三分糖", "五分糖", "七分糖", "全糖"] }
+        var seen = Set<String>()
+        options = options.filter { seen.insert($0).inserted }
         if !sweetness.isEmpty, !options.contains(sweetness) { options.append(sweetness) }
         return options
+    }
+
+    private static func normalizedSweetness(_ value: String) -> String {
+        value == "无糖" ? "不另外加糖" : value
     }
 
     private var temperatureOptions: [String] {
@@ -315,7 +407,7 @@ struct DrinkRecordForm: View {
            originalRecord.drinkName == drinkName,
            originalRecord.cupType == cupType,
            originalRecord.sizeML == recordSizeML,
-           originalRecord.sweetness == sweetness {
+           Self.normalizedSweetness(originalRecord.sweetness) == sweetness {
             let originalServing = DrinkServingSelection(
                 temperature: originalRecord.temperature,
                 ice: originalRecord.ice,
@@ -356,7 +448,7 @@ struct DrinkRecordForm: View {
         )
         if originalRecord.cupType == cupType,
            originalRecord.sizeML == recordSizeML,
-           originalRecord.sweetness == sweetness,
+           Self.normalizedSweetness(originalRecord.sweetness) == sweetness,
            originalServing.temperature == temperature,
            originalServing.ice == ice {
             return originalRecord.nutrition ?? NutritionSnapshot(
@@ -501,11 +593,6 @@ struct DrinkRecordForm: View {
         return try? MenuCatalogRepository().catalog(from: bundled)
     }
 
-    private static func catalogDrink(for id: String?) -> MenuDrink? {
-        guard let id, !id.isEmpty else { return nil }
-        return loadBundledCatalog()?.drinks.first(where: { $0.id == id })
-    }
-
     private static func loadGlobalCupSizes() -> [MenuCupSize] {
         (try? MenuCatalogRepository().loadUserState().globalCupSizes) ?? MenuCatalogUserState.defaultCupSizes
     }
@@ -576,7 +663,10 @@ struct MealRecordForm: View {
 
             Section {
                 ForEach($dishes) { $dish in
-                    MealDishEditorRow(draft: $dish)
+                    MealDishEditorRow(draft: $dish) {
+                        let removedID = dish.id
+                        dishes.removeAll { $0.id == removedID }
+                    }
                         .padding(.vertical, 6)
                         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                 }
@@ -620,11 +710,7 @@ struct MealRecordForm: View {
         }
         .sheet(isPresented: $isSelectingLocation) {
             NavigationStack {
-                MapLocationPickerView(
-                    initialAddress: locationAddress,
-                    initialLatitude: locationLatitude,
-                    initialLongitude: locationLongitude
-                ) { selection in
+                MapLocationPickerView { selection in
                     if storeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         storeName = selection.storeName
                     }
@@ -634,6 +720,7 @@ struct MealRecordForm: View {
                     locationLongitude = selection.longitude
                 }
             }
+            .presentationDetents([.large])
         }
         .alert("未能保存用餐记录", isPresented: Binding(
             get: { errorMessage != nil },
@@ -773,6 +860,89 @@ private struct OptionChipPicker: View {
     }
 }
 
+private struct PhotoPickerWell: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Binding var selection: PhotosPickerItem?
+    let image: UIImage?
+    let title: String
+    let detail: String
+    var compact = false
+
+    private var usesCompactSquare: Bool {
+        compact && !dynamicTypeSize.isAccessibilitySize
+    }
+
+    var body: some View {
+        PhotosPicker(selection: $selection, matching: .images) {
+            photoContent
+            .background(GanfanPalette.card)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(
+                        GanfanPalette.ink.opacity(0.18),
+                        style: StrokeStyle(lineWidth: 1, dash: [5, 4])
+                    )
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityHint(detail)
+    }
+
+    @ViewBuilder
+    private var photoContent: some View {
+        if let image {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: usesCompactSquare ? 96 : nil, height: imageHeight)
+                .frame(maxWidth: usesCompactSquare ? 96 : .infinity)
+                .clipped()
+        } else if usesCompactSquare {
+            VStack(spacing: 5) {
+                Image(systemName: "plus")
+                    .font(.title3.weight(.medium))
+                Text("添加照片")
+                    .font(.caption.weight(.medium))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(6)
+            .frame(width: 96, height: 96)
+        } else {
+            fullWidthPlaceholder
+        }
+    }
+
+    private var imageHeight: CGFloat {
+        if usesCompactSquare { return 96 }
+        return compact ? 150 : 190
+    }
+
+    private var fullWidthPlaceholder: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "plus")
+                .font(.title2.weight(.medium))
+                .foregroundStyle(GanfanPalette.forest)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(detail)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(16)
+        .frame(minHeight: compact ? 150 : 190)
+    }
+}
+
 private struct MealDishDraft: Identifiable {
     let id: UUID
     var name: String
@@ -804,42 +974,27 @@ private struct MealDishDraft: Identifiable {
 }
 
 private struct MealDishEditorRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var draft: MealDishDraft
+    let onRemove: () -> Void
     @State private var savedPhotoData: Data?
     @State private var errorMessage: String?
 
     var body: some View {
-        let hasPhoto = draft.photoData != nil || savedPhotoData != nil
+        let imageData = draft.photoData ?? (draft.photoRemoved ? nil : savedPhotoData)
+        let image = imageData.flatMap { UIImage(data: $0) }
 
-        VStack(alignment: .leading, spacing: 8) {
-            if let previewData = draft.photoData ?? (draft.photoRemoved ? nil : savedPhotoData),
-               let image = UIImage(data: previewData) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 150)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-
-            PhotosPicker(selection: $draft.selectedPhoto, matching: .images) {
-                Label(hasPhoto ? "更换菜品照片" : "添加菜品照片", systemImage: "photo")
-            }
-
-            TextField("菜品名称（必填）", text: $draft.name)
-
-            if errorMessage != nil {
-                Text(errorMessage ?? "")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-
-            if draft.photoData != nil || savedPhotoData != nil {
-                Button("移除这张照片", role: .destructive) {
-                    draft.photoRemoved = true
-                    draft.photoData = nil
-                    draft.selectedPhoto = nil
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 10) {
+                    photoPicker(image: image)
+                    dishFields
                 }
-                .font(.caption)
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    photoPicker(image: image)
+                    dishFields
+                }
             }
         }
         .task(id: draft.selectedPhoto) {
@@ -848,6 +1003,38 @@ private struct MealDishEditorRow: View {
         .task {
             await loadSavedPhoto()
         }
+    }
+
+    private var dishFields: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextField("菜品名称（必填）", text: $draft.name)
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+            if !draft.photoRemoved && (draft.photoData != nil || savedPhotoData != nil) {
+                Button("移除照片", role: .destructive) {
+                    draft.photoRemoved = true
+                    draft.photoData = nil
+                    draft.selectedPhoto = nil
+                }
+                .font(.footnote)
+            }
+            Button("移除这道菜", role: .destructive, action: onRemove)
+                .font(.footnote)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func photoPicker(image: UIImage?) -> some View {
+        PhotoPickerWell(
+            selection: $draft.selectedPhoto,
+            image: image,
+            title: image == nil ? "添加菜品照片" : "更换菜品照片",
+            detail: "可选",
+            compact: true
+        )
     }
 
     private func loadSelectedPhoto() async {

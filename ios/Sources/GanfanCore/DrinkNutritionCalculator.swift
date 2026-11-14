@@ -99,7 +99,7 @@ public enum DrinkNutritionCalculator {
         }
         let exactVariant = eligibleVariants.first { variant in
             matchesSize(variant, cupType: cupType, sizeML: sizeML)
-                && normalized(variant.sweetness) == normalized(sweetness)
+                && normalizedSweetness(variant.sweetness) == normalizedSweetness(sweetness)
                 && servingSelection(for: variant) == serving
         }
         let selectedVariant = exactVariant ?? eligibleVariants.first { variant in
@@ -203,6 +203,11 @@ public enum DrinkNutritionCalculator {
 
     private static func normalized(_ value: String?) -> String {
         value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    private static func normalizedSweetness(_ value: String?) -> String {
+        let result = normalized(value)
+        return result == "无糖" ? "不另外加糖" : result
     }
 
     private static func nonEmpty(_ value: String?) -> String? {

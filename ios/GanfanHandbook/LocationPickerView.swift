@@ -27,43 +27,28 @@ private struct MapLocationCandidate: Identifiable {
 
 struct MapLocationPickerView: View {
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var isSearchFocused: Bool
 
-    let initialAddress: String
-    let initialLatitude: Double?
-    let initialLongitude: Double?
     let onSelect: (MapLocationSelection) -> Void
 
     @State private var query: String
     @State private var cameraPosition: MapCameraPosition
     @State private var searchResults: [MapLocationCandidate] = []
+    @State private var isShowingSearchResults = false
     @State private var selectedLocation: MapLocationCandidate?
     @State private var isSearching = false
-    @State private var statusMessage = "先搜索地点，地图会移到结果附近；也可以直接点选地图。"
+    @State private var statusMessage = "地图优先定位到当前位置；也可以搜索或直接点选。"
 
-    init(
-        initialAddress: String = "",
-        initialLatitude: Double? = nil,
-        initialLongitude: Double? = nil,
-        onSelect: @escaping (MapLocationSelection) -> Void
-    ) {
-        self.initialAddress = initialAddress
-        self.initialLatitude = initialLatitude
-        self.initialLongitude = initialLongitude
+    init(onSelect: @escaping (MapLocationSelection) -> Void) {
         self.onSelect = onSelect
-        _query = State(initialValue: initialAddress)
+        _query = State(initialValue: "")
 
-        let center: CLLocationCoordinate2D
-        if let latitude = initialLatitude, let longitude = initialLongitude,
-           (-90...90).contains(latitude), (-180...180).contains(longitude) {
-            center = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-        } else {
-            center = CLLocationCoordinate2D(latitude: 35.86, longitude: 104.19)
-        }
+        let center = CLLocationCoordinate2D(latitude: 35.86, longitude: 104.19)
         let region = MKCoordinateRegion(
             center: center,
             span: MKCoordinateSpan(latitudeDelta: 18, longitudeDelta: 18)
         )
-        _cameraPosition = State(initialValue: .region(region))
+        _cameraPosition = State(initialValue: .userLocation(fallback: .region(region)))
     }
 
     var body: some View {
@@ -72,16 +57,20 @@ struct MapLocationPickerView: View {
                 TextField("搜索餐厅、商店或地址", text: $query)
                     .textFieldStyle(.roundedBorder)
                     .submitLabel(.search)
-                    .onSubmit { Task { await search() } }
-                Button("搜索") { Task { await search() } }
+                    .focused($isSearchFocused)
+                    .onSubmit(performSearch)
+                Button("搜索", action: performSearch)
                     .buttonStyle(.borderedProminent)
                     .tint(GanfanPalette.forest)
                     .disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSearching)
             }
-            .padding()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(GanfanPalette.canvas)
 
             MapReader { proxy in
                 Map(position: $cameraPosition) {
+                    UserAnnotation()
                     if let selectedLocation {
                         Annotation(
                             selectedLocation.name.isEmpty ? "已选地点" : selectedLocation.name,
@@ -94,6 +83,7 @@ struct MapLocationPickerView: View {
                     }
                 }
                 .mapControls {
+                    MapUserLocationButton()
                     MapCompass()
                     MapScaleView()
                 }
@@ -103,31 +93,41 @@ struct MapLocationPickerView: View {
                         Task { await selectMapPoint(coordinate) }
                     }
                 )
-                .frame(minHeight: 280)
+                .frame(minHeight: 220, maxHeight: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .padding(.horizontal, 12)
             }
+            .frame(maxHeight: .infinity)
 
-            if !searchResults.isEmpty {
-                List(searchResults) { result in
-                    Button {
-                        select(result)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(result.name.isEmpty ? result.address : result.name)
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(.primary)
-                            if !result.address.isEmpty, result.address != result.name {
-                                Text(result.address)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+            if isShowingSearchResults && !searchResults.isEmpty {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(searchResults) { result in
+                            Button {
+                                select(result)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(result.name.isEmpty ? result.address : result.name)
+                                        .font(.body.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                    if !result.address.isEmpty, result.address != result.name {
+                                        Text(result.address)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 9)
                             }
+                            .buttonStyle(.plain)
+                            if result.id != searchResults.last?.id { Divider() }
                         }
                     }
-                    .listRowSeparator(.visible)
                 }
-                .listStyle(.plain)
-                .frame(maxHeight: 220)
+                .frame(maxHeight: 160)
+                .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.horizontal, 12)
             }
 
             HStack(spacing: 8) {
@@ -137,15 +137,20 @@ struct MapLocationPickerView: View {
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
-            .padding(12)
+            .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .padding()
+            .padding(12)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .navigationTitle("选择地图地址")
         .navigationBarTitleDisplayMode(.inline)
         .background(GanfanPalette.canvas)
         .tint(GanfanPalette.forest)
+        .onChange(of: query) { _, _ in
+            searchResults = []
+            isShowingSearchResults = false
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("取消") { dismiss() }
@@ -160,6 +165,11 @@ struct MapLocationPickerView: View {
             }
         }
         .sensoryFeedback(.selection, trigger: selectedLocation?.id)
+    }
+
+    private func performSearch() {
+        isSearchFocused = false
+        Task { await search() }
     }
 
     @MainActor
@@ -180,10 +190,11 @@ struct MapLocationPickerView: View {
                     coordinate: item.placemark.coordinate
                 )
             }
-            statusMessage = searchResults.isEmpty ? "没有找到地点；可以继续搜索或手动填写地址。" : "选择一个搜索结果，或在地图上点选位置。"
+            isShowingSearchResults = !searchResults.isEmpty
+            statusMessage = searchResults.isEmpty ? "没有找到地点；可以继续搜索或直接点选地图。" : "选择一个搜索结果，或在地图上点选位置。"
         } catch {
             searchResults = []
-            statusMessage = "地图搜索暂不可用；仍可在记录表单中手动填写地址。"
+            statusMessage = "地图搜索暂不可用；仍可直接点选地图位置。"
         }
     }
 
@@ -197,11 +208,12 @@ struct MapLocationPickerView: View {
         let address = Self.address(from: placemark)
         let result = MapLocationCandidate(name: name, address: address, coordinate: coordinate)
         select(result)
-        statusMessage = address.isEmpty ? "位置已选；地址可返回表单后手动填写。" : "已确认地图位置。"
+        statusMessage = address.isEmpty ? "位置已选；地址由地图自动补充。" : "已确认地图位置。"
     }
 
     private func select(_ candidate: MapLocationCandidate) {
         selectedLocation = candidate
+        isShowingSearchResults = false
         let region = MKCoordinateRegion(
             center: candidate.coordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)

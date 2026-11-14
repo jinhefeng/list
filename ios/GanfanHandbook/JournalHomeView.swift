@@ -145,15 +145,13 @@ struct JournalHomeView: View {
     private var todayHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
             if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 10) {
-                    brandIdentity
-                    backupLink
-                }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("今天")
                         .font(.largeTitle.weight(.bold))
                         .foregroundStyle(GanfanPalette.ink)
                     dateLabel
+                    backupLink
+                        .padding(.top, 4)
                 }
             } else {
                 HStack(spacing: 8) {
@@ -1116,6 +1114,8 @@ private struct HistoryView: View {
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
+                .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             }
 
@@ -1152,6 +1152,7 @@ private struct HistoryView: View {
                 }
             }
         }
+        .listSectionSpacing(.compact)
         .scrollContentBackground(.hidden)
         .background(GanfanPalette.canvas)
         .tint(GanfanPalette.forest)
