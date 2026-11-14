@@ -2,6 +2,8 @@ name: Nutrition V2 iOS validation
 on:
   push:
     branches: [feature/nutrition-v2]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
