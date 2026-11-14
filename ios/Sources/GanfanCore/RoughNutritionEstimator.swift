@@ -81,13 +81,18 @@ public enum RoughNutritionEstimator {
         else if cupType.contains("小") { guessedSize = 350 }
         else { guessedSize = 500 }
 
-        let isSweetened = !["无糖饮用水", "无糖汽水", "含糖汽水", "黑咖啡", "纯茶类"].contains(profile.label)
-        let addedSugar = isSweetened ? 5 * addedSugarFactor(sweetness) : 0
-        let defaultAddedSugar = isSweetened ? 2.5 : 0
+        let intrinsicallyUnsweetened = ["黑咖啡", "普通咖啡", "纯茶类"].contains(profile.label)
+        let fixedFormula = ["无糖饮用水", "无糖汽水", "含糖汽水"].contains(profile.label)
+        let defaultAddedSugar = (!fixedFormula && !intrinsicallyUnsweetened) ? 2.5 : 0
+        let addedSugar = fixedFormula ? 0
+            : ((intrinsicallyUnsweetened && sweetness.isEmpty) ? 0 : 5 * addedSugarFactor(sweetness))
         let multiplier = Double(guessedSize) / 100
         let sugar = max(0, profile.sugar + addedSugar - defaultAddedSugar)
         let energy = max(0, profile.energy + 4 * (addedSugar - defaultAddedSugar))
-        let assumptions = "\(profile.label)类比；\(guessedSize) ml\(sizeML == nil ? "（容量假定）" : "")；\(sweetness.isEmpty ? "甜度按五分糖" : "甜度按用户选择")；冰量不用于直接缩放营养"
+        let sweetnessAssumption = sweetness.isEmpty
+            ? (intrinsicallyUnsweetened ? "默认不额外加糖" : "甜度按五分糖")
+            : "甜度按用户选择（各品牌比例不一致）"
+        let assumptions = "\(profile.label)类比；\(guessedSize) ml\(sizeML == nil ? "（容量假定）" : "")；\(sweetnessAssumption)；冰量不用于直接缩放营养"
         return NutritionSnapshot(
             energyKcal: rounded(energy * multiplier, to: 10),
             sugarGrams: rounded(sugar * multiplier, to: 5),
