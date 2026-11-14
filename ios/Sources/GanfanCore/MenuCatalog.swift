@@ -81,6 +81,9 @@ public struct MenuNutritionPerUnit: Codable, Equatable, Sendable {
     public let energyKcal: Double?
     public let sugarG: Double?
     public let caffeineMg: Double?
+    public let proteinG: Double?
+    public let fatG: Double?
+    public let carbohydrateG: Double?
     public let sourceType: String?
     public let source: String?
     public let updatedAt: String?
@@ -91,6 +94,9 @@ public struct MenuNutritionPerUnit: Codable, Equatable, Sendable {
         energyKcal: Double? = nil,
         sugarG: Double? = nil,
         caffeineMg: Double? = nil,
+        proteinG: Double? = nil,
+        fatG: Double? = nil,
+        carbohydrateG: Double? = nil,
         sourceType: String? = "estimated",
         source: String? = nil,
         updatedAt: String? = nil
@@ -100,6 +106,9 @@ public struct MenuNutritionPerUnit: Codable, Equatable, Sendable {
         self.energyKcal = energyKcal
         self.sugarG = sugarG
         self.caffeineMg = caffeineMg
+        self.proteinG = proteinG
+        self.fatG = fatG
+        self.carbohydrateG = carbohydrateG
         self.sourceType = sourceType
         self.source = source
         self.updatedAt = updatedAt
@@ -117,6 +126,9 @@ public struct MenuNutritionVariant: Codable, Equatable, Sendable {
     public let energyKcal: Double?
     public let sugarG: Double?
     public let caffeineMg: Double?
+    public let proteinG: Double?
+    public let fatG: Double?
+    public let carbohydrateG: Double?
     public let sourceType: String?
     public let source: String?
     public let sourceURL: String?
@@ -125,7 +137,7 @@ public struct MenuNutritionVariant: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case cupType, sweetness, servingOption, temperature, ice, toppings
         case sizeML = "sizeMl"
-        case energyKcal, sugarG, caffeineMg, sourceType, source, updatedAt
+        case energyKcal, sugarG, caffeineMg, proteinG, fatG, carbohydrateG, sourceType, source, updatedAt
         case sourceURL = "sourceUrl"
     }
 
@@ -140,6 +152,9 @@ public struct MenuNutritionVariant: Codable, Equatable, Sendable {
         energyKcal: Double? = nil,
         sugarG: Double? = nil,
         caffeineMg: Double? = nil,
+        proteinG: Double? = nil,
+        fatG: Double? = nil,
+        carbohydrateG: Double? = nil,
         sourceType: String? = nil,
         source: String? = nil,
         sourceURL: String? = nil,
@@ -155,6 +170,9 @@ public struct MenuNutritionVariant: Codable, Equatable, Sendable {
         self.energyKcal = energyKcal
         self.sugarG = sugarG
         self.caffeineMg = caffeineMg
+        self.proteinG = proteinG
+        self.fatG = fatG
+        self.carbohydrateG = carbohydrateG
         self.sourceType = sourceType
         self.source = source
         self.sourceURL = sourceURL

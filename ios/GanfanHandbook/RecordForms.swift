@@ -1,5 +1,3 @@
-import CoreLocation
-import ImageIO
 import PhotosUI
 import SwiftData
 import SwiftUI
@@ -16,89 +14,6 @@ private struct DrinkNameFieldFrameKey: PreferenceKey {
 
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         value = nextValue()
-    }
-}
-
-private struct PhotoCaptureMetadata {
-    let date: Date?
-    let latitude: Double?
-    let longitude: Double?
-}
-
-private enum PhotoCaptureMetadataReader {
-    static func read(from data: Data) -> PhotoCaptureMetadata? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
-            return nil
-        }
-
-        let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any] ?? [:]
-        let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any] ?? [:]
-        let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any] ?? [:]
-
-        let dateTexts = [
-            exif[kCGImagePropertyExifDateTimeOriginal as String] as? String,
-            exif[kCGImagePropertyExifDateTimeDigitized as String] as? String,
-            tiff[kCGImagePropertyTIFFDateTime as String] as? String
-        ].compactMap { $0 }
-        let offset = exif[kCGImagePropertyExifOffsetTimeOriginal as String] as? String
-        let date = dateTexts.lazy.compactMap { parseDate($0, offset: offset) }.first
-
-        let latitude = coordinate(
-            gps[kCGImagePropertyGPSLatitude as String] as? NSNumber,
-            reference: gps[kCGImagePropertyGPSLatitudeRef as String] as? String,
-            negativeReference: "S",
-            limit: 90
-        )
-        let longitude = coordinate(
-            gps[kCGImagePropertyGPSLongitude as String] as? NSNumber,
-            reference: gps[kCGImagePropertyGPSLongitudeRef as String] as? String,
-            negativeReference: "W",
-            limit: 180
-        )
-
-        guard date != nil || (latitude != nil && longitude != nil) else { return nil }
-        return PhotoCaptureMetadata(date: date, latitude: latitude, longitude: longitude)
-    }
-
-    private static func coordinate(_ value: NSNumber?, reference: String?, negativeReference: String, limit: Double) -> Double? {
-        guard let value else { return nil }
-        var coordinate = value.doubleValue
-        guard coordinate.isFinite, abs(coordinate) <= limit else { return nil }
-        if reference?.uppercased() == negativeReference { coordinate = -abs(coordinate) }
-        return coordinate
-    }
-
-    private static func parseDate(_ value: String, offset: String?) -> Date? {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.isLenient = false
-
-        guard let offset = normalizedOffset(offset) else {
-            formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-            formatter.timeZone = .current
-            return formatter.date(from: value)
-        }
-
-        formatter.dateFormat = "yyyy:MM:dd HH:mm:ssXXXXX"
-        formatter.timeZone = .current
-        return formatter.date(from: value + offset)
-    }
-
-    private static func normalizedOffset(_ offset: String?) -> String? {
-        guard let offset = offset?.trimmingCharacters(in: .whitespacesAndNewlines), !offset.isEmpty else { return nil }
-        if offset == "Z" { return offset }
-        let digits = offset.filter(\.isNumber)
-        let sign = offset.hasPrefix("-") ? "-" : "+"
-        switch digits.count {
-        case 2:
-            return "\(sign)\(digits):00"
-        case 4:
-            return "\(sign)\(digits.prefix(2)):\(digits.suffix(2))"
-        default:
-            return offset
-        }
     }
 }
 
@@ -125,13 +40,13 @@ struct DrinkRecordForm: View {
     @State private var locationAddress: String
     @State private var locationLatitude: Double?
     @State private var locationLongitude: Double?
+    @State private var isSelectingLocation = false
     @State private var notes: String
     @State private var isSelectingMenuDrink = false
     @State private var selectedMenuDrink: MenuDrink?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedPhotoData: Data?
     @State private var savedPhotoData: Data?
-    @State private var photoMetadataMessage: String?
     @State private var photoExtension = "jpg"
     @State private var photoRemoved = false
     @State private var isSaving = false
@@ -189,13 +104,12 @@ struct DrinkRecordForm: View {
                         photoRemoved = true
                         selectedPhotoData = nil
                         selectedPhoto = nil
-                        photoMetadataMessage = nil
                     }
                 }
             } header: {
                 Text("照片")
             } footer: {
-                Text(photoMetadataMessage ?? "照片可以稍后补上。选择包含拍摄信息的照片时，会自动填入时间和地点。")
+                Text("照片可以稍后补上。")
             }
 
             Section("喝的是什么") {
@@ -281,7 +195,6 @@ struct DrinkRecordForm: View {
                 }
 
                 Button("浏览完整饮品目录", systemImage: "list.bullet") {
-                    focusedField = nil
                     isSelectingMenuDrink = true
                 }
                 .font(.subheadline)
@@ -306,6 +219,12 @@ struct DrinkRecordForm: View {
                     nutritionValue("能量", amount: nutrition.energyKcal, unit: "kcal")
                     nutritionValue("糖", amount: nutrition.sugarGrams, unit: "g")
                     nutritionValue("咖啡因", amount: nutrition.caffeineMilligrams, unit: "mg")
+                    nutritionValue("蛋白质" + (nutrition.metricSources["proteinGrams"] == "rough" ? "（粗估）" : ""), amount: nutrition.proteinGrams, unit: "g")
+                    nutritionValue("脂肪" + (nutrition.metricSources["fatGrams"] == "rough" ? "（粗估）" : ""), amount: nutrition.fatGrams, unit: "g")
+                    nutritionValue("碳水化合物" + (nutrition.metricSources["carbohydrateGrams"] == "rough" ? "（粗估）" : ""), amount: nutrition.carbohydrateGrams, unit: "g")
+                    if !nutrition.assumptions.isEmpty {
+                        Text(nutrition.assumptions).font(.caption).foregroundStyle(.secondary)
+                    }
                     if !nutrition.source.isEmpty {
                         LabeledContent("来源", value: nutrition.source)
                     }
@@ -321,13 +240,8 @@ struct DrinkRecordForm: View {
 
             Section("时间与地点") {
                 DatePicker("饮用时间", selection: $consumedAt, displayedComponents: [.date, .hourAndMinute])
-                NavigationLink {
-                    MapLocationPickerView { selection in
-                        locationName = selection.storeName
-                        locationAddress = selection.address
-                        locationLatitude = selection.latitude
-                        locationLongitude = selection.longitude
-                    }
+                Button {
+                    isSelectingLocation = true
                 } label: {
                     Label(locationLatitude == nil ? "从地图选择地点" : "重新选择地图地点", systemImage: "map")
                 }
@@ -387,6 +301,16 @@ struct DrinkRecordForm: View {
             NavigationStack {
                 MenuPickerView(catalog: menuCatalog) { drink in
                     chooseMenuDrink(drink)
+                }
+            }
+        }
+        .sheet(isPresented: $isSelectingLocation) {
+            NavigationStack {
+                MapLocationPickerView { selection in
+                    locationName = selection.storeName
+                    locationAddress = selection.address
+                    locationLatitude = selection.latitude
+                    locationLongitude = selection.longitude
                 }
             }
             .presentationDetents([.large])
@@ -498,7 +422,7 @@ struct DrinkRecordForm: View {
                     : nil
             )
             if originalServing.temperature == temperature, originalServing.ice == ice,
-               let savedNutrition = originalRecord.nutrition {
+               let savedNutrition = originalRecord.nutrition, savedNutrition.confidence != .unavailable {
                 return savedNutrition
             }
         }
@@ -519,7 +443,9 @@ struct DrinkRecordForm: View {
         guard let originalRecord,
               originalRecord.brandName == brandName,
               originalRecord.drinkName == drinkName else {
-            return NutritionSnapshot(energyKcal: nil, sugarGrams: nil, caffeineMilligrams: nil, confidence: .unavailable)
+            return RoughNutritionEstimator.drink(name: drinkName, sizeML: recordSizeML,
+                                                  cupType: cupType, sweetness: sweetness,
+                                                  temperature: temperature, ice: ice)
         }
         let originalServing = DrinkServingSelection(
             temperature: originalRecord.temperature,
@@ -533,14 +459,16 @@ struct DrinkRecordForm: View {
            Self.normalizedSweetness(originalRecord.sweetness) == sweetness,
            originalServing.temperature == temperature,
            originalServing.ice == ice {
-            return originalRecord.nutrition ?? NutritionSnapshot(
-                energyKcal: nil,
-                sugarGrams: nil,
-                caffeineMilligrams: nil,
-                confidence: .unavailable
-            )
+            if let existing = originalRecord.nutrition, existing.confidence != .unavailable {
+                return existing
+            }
+            return RoughNutritionEstimator.drink(name: drinkName, sizeML: recordSizeML,
+                                                 cupType: cupType, sweetness: sweetness,
+                                                 temperature: temperature, ice: ice)
         }
-        return NutritionSnapshot(energyKcal: nil, sugarGrams: nil, caffeineMilligrams: nil, confidence: .unavailable)
+        return RoughNutritionEstimator.drink(name: drinkName, sizeML: recordSizeML,
+                                             cupType: cupType, sweetness: sweetness,
+                                             temperature: temperature, ice: ice)
     }
 
     @ViewBuilder
@@ -555,58 +483,13 @@ struct DrinkRecordForm: View {
     private func loadSelectedPhoto() async {
         guard let selectedPhoto else { return }
         do {
-            let data = try await selectedPhoto.loadTransferable(type: Data.self)
-            guard !Task.isCancelled else { return }
-            selectedPhotoData = data
+            selectedPhotoData = try await selectedPhoto.loadTransferable(type: Data.self)
             photoExtension = selectedPhoto.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
             photoRemoved = false
-            photoMetadataMessage = nil
-            if let data, let metadata = PhotoCaptureMetadataReader.read(from: data) {
-                await applyPhotoMetadata(metadata)
-            }
         } catch {
             selectedPhotoData = nil
             PhotoStorageDiagnosticsStore().record(stage: .photoSelection, reason: PhotoStorageDiagnosticsStore.reason(for: error))
             errorMessage = "读取所选照片失败：\(error.localizedDescription)"
-        }
-    }
-
-    private func applyPhotoMetadata(_ metadata: PhotoCaptureMetadata) async {
-        var placemark: CLPlacemark?
-        if let latitude = metadata.latitude, let longitude = metadata.longitude {
-            let location = CLLocation(latitude: latitude, longitude: longitude)
-            placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first
-        }
-        guard !Task.isCancelled else { return }
-
-        if let date = metadata.date {
-            consumedAt = date
-        }
-
-        var locationWasResolved = false
-        if let latitude = metadata.latitude, let longitude = metadata.longitude {
-            locationLatitude = latitude
-            locationLongitude = longitude
-            if let placemark {
-                locationName = placemark.name ?? placemark.locality ?? ""
-                locationAddress = MapLocationPickerView.address(from: placemark)
-                locationWasResolved = !locationAddress.isEmpty
-            } else {
-                locationName = ""
-                locationAddress = ""
-            }
-        }
-
-        if metadata.date != nil, metadata.latitude != nil {
-            photoMetadataMessage = locationWasResolved
-                ? "已从照片读取拍摄时间和地点，并填入记录。"
-                : "已读取照片拍摄时间和坐标；地址暂时无法解析。"
-        } else if metadata.date != nil {
-            photoMetadataMessage = "已从照片读取拍摄时间，并填入记录。"
-        } else if metadata.latitude != nil {
-            photoMetadataMessage = locationWasResolved
-                ? "已从照片读取拍摄地点，并填入记录。"
-                : "已读取照片坐标；地址暂时无法解析。"
         }
     }
 
@@ -889,7 +772,11 @@ struct MealRecordForm: View {
                     } else {
                         photo = draft.originalPhoto
                     }
-                    savedDishes.append(try MealDish(id: draft.id, name: normalizedName, photo: photo))
+                    let nutrition = draft.nutritionName == normalizedName
+                        ? (draft.nutrition ?? RoughNutritionEstimator.dish(name: normalizedName))
+                        : RoughNutritionEstimator.dish(name: normalizedName)
+                    savedDishes.append(try MealDish(id: draft.id, name: normalizedName,
+                                                    photo: photo, nutrition: nutrition))
                 }
 
                 let record = try MealRecord(
@@ -1078,6 +965,8 @@ private struct MealDishDraft: Identifiable {
     var photoData: Data?
     var photoExtension: String
     var photoRemoved: Bool
+    var nutrition: NutritionSnapshot?
+    var nutritionName: String
 
     init() {
         id = UUID()
@@ -1087,6 +976,8 @@ private struct MealDishDraft: Identifiable {
         photoData = nil
         photoExtension = "jpg"
         photoRemoved = false
+        nutrition = nil
+        nutritionName = ""
     }
 
     init(dish: MealDish) {
@@ -1097,6 +988,8 @@ private struct MealDishDraft: Identifiable {
         photoData = nil
         photoExtension = dish.photo?.fileExtension ?? "jpg"
         photoRemoved = false
+        nutrition = dish.nutrition
+        nutritionName = dish.name
     }
 }
 
@@ -1106,6 +999,9 @@ private struct MealDishEditorRow: View {
     let onRemove: () -> Void
     @State private var savedPhotoData: Data?
     @State private var errorMessage: String?
+    @State private var aiConfigured = false
+    @State private var isRecognizing = false
+    @State private var showUploadConfirmation = false
 
     var body: some View {
         let imageData = draft.photoData ?? (draft.photoRemoved ? nil : savedPhotoData)
@@ -1130,11 +1026,50 @@ private struct MealDishEditorRow: View {
         .task {
             await loadSavedPhoto()
         }
+        .onAppear { aiConfigured = AISettingsStore.isReady }
+        .confirmationDialog("将菜品照片发送给您配置的 AI 服务商？",
+                            isPresented: $showUploadConfirmation, titleVisibility: .visible) {
+            Button("发送照片并识别") { Task { await recognizeFood() } }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("仅本次发送处理后的照片，服务商可能收费。营养结果为估算值，您可以更正菜名。")
+        }
+    }
+
+    private var hasPhoto: Bool {
+        draft.photoData != nil || (!draft.photoRemoved && savedPhotoData != nil)
     }
 
     private var dishFields: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("菜品名称（必填）", text: $draft.name)
+
+            if !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let nutrition = draft.nutritionName == draft.name && draft.nutrition != nil
+                    ? draft.nutrition!
+                    : RoughNutritionEstimator.dish(name: draft.name)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(nutrition.confidence.displayName) · \(Int(nutrition.energyKcal ?? 0)) kcal")
+                        .font(.subheadline.weight(.semibold))
+                    Text("蛋白质 \(Int(nutrition.proteinGrams ?? 0))g · 脂肪 \(Int(nutrition.fatGrams ?? 0))g · 碳水 \(Int(nutrition.carbohydrateGrams ?? 0))g")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(nutrition.assumptions)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if aiConfigured && hasPhoto {
+                Button {
+                    showUploadConfirmation = true
+                } label: {
+                    Label(isRecognizing ? "正在分析照片…" : "AI 识别并估算营养", systemImage: "sparkles")
+                }
+                .disabled(isRecognizing)
+            }
+
             if let errorMessage {
                 Text(errorMessage)
                     .font(.caption)
@@ -1145,6 +1080,8 @@ private struct MealDishEditorRow: View {
                     draft.photoRemoved = true
                     draft.photoData = nil
                     draft.selectedPhoto = nil
+                    draft.nutrition = nil
+                    draft.nutritionName = ""
                 }
                 .font(.footnote)
             }
@@ -1170,11 +1107,35 @@ private struct MealDishEditorRow: View {
             draft.photoData = try await selectedPhoto.loadTransferable(type: Data.self)
             draft.photoExtension = selectedPhoto.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
             draft.photoRemoved = false
+            draft.nutrition = nil
+            draft.nutritionName = ""
             errorMessage = nil
         } catch {
             draft.photoData = nil
             PhotoStorageDiagnosticsStore().record(stage: .photoSelection, reason: PhotoStorageDiagnosticsStore.reason(for: error))
             errorMessage = "读取照片失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func recognizeFood() async {
+        guard aiConfigured, AISettingsStore.isReady,
+              let apiKey = AISettingsStore.apiKey(),
+              let photo = draft.photoData ?? (draft.photoRemoved ? nil : savedPhotoData) else { return }
+        isRecognizing = true
+        defer { isRecognizing = false }
+        do {
+            let result = try await AIPhotoNutritionService().recognize(
+                photo: photo, configuration: AISettingsStore.load(), apiKey: apiKey
+            )
+            let name = result.dishName.trimmingCharacters(in: .whitespacesAndNewlines)
+            draft.name = name
+            draft.nutritionName = name
+            draft.nutrition = IngredientNutritionEstimator.calculate(
+                dishName: name, ingredients: result.ingredients
+            )
+            errorMessage = nil
+        } catch {
+            errorMessage = "AI 识别失败：\(error.localizedDescription)。您仍可使用离线粗估。"
         }
     }
 

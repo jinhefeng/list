@@ -642,7 +642,7 @@ private struct JournalRecordCardRow: View {
         guard let nutrition else { return "暂无数据" }
         let isEstimated: Bool
         switch nutrition.confidence {
-        case .estimated: isEstimated = true
+        case .estimated, .rough: isEstimated = true
         case .official, .unavailable: isEstimated = false
         }
 
@@ -900,7 +900,7 @@ private struct DailyNutritionHero: View {
 
     private var qualityText: String {
         guard summary.drinkCount > 0 else { return "录入饮品后显示营养汇总" }
-        return "官方 \(summary.officialCount) · 估算 \(summary.estimatedCount) · 暂无 \(summary.unavailableCount)"
+        return "官方 \(summary.officialCount) · 估算 \(summary.estimatedCount) · 粗估 \(summary.roughCount) · 暂无 \(summary.unavailableCount)"
     }
 }
 
@@ -941,7 +941,7 @@ private struct TodayDrinkSummaryCard: View {
         let known = [summary.energyKcal.value, summary.sugarGrams.value, summary.caffeineMilligrams.value]
             .contains { $0 != nil }
         guard known else { return "营养数据暂缺" }
-        return "官方 \(summary.officialCount) · 估算 \(summary.estimatedCount) · 暂无 \(summary.unavailableCount)"
+        return "官方 \(summary.officialCount) · 估算 \(summary.estimatedCount) · 粗估 \(summary.roughCount) · 暂无 \(summary.unavailableCount)"
     }
 
     private func valueLabel(_ value: Double?) -> String {
@@ -1382,6 +1382,7 @@ private struct InsightsView: View {
         let confidence = switch nutrition.confidence {
         case .official: "官方数据"
         case .estimated: "估算值"
+        case .rough: "粗略估计"
         case .unavailable: "暂无数据"
         }
         let source = nutrition.source.isEmpty ? "" : " · \(nutrition.source)"
@@ -1729,6 +1730,10 @@ private struct RecordDetailView: View {
                                 detailLine("能量", nutrition.energyKcal.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) kcal" } ?? "")
                                 detailLine("糖", nutrition.sugarGrams.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) g" } ?? "")
                                 detailLine("咖啡因", nutrition.caffeineMilligrams.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) mg" } ?? "")
+                                detailLine("蛋白质" + (nutrition.metricSources["proteinGrams"] == "rough" ? "（粗估）" : ""), nutrition.proteinGrams.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) g" } ?? "")
+                                detailLine("脂肪" + (nutrition.metricSources["fatGrams"] == "rough" ? "（粗估）" : ""), nutrition.fatGrams.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) g" } ?? "")
+                                detailLine("碳水化合物" + (nutrition.metricSources["carbohydrateGrams"] == "rough" ? "（粗估）" : ""), nutrition.carbohydrateGrams.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) g" } ?? "")
+                                detailLine("估算假设", nutrition.assumptions)
                                 detailLine("营养来源", nutrition.source)
                                 detailLine("来源链接", nutrition.sourceURL ?? "")
                             } else {
@@ -1795,6 +1800,21 @@ private struct RecordDetailView: View {
                         }
                     }
 
+                    let mealNutrition = meal.dishes.map {
+                        $0.nutrition ?? RoughNutritionEstimator.dish(name: $0.name)
+                    }
+                    RecordDetailSection(title: "本餐营养参考") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            LabeledContent("能量", value: "约 \(Int(mealNutrition.compactMap(\.energyKcal).reduce(0, +))) kcal")
+                            LabeledContent("蛋白质", value: "约 \(Int(mealNutrition.compactMap(\.proteinGrams).reduce(0, +))) g")
+                            LabeledContent("脂肪", value: "约 \(Int(mealNutrition.compactMap(\.fatGrams).reduce(0, +))) g")
+                            LabeledContent("碳水化合物", value: "约 \(Int(mealNutrition.compactMap(\.carbohydrateGrams).reduce(0, +))) g")
+                            Text("包含离线粗估或 AI 辅助估算，实际份量与烹调用油可能造成较大误差。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     HStack(alignment: .firstTextBaseline) {
                         Text("菜品")
                             .font(.title2.weight(.bold))
@@ -1846,6 +1866,10 @@ private struct RecordDetailView: View {
                 Text("\(index + 1). \(dish.name)")
                     .font(.headline)
                     .foregroundStyle(GanfanPalette.ink)
+                let nutrition = dish.nutrition ?? RoughNutritionEstimator.dish(name: dish.name)
+                Text("\(nutrition.confidence.displayName) · 约 \(Int(nutrition.energyKcal ?? 0)) kcal")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 if dish.photo != nil {
                     Text("查看菜品照片")
                         .font(.caption)

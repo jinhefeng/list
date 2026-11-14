@@ -30,6 +30,10 @@
 		A10000000000000000000021 /* Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift */; };
 		A10000000000000000000022 /* Sources/GanfanCore/DrinkNutritionCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* Sources/GanfanCore/DrinkNutritionCalculator.swift */; };
 		A10000000000000000000023 /* GanfanHandbook/LocationPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* GanfanHandbook/LocationPickerView.swift */; };
+		A10000000000000000000024 /* Sources/GanfanCore/RoughNutritionEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* Sources/GanfanCore/RoughNutritionEstimator.swift */; };
+		A10000000000000000000025 /* Sources/GanfanCore/NutritionDataUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* Sources/GanfanCore/NutritionDataUpdate.swift */; };
+		A10000000000000000000026 /* Sources/GanfanCore/IngredientNutritionEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* Sources/GanfanCore/IngredientNutritionEstimator.swift */; };
+		A10000000000000000000027 /* GanfanHandbook/AINutritionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* GanfanHandbook/AINutritionSettings.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -58,6 +62,10 @@
 		A20000000000000000000024 /* Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift; sourceTree = "<group>"; };
 		A20000000000000000000025 /* Sources/GanfanCore/DrinkNutritionCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/DrinkNutritionCalculator.swift; sourceTree = "<group>"; };
 		A20000000000000000000026 /* GanfanHandbook/LocationPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanfanHandbook/LocationPickerView.swift; sourceTree = "<group>"; };
+		A20000000000000000000027 /* Sources/GanfanCore/RoughNutritionEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/RoughNutritionEstimator.swift; sourceTree = "<group>"; };
+		A20000000000000000000028 /* Sources/GanfanCore/NutritionDataUpdate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/NutritionDataUpdate.swift; sourceTree = "<group>"; };
+		A20000000000000000000029 /* Sources/GanfanCore/IngredientNutritionEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/IngredientNutritionEstimator.swift; sourceTree = "<group>"; };
+		A20000000000000000000030 /* GanfanHandbook/AINutritionSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanfanHandbook/AINutritionSettings.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +105,10 @@
 				A20000000000000000000024 /* Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift */,
 				A20000000000000000000025 /* Sources/GanfanCore/DrinkNutritionCalculator.swift */,
 				A20000000000000000000026 /* GanfanHandbook/LocationPickerView.swift */,
+				A20000000000000000000027 /* Sources/GanfanCore/RoughNutritionEstimator.swift */,
+				A20000000000000000000028 /* Sources/GanfanCore/NutritionDataUpdate.swift */,
+				A20000000000000000000029 /* Sources/GanfanCore/IngredientNutritionEstimator.swift */,
+				A20000000000000000000030 /* GanfanHandbook/AINutritionSettings.swift */,
 				A20000000000000000000004 /* GanfanHandbook/Info.plist */,
 				A40000000000000000000002 /* Products */,
 			);
@@ -200,6 +212,10 @@
 				A10000000000000000000020 /* Sources/GanfanCore/DailyNutritionSummary.swift in Sources */,
 				A10000000000000000000021 /* Sources/GanfanCore/PhotoStorageDiagnosticsStore.swift in Sources */,
 				A10000000000000000000022 /* Sources/GanfanCore/DrinkNutritionCalculator.swift in Sources */,
+				A10000000000000000000024 /* Sources/GanfanCore/RoughNutritionEstimator.swift in Sources */,
+				A10000000000000000000025 /* Sources/GanfanCore/NutritionDataUpdate.swift in Sources */,
+				A10000000000000000000026 /* Sources/GanfanCore/IngredientNutritionEstimator.swift in Sources */,
+				A10000000000000000000027 /* GanfanHandbook/AINutritionSettings.swift in Sources */,
 				A10000000000000000000023 /* GanfanHandbook/LocationPickerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
