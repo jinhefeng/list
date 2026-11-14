@@ -902,7 +902,7 @@ private struct DailyNutritionHero: View {
 
     private var qualityText: String {
         guard summary.drinkCount > 0 else { return "录入饮品后显示营养汇总" }
-        return "官方 \(summary.officialCount) · 估算 \(summary.estimatedCount) · 暂无 \(summary.unavailableCount)"
+        return "官方 \(summary.officialCount) · 估算 \(summary.estimatedCount) · 粗估 \(summary.roughCount) · 暂无 \(summary.unavailableCount)"
     }
 }
 
@@ -943,7 +943,7 @@ private struct TodayDrinkSummaryCard: View {
         let known = [summary.energyKcal.value, summary.sugarGrams.value, summary.caffeineMilligrams.value]
             .contains { $0 != nil }
         guard known else { return "营养数据暂缺" }
-        return "官方 \(summary.officialCount) · 估算 \(summary.estimatedCount) · 暂无 \(summary.unavailableCount)"
+        return "官方 \(summary.officialCount) · 估算 \(summary.estimatedCount) · 粗估 \(summary.roughCount) · 暂无 \(summary.unavailableCount)"
     }
 
     private func valueLabel(_ value: Double?) -> String {
