@@ -52,12 +52,14 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
     public enum Confidence: String, Codable, Sendable {
         case official
         case estimated
+        case rough
         case unavailable
 
         public var displayName: String {
             switch self {
             case .official: "官方数据"
             case .estimated: "估算值"
+            case .rough: "粗略估计"
             case .unavailable: "暂无数据"
             }
         }
@@ -69,6 +71,10 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
     public let confidence: Confidence
     public let source: String
     public let sourceURL: String?
+    public let proteinGrams: Double?
+    public let fatGrams: Double?
+    public let carbohydrateGrams: Double?
+    public let assumptions: String
 
     public init(
         energyKcal: Double?,
@@ -76,7 +82,11 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
         caffeineMilligrams: Double?,
         confidence: Confidence,
         source: String = "",
-        sourceURL: String? = nil
+        sourceURL: String? = nil,
+        proteinGrams: Double? = nil,
+        fatGrams: Double? = nil,
+        carbohydrateGrams: Double? = nil,
+        assumptions: String = ""
     ) {
         self.energyKcal = energyKcal
         self.sugarGrams = sugarGrams
@@ -84,6 +94,10 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
         self.confidence = confidence
         self.source = source
         self.sourceURL = sourceURL
+        self.proteinGrams = proteinGrams
+        self.fatGrams = fatGrams
+        self.carbohydrateGrams = carbohydrateGrams
+        self.assumptions = assumptions
     }
 }
 
@@ -183,8 +197,9 @@ public struct MealDish: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public let name: String
     public let photo: PhotoAsset?
+    public let nutrition: NutritionSnapshot?
 
-    public init(id: UUID = UUID(), name: String, photo: PhotoAsset? = nil) throws {
+    public init(id: UUID = UUID(), name: String, photo: PhotoAsset? = nil, nutrition: NutritionSnapshot? = nil) throws {
         let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedName.isEmpty else {
             throw JournalModelError.emptyDishName
@@ -192,6 +207,7 @@ public struct MealDish: Codable, Equatable, Identifiable, Sendable {
         self.id = id
         self.name = normalizedName
         self.photo = photo
+        self.nutrition = nutrition
     }
 }
 
