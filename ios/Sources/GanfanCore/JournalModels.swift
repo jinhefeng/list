@@ -99,6 +99,26 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
         self.carbohydrateGrams = carbohydrateGrams
         self.assumptions = assumptions
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case energyKcal, sugarGrams, caffeineMilligrams, confidence, source, sourceURL
+        case proteinGrams, fatGrams, carbohydrateGrams, assumptions
+    }
+
+    /// Older saved records have no macro fields or assumptions.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        energyKcal = try c.decodeIfPresent(Double.self, forKey: .energyKcal)
+        sugarGrams = try c.decodeIfPresent(Double.self, forKey: .sugarGrams)
+        caffeineMilligrams = try c.decodeIfPresent(Double.self, forKey: .caffeineMilligrams)
+        confidence = try c.decode(Confidence.self, forKey: .confidence)
+        source = try c.decodeIfPresent(String.self, forKey: .source) ?? ""
+        sourceURL = try c.decodeIfPresent(String.self, forKey: .sourceURL)
+        proteinGrams = try c.decodeIfPresent(Double.self, forKey: .proteinGrams)
+        fatGrams = try c.decodeIfPresent(Double.self, forKey: .fatGrams)
+        carbohydrateGrams = try c.decodeIfPresent(Double.self, forKey: .carbohydrateGrams)
+        assumptions = try c.decodeIfPresent(String.self, forKey: .assumptions) ?? ""
+    }
 }
 
 public struct DrinkRecord: Codable, Equatable, Identifiable, Sendable {
