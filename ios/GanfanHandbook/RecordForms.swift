@@ -401,28 +401,6 @@ struct DrinkRecordForm: View {
         }
     }
 
-    private func recognizeFood() async {
-        guard aiConfigured, AISettingsStore.isReady,
-              let apiKey = AISettingsStore.apiKey(),
-              let photo = draft.photoData ?? (draft.photoRemoved ? nil : savedPhotoData) else { return }
-        isRecognizing = true
-        defer { isRecognizing = false }
-        do {
-            let result = try await AIPhotoNutritionService().recognize(
-                photo: photo, configuration: AISettingsStore.load(), apiKey: apiKey
-            )
-            let name = result.dishName.trimmingCharacters(in: .whitespacesAndNewlines)
-            draft.name = name
-            draft.nutritionName = name
-            draft.nutrition = IngredientNutritionEstimator.calculate(
-                dishName: name, ingredients: result.ingredients
-            )
-            errorMessage = nil
-        } catch {
-            errorMessage = "AI 识别失败：\(error.localizedDescription)。您仍可使用离线粗估。"
-        }
-    }
-
     private func loadSavedPhoto() async {
         guard let photo = originalRecord?.photo else { return }
         do {
@@ -945,6 +923,28 @@ private struct MealDishEditorRow: View {
             draft.photoData = nil
             PhotoStorageDiagnosticsStore().record(stage: .photoSelection, reason: PhotoStorageDiagnosticsStore.reason(for: error))
             errorMessage = "读取照片失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func recognizeFood() async {
+        guard aiConfigured, AISettingsStore.isReady,
+              let apiKey = AISettingsStore.apiKey(),
+              let photo = draft.photoData ?? (draft.photoRemoved ? nil : savedPhotoData) else { return }
+        isRecognizing = true
+        defer { isRecognizing = false }
+        do {
+            let result = try await AIPhotoNutritionService().recognize(
+                photo: photo, configuration: AISettingsStore.load(), apiKey: apiKey
+            )
+            let name = result.dishName.trimmingCharacters(in: .whitespacesAndNewlines)
+            draft.name = name
+            draft.nutritionName = name
+            draft.nutrition = IngredientNutritionEstimator.calculate(
+                dishName: name, ingredients: result.ingredients
+            )
+            errorMessage = nil
+        } catch {
+            errorMessage = "AI 识别失败：\(error.localizedDescription)。您仍可使用离线粗估。"
         }
     }
 
