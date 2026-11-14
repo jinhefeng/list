@@ -1804,10 +1804,10 @@ private struct RecordDetailView: View {
                     }
                     RecordDetailSection(title: "本餐营养参考") {
                         VStack(alignment: .leading, spacing: 8) {
-                            LabeledContent("能量", value: "约 \(Int(mealNutrition.compactMap(\\.energyKcal).reduce(0, +))) kcal")
-                            LabeledContent("蛋白质", value: "约 \(Int(mealNutrition.compactMap(\\.proteinGrams).reduce(0, +))) g")
-                            LabeledContent("脂肪", value: "约 \(Int(mealNutrition.compactMap(\\.fatGrams).reduce(0, +))) g")
-                            LabeledContent("碳水化合物", value: "约 \(Int(mealNutrition.compactMap(\\.carbohydrateGrams).reduce(0, +))) g")
+                            LabeledContent("能量", value: "约 \(Int(mealNutrition.compactMap(\.energyKcal).reduce(0, +))) kcal")
+                            LabeledContent("蛋白质", value: "约 \(Int(mealNutrition.compactMap(\.proteinGrams).reduce(0, +))) g")
+                            LabeledContent("脂肪", value: "约 \(Int(mealNutrition.compactMap(\.fatGrams).reduce(0, +))) g")
+                            LabeledContent("碳水化合物", value: "约 \(Int(mealNutrition.compactMap(\.carbohydrateGrams).reduce(0, +))) g")
                             Text("包含离线粗估或 AI 辅助估算，实际份量与烹调用油可能造成较大误差。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
