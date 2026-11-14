@@ -16,6 +16,19 @@ struct MoreView: View {
                 }
             }
 
+            Section("营养与智能识别") {
+                NavigationLink {
+                    NutritionUpdateSettingsView()
+                } label: {
+                    MoreDestinationRow(title: "营养数据库", detail: "查看内置数据及检查在线更新", symbol: "arrow.down.doc")
+                }
+                NavigationLink {
+                    AINutritionSettingsView()
+                } label: {
+                    MoreDestinationRow(title: "AI 模型设置", detail: "配置自己的 API；未配置时不显示识别入口", symbol: "slider.horizontal.3")
+                }
+            }
+
             Section("数据管理") {
                 NavigationLink {
                     StorageDiagnosticsView()
@@ -677,5 +690,84 @@ private struct CupSizeSettingsView: View {
         }
         onSave(result)
         dismiss()
+    }
+}
+
+
+/// Data updates are downloaded only after an explicit user action.
+struct NutritionUpdateSettingsView: View {
+    @AppStorage("ganfan.nutrition.updateURL.v1") private var updateURL = ""
+    @State private var currentVersion = "仅内置"
+    @State private var currentCount = 0
+    @State private var status = ""
+    @State private var isUpdating = false
+
+    var body: some View {
+        Form {
+            Section("当前营养资料") {
+                LabeledContent("在线数据版本", value: currentVersion)
+                LabeledContent("已安装远程记录", value: "\(currentCount) 条")
+                Text("App 随安装包提供内置营养数据；更新成功后存储在本机。用户手动维护的饮品资料优先于远程版本，历史记录不会被修改。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Section("在线更新") {
+                TextField("HTTPS JSON 文件地址", text: $updateURL)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                Button {
+                    Task { await update() }
+                } label: {
+                    HStack {
+                        Text("检查并更新营养数据")
+                        if isUpdating { Spacer(); ProgressView() }
+                    }
+                }
+                .disabled(isUpdating || updateURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            } footer: {
+                Text("远程文件由您自行托管；仅支持 HTTPS 和版本化营养数据包。更新异常时保留之前的本机数据。")
+            }
+            if !status.isEmpty {
+                Section("更新结果") {
+                    Text(status).font(.footnote)
+                }
+            }
+        }
+        .navigationTitle("营养数据库")
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .background(GanfanPalette.canvas)
+        .onAppear(perform: refresh)
+    }
+
+    private func refresh() {
+        let pack = NutritionUpdateRepository().load()
+        currentVersion = pack?.version ?? "仅内置"
+        currentCount = pack?.entries.count ?? 0
+    }
+
+    private func update() async {
+        guard let url = URL(string: updateURL.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            status = "请输入合法的 HTTPS JSON 地址。"
+            return
+        }
+        isUpdating = true
+        defer { isUpdating = false }
+        do {
+            guard let catalogURL = Bundle.main.url(forResource: "catalog", withExtension: "json") else {
+                status = "内置菜单不可用。"
+                return
+            }
+            let bundled = try MenuCatalog.decode(Data(contentsOf: catalogURL))
+            let bytes = try await NutritionUpdateClient().fetch(from: url)
+            let pack = try NutritionUpdateRepository().install(bytes, bundled: bundled)
+            refresh()
+            status = "已更新至 \(pack.version)：包含 \(pack.entries.count) 条远程营养数据。"
+        } catch NutritionUpdateError.olderVersion {
+            status = "已经是当前版本或远程版本更旧，没有覆盖本地数据。"
+        } catch {
+            status = "更新未完成：\(error.localizedDescription)"
+        }
     }
 }
