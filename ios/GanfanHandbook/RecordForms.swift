@@ -330,7 +330,7 @@ struct DrinkRecordForm: View {
                     : nil
             )
             if originalServing.temperature == temperature, originalServing.ice == ice,
-               let savedNutrition = originalRecord.nutrition {
+               let savedNutrition = originalRecord.nutrition, savedNutrition.confidence != .unavailable {
                 return savedNutrition
             }
         }
@@ -398,6 +398,28 @@ struct DrinkRecordForm: View {
             selectedPhotoData = nil
             PhotoStorageDiagnosticsStore().record(stage: .photoSelection, reason: PhotoStorageDiagnosticsStore.reason(for: error))
             errorMessage = "读取所选照片失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func recognizeFood() async {
+        guard aiConfigured, AISettingsStore.isReady,
+              let apiKey = AISettingsStore.apiKey(),
+              let photo = draft.photoData ?? (draft.photoRemoved ? nil : savedPhotoData) else { return }
+        isRecognizing = true
+        defer { isRecognizing = false }
+        do {
+            let result = try await AIPhotoNutritionService().recognize(
+                photo: photo, configuration: AISettingsStore.load(), apiKey: apiKey
+            )
+            let name = result.dishName.trimmingCharacters(in: .whitespacesAndNewlines)
+            draft.name = name
+            draft.nutritionName = name
+            draft.nutrition = IngredientNutritionEstimator.calculate(
+                dishName: name, ingredients: result.ingredients
+            )
+            errorMessage = nil
+        } catch {
+            errorMessage = "AI 识别失败：\(error.localizedDescription)。您仍可使用离线粗估。"
         }
     }
 
@@ -685,7 +707,11 @@ struct MealRecordForm: View {
                     } else {
                         photo = draft.originalPhoto
                     }
-                    savedDishes.append(try MealDish(id: draft.id, name: normalizedName, photo: photo))
+                    let nutrition = draft.nutritionName == normalizedName
+                        ? (draft.nutrition ?? RoughNutritionEstimator.dish(name: normalizedName))
+                        : RoughNutritionEstimator.dish(name: normalizedName)
+                    savedDishes.append(try MealDish(id: draft.id, name: normalizedName,
+                                                    photo: photo, nutrition: nutrition))
                 }
 
                 let record = try MealRecord(
@@ -791,6 +817,8 @@ private struct MealDishDraft: Identifiable {
     var photoData: Data?
     var photoExtension: String
     var photoRemoved: Bool
+    var nutrition: NutritionSnapshot?
+    var nutritionName: String
 
     init() {
         id = UUID()
@@ -800,6 +828,8 @@ private struct MealDishDraft: Identifiable {
         photoData = nil
         photoExtension = "jpg"
         photoRemoved = false
+        nutrition = nil
+        nutritionName = ""
     }
 
     init(dish: MealDish) {
@@ -810,6 +840,8 @@ private struct MealDishDraft: Identifiable {
         photoData = nil
         photoExtension = dish.photo?.fileExtension ?? "jpg"
         photoRemoved = false
+        nutrition = dish.nutrition
+        nutritionName = dish.name
     }
 }
 
@@ -817,9 +849,12 @@ private struct MealDishEditorRow: View {
     @Binding var draft: MealDishDraft
     @State private var savedPhotoData: Data?
     @State private var errorMessage: String?
+    @State private var aiConfigured = false
+    @State private var isRecognizing = false
+    @State private var showUploadConfirmation = false
 
     var body: some View {
-        let hasPhoto = draft.photoData != nil || savedPhotoData != nil
+        let hasPhoto = draft.photoData != nil || (!draft.photoRemoved && savedPhotoData != nil)
 
         VStack(alignment: .leading, spacing: 8) {
             if let previewData = draft.photoData ?? (draft.photoRemoved ? nil : savedPhotoData),
@@ -837,6 +872,33 @@ private struct MealDishEditorRow: View {
 
             TextField("菜品名称（必填）", text: $draft.name)
 
+            if !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let nutrition = draft.nutritionName == draft.name && draft.nutrition != nil
+                    ? draft.nutrition!
+                    : RoughNutritionEstimator.dish(name: draft.name)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(nutrition.confidence.displayName) · \(Int(nutrition.energyKcal ?? 0)) kcal")
+                        .font(.subheadline.weight(.semibold))
+                    Text("蛋白质 \(Int(nutrition.proteinGrams ?? 0))g · 脂肪 \(Int(nutrition.fatGrams ?? 0))g · 碳水 \(Int(nutrition.carbohydrateGrams ?? 0))g")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(nutrition.assumptions)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // Deliberately remove the entire entry point when AI is not configured.
+            if aiConfigured && hasPhoto {
+                Button {
+                    showUploadConfirmation = true
+                } label: {
+                    Label(isRecognizing ? "正在分析照片…" : "AI 识别并估算营养", systemImage: "sparkles")
+                }
+                .disabled(isRecognizing)
+            }
+
             if errorMessage != nil {
                 Text(errorMessage ?? "")
                     .font(.caption)
@@ -848,9 +910,19 @@ private struct MealDishEditorRow: View {
                     draft.photoRemoved = true
                     draft.photoData = nil
                     draft.selectedPhoto = nil
+                    draft.nutrition = nil
+                    draft.nutritionName = ""
                 }
                 .font(.caption)
             }
+        }
+        .onAppear { aiConfigured = AISettingsStore.isReady }
+        .confirmationDialog("将菜品照片发送给您配置的 AI 服务商？",
+                            isPresented: $showUploadConfirmation, titleVisibility: .visible) {
+            Button("发送照片并识别") { Task { await recognizeFood() } }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("仅本次发送处理后的照片，服务商可能收费。营养结果为估算值，您可以更正菜名。")
         }
         .task(id: draft.selectedPhoto) {
             await loadSelectedPhoto()
@@ -866,6 +938,8 @@ private struct MealDishEditorRow: View {
             draft.photoData = try await selectedPhoto.loadTransferable(type: Data.self)
             draft.photoExtension = selectedPhoto.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
             draft.photoRemoved = false
+            draft.nutrition = nil
+            draft.nutritionName = ""
             errorMessage = nil
         } catch {
             draft.photoData = nil
