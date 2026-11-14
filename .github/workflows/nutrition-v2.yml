@@ -1,10 +1,12 @@
 name: Nutrition V2 iOS validation
 on:
-  push:
-    branches: [feature/nutrition-v2]
   pull_request:
     branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: nutrition-v2-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   swift-and-ios:
