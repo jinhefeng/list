@@ -30,6 +30,9 @@ public enum RoughNutritionEstimator {
         if matches(text, ["拿铁", "卡布奇诺", "摩卡", "馥芮白", "奶咖", "latte", "cappuccino"]) {
             return Profile(label: "奶咖", energy: 55, sugar: 5, caffeine: 20, protein: 2.3, fat: 2.4, carbohydrate: 6)
         }
+        if matches(text, ["咖啡", "coffee"]) {
+            return Profile(label: "普通咖啡", energy: 5, sugar: 0, caffeine: 30, protein: 0.3, fat: 0, carbohydrate: 0.6)
+        }
         if matches(text, ["奶茶", "鲜奶", "厚乳", "牛乳", "椰奶", "奶绿", "奶盖", "珍珠", "芋泥"]) {
             return Profile(label: "奶茶类", energy: 65, sugar: 7, caffeine: 12, protein: 1.5, fat: 2.5, carbohydrate: 9)
         }
