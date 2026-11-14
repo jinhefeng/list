@@ -644,7 +644,7 @@ private struct JournalRecordCardRow: View {
         guard let nutrition else { return "暂无数据" }
         let isEstimated: Bool
         switch nutrition.confidence {
-        case .estimated: isEstimated = true
+        case .estimated, .rough: isEstimated = true
         case .official, .unavailable: isEstimated = false
         }
 
@@ -1381,6 +1381,7 @@ private struct InsightsView: View {
         let confidence = switch nutrition.confidence {
         case .official: "官方数据"
         case .estimated: "估算值"
+        case .rough: "粗略估计"
         case .unavailable: "暂无数据"
         }
         let source = nutrition.source.isEmpty ? "" : " · \(nutrition.source)"
