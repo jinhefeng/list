@@ -75,6 +75,7 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
     public let fatGrams: Double?
     public let carbohydrateGrams: Double?
     public let assumptions: String
+    public let metricSources: [String: String]
 
     public init(
         energyKcal: Double?,
@@ -86,7 +87,8 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
         proteinGrams: Double? = nil,
         fatGrams: Double? = nil,
         carbohydrateGrams: Double? = nil,
-        assumptions: String = ""
+        assumptions: String = "",
+        metricSources: [String: String] = [:]
     ) {
         self.energyKcal = energyKcal
         self.sugarGrams = sugarGrams
@@ -98,11 +100,12 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
         self.fatGrams = fatGrams
         self.carbohydrateGrams = carbohydrateGrams
         self.assumptions = assumptions
+        self.metricSources = metricSources
     }
 
     private enum CodingKeys: String, CodingKey {
         case energyKcal, sugarGrams, caffeineMilligrams, confidence, source, sourceURL
-        case proteinGrams, fatGrams, carbohydrateGrams, assumptions
+        case proteinGrams, fatGrams, carbohydrateGrams, assumptions, metricSources
     }
 
     /// Older saved records have no macro fields or assumptions.
@@ -118,6 +121,7 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
         fatGrams = try c.decodeIfPresent(Double.self, forKey: .fatGrams)
         carbohydrateGrams = try c.decodeIfPresent(Double.self, forKey: .carbohydrateGrams)
         assumptions = try c.decodeIfPresent(String.self, forKey: .assumptions) ?? ""
+        metricSources = try c.decodeIfPresent([String: String].self, forKey: .metricSources) ?? [:]
     }
 }
 
