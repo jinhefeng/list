@@ -153,9 +153,9 @@ struct DrinkRecordForm: View {
                     nutritionValue("能量", amount: nutrition.energyKcal, unit: "kcal")
                     nutritionValue("糖", amount: nutrition.sugarGrams, unit: "g")
                     nutritionValue("咖啡因", amount: nutrition.caffeineMilligrams, unit: "mg")
-                    nutritionValue("蛋白质", amount: nutrition.proteinGrams, unit: "g")
-                    nutritionValue("脂肪", amount: nutrition.fatGrams, unit: "g")
-                    nutritionValue("碳水化合物", amount: nutrition.carbohydrateGrams, unit: "g")
+                    nutritionValue("蛋白质" + (nutrition.metricSources["proteinGrams"] == "rough" ? "（粗估）" : ""), amount: nutrition.proteinGrams, unit: "g")
+                    nutritionValue("脂肪" + (nutrition.metricSources["fatGrams"] == "rough" ? "（粗估）" : ""), amount: nutrition.fatGrams, unit: "g")
+                    nutritionValue("碳水化合物" + (nutrition.metricSources["carbohydrateGrams"] == "rough" ? "（粗估）" : ""), amount: nutrition.carbohydrateGrams, unit: "g")
                     if !nutrition.assumptions.isEmpty {
                         Text(nutrition.assumptions).font(.caption).foregroundStyle(.secondary)
                     }
