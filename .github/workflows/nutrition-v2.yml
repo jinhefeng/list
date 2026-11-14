@@ -1,0 +1,20 @@
+name: Nutrition V2 iOS validation
+on:
+  push:
+    branches: [feature/nutrition-v2]
+  workflow_dispatch:
+
+jobs:
+  swift-and-ios:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift core tests
+        run: cd ios && swift test --parallel
+      - name: iOS simulator build
+        run: |
+          xcodebuild -project ios/GanfanHandbook.xcodeproj \
+            -scheme GanfanHandbook -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build
