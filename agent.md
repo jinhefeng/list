@@ -1,5 +1,9 @@
 # Agent Development Rules
 
+## Device Hub debugging preference
+
+For this iOS project, prefer doing interactive debugging and runtime checks in Device Hub whenever practical. Use either a connected physical device or a simulator; a physical device is not required when a simulator is suitable. If a needed debugging action is unavailable in Device Hub, use the appropriate alternative and note the limitation.
+
 ## Test-driven development is mandatory
 
 This project must be developed from the test file at `tests/mvp.test.md`.
