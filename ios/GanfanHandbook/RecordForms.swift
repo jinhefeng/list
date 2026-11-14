@@ -153,6 +153,12 @@ struct DrinkRecordForm: View {
                     nutritionValue("能量", amount: nutrition.energyKcal, unit: "kcal")
                     nutritionValue("糖", amount: nutrition.sugarGrams, unit: "g")
                     nutritionValue("咖啡因", amount: nutrition.caffeineMilligrams, unit: "mg")
+                    nutritionValue("蛋白质", amount: nutrition.proteinGrams, unit: "g")
+                    nutritionValue("脂肪", amount: nutrition.fatGrams, unit: "g")
+                    nutritionValue("碳水化合物", amount: nutrition.carbohydrateGrams, unit: "g")
+                    if !nutrition.assumptions.isEmpty {
+                        Text(nutrition.assumptions).font(.caption).foregroundStyle(.secondary)
+                    }
                     if !nutrition.source.isEmpty {
                         LabeledContent("来源", value: nutrition.source)
                     }
@@ -345,7 +351,9 @@ struct DrinkRecordForm: View {
         guard let originalRecord,
               originalRecord.brandName == brandName,
               originalRecord.drinkName == drinkName else {
-            return NutritionSnapshot(energyKcal: nil, sugarGrams: nil, caffeineMilligrams: nil, confidence: .unavailable)
+            return RoughNutritionEstimator.drink(name: drinkName, sizeML: recordSizeML,
+                                                  cupType: cupType, sweetness: sweetness,
+                                                  temperature: temperature, ice: ice)
         }
         let originalServing = DrinkServingSelection(
             temperature: originalRecord.temperature,
@@ -366,7 +374,9 @@ struct DrinkRecordForm: View {
                 confidence: .unavailable
             )
         }
-        return NutritionSnapshot(energyKcal: nil, sugarGrams: nil, caffeineMilligrams: nil, confidence: .unavailable)
+        return RoughNutritionEstimator.drink(name: drinkName, sizeML: recordSizeML,
+                                             cupType: cupType, sweetness: sweetness,
+                                             temperature: temperature, ice: ice)
     }
 
     @ViewBuilder
