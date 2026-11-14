@@ -52,12 +52,14 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
     public enum Confidence: String, Codable, Sendable {
         case official
         case estimated
+        case rough
         case unavailable
 
         public var displayName: String {
             switch self {
             case .official: "官方数据"
             case .estimated: "估算值"
+            case .rough: "粗略估计"
             case .unavailable: "暂无数据"
             }
         }
@@ -69,6 +71,11 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
     public let confidence: Confidence
     public let source: String
     public let sourceURL: String?
+    public let proteinGrams: Double?
+    public let fatGrams: Double?
+    public let carbohydrateGrams: Double?
+    public let assumptions: String
+    public let metricSources: [String: String]
 
     public init(
         energyKcal: Double?,
@@ -76,7 +83,12 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
         caffeineMilligrams: Double?,
         confidence: Confidence,
         source: String = "",
-        sourceURL: String? = nil
+        sourceURL: String? = nil,
+        proteinGrams: Double? = nil,
+        fatGrams: Double? = nil,
+        carbohydrateGrams: Double? = nil,
+        assumptions: String = "",
+        metricSources: [String: String] = [:]
     ) {
         self.energyKcal = energyKcal
         self.sugarGrams = sugarGrams
@@ -84,6 +96,32 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
         self.confidence = confidence
         self.source = source
         self.sourceURL = sourceURL
+        self.proteinGrams = proteinGrams
+        self.fatGrams = fatGrams
+        self.carbohydrateGrams = carbohydrateGrams
+        self.assumptions = assumptions
+        self.metricSources = metricSources
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case energyKcal, sugarGrams, caffeineMilligrams, confidence, source, sourceURL
+        case proteinGrams, fatGrams, carbohydrateGrams, assumptions, metricSources
+    }
+
+    /// Older saved records have no macro fields or assumptions.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        energyKcal = try c.decodeIfPresent(Double.self, forKey: .energyKcal)
+        sugarGrams = try c.decodeIfPresent(Double.self, forKey: .sugarGrams)
+        caffeineMilligrams = try c.decodeIfPresent(Double.self, forKey: .caffeineMilligrams)
+        confidence = try c.decode(Confidence.self, forKey: .confidence)
+        source = try c.decodeIfPresent(String.self, forKey: .source) ?? ""
+        sourceURL = try c.decodeIfPresent(String.self, forKey: .sourceURL)
+        proteinGrams = try c.decodeIfPresent(Double.self, forKey: .proteinGrams)
+        fatGrams = try c.decodeIfPresent(Double.self, forKey: .fatGrams)
+        carbohydrateGrams = try c.decodeIfPresent(Double.self, forKey: .carbohydrateGrams)
+        assumptions = try c.decodeIfPresent(String.self, forKey: .assumptions) ?? ""
+        metricSources = try c.decodeIfPresent([String: String].self, forKey: .metricSources) ?? [:]
     }
 }
 
@@ -183,8 +221,9 @@ public struct MealDish: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public let name: String
     public let photo: PhotoAsset?
+    public let nutrition: NutritionSnapshot?
 
-    public init(id: UUID = UUID(), name: String, photo: PhotoAsset? = nil) throws {
+    public init(id: UUID = UUID(), name: String, photo: PhotoAsset? = nil, nutrition: NutritionSnapshot? = nil) throws {
         let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedName.isEmpty else {
             throw JournalModelError.emptyDishName
@@ -192,6 +231,7 @@ public struct MealDish: Codable, Equatable, Identifiable, Sendable {
         self.id = id
         self.name = normalizedName
         self.photo = photo
+        self.nutrition = nutrition
     }
 }
 

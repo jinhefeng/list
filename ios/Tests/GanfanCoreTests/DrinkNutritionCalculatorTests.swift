@@ -81,9 +81,9 @@ final class DrinkNutritionCalculatorTests: XCTestCase {
             ice: "少冰"
         )
 
-        XCTAssertNil(snapshot.energyKcal)
-        XCTAssertEqual(snapshot.confidence, .unavailable)
-        XCTAssertEqual(snapshot.source, "")
+        XCTAssertNotNil(snapshot.energyKcal)
+        XCTAssertEqual(snapshot.confidence, .rough)
+        XCTAssertTrue(snapshot.source.contains("粗估"))
     }
 
     func testPerMilliliterBaselineScalesWithKnownSize() {
@@ -106,7 +106,7 @@ final class DrinkNutritionCalculatorTests: XCTestCase {
         XCTAssertEqual(snapshot.source, "按每 100 ml 估算")
     }
 
-    func testPerCupBaselineDoesNotRequireCapacityAndUnknownMlSizeIsUnavailable() {
+    func testPerCupBaselineDoesNotRequireCapacityAndUnknownMlSizeFallsBackToRough() {
         let perCupDrink = menuDrink(perUnit: MenuNutritionPerUnit(
             amount: 1,
             unit: "杯",
@@ -116,7 +116,9 @@ final class DrinkNutritionCalculatorTests: XCTestCase {
         ))
         let perCup = DrinkNutritionCalculator.snapshot(for: perCupDrink, cupType: "自定义杯")
         XCTAssertEqual(perCup.energyKcal, 120)
-        XCTAssertEqual(perCup.confidence, .official)
+        XCTAssertEqual(perCup.confidence, .rough)
+        XCTAssertEqual(perCup.metricSources["energyKcal"], "official")
+        XCTAssertEqual(perCup.metricSources["sugarGrams"], "rough")
 
         let perMLDrink = menuDrink(perUnit: MenuNutritionPerUnit(
             amount: 100,
@@ -125,8 +127,27 @@ final class DrinkNutritionCalculatorTests: XCTestCase {
             sourceType: "official"
         ))
         let unknownSize = DrinkNutritionCalculator.snapshot(for: perMLDrink, cupType: "未知容量杯")
-        XCTAssertNil(unknownSize.energyKcal)
-        XCTAssertEqual(unknownSize.confidence, .unavailable)
+        XCTAssertNotNil(unknownSize.energyKcal)
+        XCTAssertEqual(unknownSize.confidence, .rough)
+    }
+
+    func testRoughEstimateDoesNotClaimZeroSugarForMilkTea() {
+        let drink = MenuDrink(id: "tea", brandID: "a", brandName: "示例", name: "鲜奶茶", category: "奶茶")
+        let result = DrinkNutritionCalculator.snapshot(for: drink, cupType: "中杯", sizeML: 500, sweetness: "无糖")
+        XCTAssertEqual(result.confidence, .rough)
+        XCTAssertGreaterThan(result.sugarGrams ?? 0, 0)
+        XCTAssertNotNil(result.energyKcal)
+        XCTAssertNotNil(result.proteinGrams)
+        XCTAssertTrue(result.assumptions.contains("500"))
+    }
+
+    func testKnownGenericBaselineIsNotReusedForDifferentSweetness() {
+        let drink = menuDrink(perUnit: MenuNutritionPerUnit(
+            amount: 100, unit: "ml", energyKcal: 80, sourceType: "official"
+        ))
+        let result = DrinkNutritionCalculator.snapshot(for: drink, sizeML: 500, sweetness: "三分糖")
+        XCTAssertEqual(result.confidence, .rough)
+        XCTAssertNotEqual(result.energyKcal, 400)
     }
 
     private func menuDrink(

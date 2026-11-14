@@ -91,7 +91,10 @@ public enum DrinkNutritionCalculator {
         temperature: String = "",
         ice: String = ""
     ) -> NutritionSnapshot {
-        guard let drink else { return unavailable }
+        guard let drink else {
+            return RoughNutritionEstimator.drink(name: "", sizeML: sizeML, cupType: cupType,
+                                                  sweetness: sweetness, temperature: temperature, ice: ice)
+        }
 
         let serving = DrinkServingSelection(temperature: temperature, ice: ice)
         let eligibleVariants = drink.nutritionVariants.filter { variant in
@@ -111,7 +114,9 @@ public enum DrinkNutritionCalculator {
                 && (variant.toppings?.isEmpty ?? true)
         }
 
-        let multiplier = perUnitMultiplier(drink.nutritionPerUnit, sizeML: sizeML)
+        // A generic per-100ml label cannot be claimed to match an arbitrary sweetness.
+        let multiplier = normalized(sweetness).isEmpty
+            ? perUnitMultiplier(drink.nutritionPerUnit, sizeML: sizeML) : nil
         let values: [ValueWithSource?] = Nutrient.allCases.map { nutrient in
             if let selectedVariant,
                let value = valid(nutrient.variantValue(selectedVariant)) {
@@ -136,21 +141,45 @@ public enum DrinkNutritionCalculator {
         }
 
         let availableValues = values.compactMap { $0 }
-        guard !availableValues.isEmpty else { return unavailable }
-
+        let rough = RoughNutritionEstimator.drink(name: drink.name, category: drink.category,
+                                                   sizeML: sizeML, cupType: cupType, sweetness: sweetness,
+                                                   temperature: temperature, ice: ice)
+        // Fill missing metrics independently, rather than reporting unknown sugar or caffeine
+        // as zero. Any mixed snapshot is marked as rough, with both sources preserved.
+        let usedRoughValue = values.contains(where: { $0 == nil })
         let usedEstimatedValue = availableValues.contains { $0.confidence == .estimated }
-        let snapshotConfidence: NutritionSnapshot.Confidence = usedEstimatedValue ? .estimated : .official
+        let snapshotConfidence: NutritionSnapshot.Confidence = usedRoughValue ? .rough :
+            (usedEstimatedValue ? .estimated : .official)
         let sources = Array(Set(availableValues.map(\.source).filter { !$0.isEmpty })).sorted()
         let sourceURLs = Array(Set(availableValues.map(\.sourceURL).filter { !$0.isEmpty })).sorted()
+        let sourceDescription = (sources + (usedRoughValue ? [rough.source] : [])).joined(separator: "；")
 
         return NutritionSnapshot(
-            energyKcal: values[0]?.value,
-            sugarGrams: values[1]?.value,
-            caffeineMilligrams: values[2]?.value,
+            energyKcal: values[0]?.value ?? rough.energyKcal,
+            sugarGrams: values[1]?.value ?? rough.sugarGrams,
+            caffeineMilligrams: values[2]?.value ?? rough.caffeineMilligrams,
             confidence: snapshotConfidence,
-            source: sources.joined(separator: "；"),
-            sourceURL: sourceURLs.isEmpty ? nil : sourceURLs.joined(separator: "；")
+            source: sourceDescription,
+            sourceURL: sourceURLs.isEmpty ? nil : sourceURLs.joined(separator: "；"),
+            proteinGrams: macro(variant: selectedVariant?.proteinG, unit: drink.nutritionPerUnit?.proteinG, multiplier: multiplier) ?? rough.proteinGrams,
+            fatGrams: macro(variant: selectedVariant?.fatG, unit: drink.nutritionPerUnit?.fatG, multiplier: multiplier) ?? rough.fatGrams,
+            carbohydrateGrams: macro(variant: selectedVariant?.carbohydrateG, unit: drink.nutritionPerUnit?.carbohydrateG, multiplier: multiplier) ?? rough.carbohydrateGrams,
+            assumptions: rough.assumptions,
+            metricSources: [
+                "energyKcal": values[0]?.confidence.rawValue ?? "rough",
+                "sugarGrams": values[1]?.confidence.rawValue ?? "rough",
+                "caffeineMilligrams": values[2]?.confidence.rawValue ?? "rough",
+                "proteinGrams": macro(variant: selectedVariant?.proteinG, unit: drink.nutritionPerUnit?.proteinG, multiplier: multiplier) == nil ? "rough" : snapshotConfidence.rawValue,
+                "fatGrams": macro(variant: selectedVariant?.fatG, unit: drink.nutritionPerUnit?.fatG, multiplier: multiplier) == nil ? "rough" : snapshotConfidence.rawValue,
+                "carbohydrateGrams": macro(variant: selectedVariant?.carbohydrateG, unit: drink.nutritionPerUnit?.carbohydrateG, multiplier: multiplier) == nil ? "rough" : snapshotConfidence.rawValue
+            ]
         )
+    }
+
+    private static func macro(variant: Double?, unit: Double?, multiplier: Double?) -> Double? {
+        if let variant = valid(variant) { return variant }
+        if let multiplier, let value = valid(unit) { return value * multiplier }
+        return nil
     }
 
     private static var unavailable: NutritionSnapshot {
