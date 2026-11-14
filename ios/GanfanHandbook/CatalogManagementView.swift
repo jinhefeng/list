@@ -711,7 +711,7 @@ struct NutritionUpdateSettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            Section("在线更新") {
+            Section {
                 TextField("HTTPS JSON 文件地址", text: $updateURL)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
@@ -725,6 +725,8 @@ struct NutritionUpdateSettingsView: View {
                     }
                 }
                 .disabled(isUpdating || updateURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            } header: {
+                Text("在线更新")
             } footer: {
                 Text("远程文件由您自行托管；仅支持 HTTPS 和版本化营养数据包。更新异常时保留之前的本机数据。")
             }
