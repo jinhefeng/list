@@ -116,7 +116,9 @@ final class DrinkNutritionCalculatorTests: XCTestCase {
         ))
         let perCup = DrinkNutritionCalculator.snapshot(for: perCupDrink, cupType: "自定义杯")
         XCTAssertEqual(perCup.energyKcal, 120)
-        XCTAssertEqual(perCup.confidence, .official)
+        XCTAssertEqual(perCup.confidence, .rough)
+        XCTAssertEqual(perCup.metricSources["energyKcal"], "official")
+        XCTAssertEqual(perCup.metricSources["sugarGrams"], "rough")
 
         let perMLDrink = menuDrink(perUnit: MenuNutritionPerUnit(
             amount: 100,
