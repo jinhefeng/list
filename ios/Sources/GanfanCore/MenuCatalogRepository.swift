@@ -65,11 +65,7 @@ public final class MenuCatalogRepository {
 
     public func catalog(from bundled: MenuCatalog) throws -> MenuCatalog {
         let state = try loadUserState()
-        return bundled.merging(
-            localBrands: state.brands,
-            localDrinks: state.drinks,
-            deletedDrinkIDs: state.deletedDrinkIDs
-        )
+        return try NutritionUpdateRepository(store: userDefaults).catalog(from: bundled, userState: state)
     }
 
     public static func validate(_ state: MenuCatalogUserState) throws {
