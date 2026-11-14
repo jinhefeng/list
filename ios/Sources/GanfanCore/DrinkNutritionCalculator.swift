@@ -164,7 +164,15 @@ public enum DrinkNutritionCalculator {
             proteinGrams: macro(variant: selectedVariant?.proteinG, unit: drink.nutritionPerUnit?.proteinG, multiplier: multiplier) ?? rough.proteinGrams,
             fatGrams: macro(variant: selectedVariant?.fatG, unit: drink.nutritionPerUnit?.fatG, multiplier: multiplier) ?? rough.fatGrams,
             carbohydrateGrams: macro(variant: selectedVariant?.carbohydrateG, unit: drink.nutritionPerUnit?.carbohydrateG, multiplier: multiplier) ?? rough.carbohydrateGrams,
-            assumptions: usedRoughValue ? rough.assumptions : ""
+            assumptions: rough.assumptions,
+            metricSources: [
+                "energyKcal": values[0]?.confidence.rawValue ?? "rough",
+                "sugarGrams": values[1]?.confidence.rawValue ?? "rough",
+                "caffeineMilligrams": values[2]?.confidence.rawValue ?? "rough",
+                "proteinGrams": macro(variant: selectedVariant?.proteinG, unit: drink.nutritionPerUnit?.proteinG, multiplier: multiplier) == nil ? "rough" : snapshotConfidence.rawValue,
+                "fatGrams": macro(variant: selectedVariant?.fatG, unit: drink.nutritionPerUnit?.fatG, multiplier: multiplier) == nil ? "rough" : snapshotConfidence.rawValue,
+                "carbohydrateGrams": macro(variant: selectedVariant?.carbohydrateG, unit: drink.nutritionPerUnit?.carbohydrateG, multiplier: multiplier) == nil ? "rough" : snapshotConfidence.rawValue
+            ]
         )
     }
 
