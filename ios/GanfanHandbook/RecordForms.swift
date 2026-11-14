@@ -367,12 +367,12 @@ struct DrinkRecordForm: View {
            originalRecord.sweetness == sweetness,
            originalServing.temperature == temperature,
            originalServing.ice == ice {
-            return originalRecord.nutrition ?? NutritionSnapshot(
-                energyKcal: nil,
-                sugarGrams: nil,
-                caffeineMilligrams: nil,
-                confidence: .unavailable
-            )
+            if let existing = originalRecord.nutrition, existing.confidence != .unavailable {
+                return existing
+            }
+            return RoughNutritionEstimator.drink(name: drinkName, sizeML: recordSizeML,
+                                                 cupType: cupType, sweetness: sweetness,
+                                                 temperature: temperature, ice: ice)
         }
         return RoughNutritionEstimator.drink(name: drinkName, sizeML: recordSizeML,
                                              cupType: cupType, sweetness: sweetness,
