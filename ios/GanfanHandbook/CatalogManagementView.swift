@@ -238,11 +238,7 @@ struct CatalogManagementView: View {
         do {
             let bundled = try MenuCatalog.decode(data)
             userState = try repository.loadUserState()
-            catalog = bundled.merging(
-                localBrands: userState.brands,
-                localDrinks: userState.drinks,
-                deletedDrinkIDs: userState.deletedDrinkIDs
-            )
+            catalog = try repository.catalog(from: bundled)
             errorMessage = nil
         } catch {
             errorMessage = "无法读取菜单或本地改动：\(error.localizedDescription)"
