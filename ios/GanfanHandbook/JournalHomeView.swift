@@ -472,7 +472,7 @@ private struct PhotoViewerSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
-        .presentationBackground(GanfanPalette.canvas)
+        .presentationBackground(GanfanPalette.card)
     }
 }
 
@@ -2187,7 +2187,7 @@ private struct PhotoViewer: View {
                 .background(GanfanPalette.card)
             }
         }
-        .background(GanfanPalette.canvas)
+        .background(GanfanPalette.card)
         .navigationTitle("照片")
         .navigationBarTitleDisplayMode(.inline)
         .task {
