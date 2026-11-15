@@ -2091,6 +2091,7 @@ private struct RecordDetailPhoto: View {
 }
 
 private struct PhotoViewer: View {
+    @Environment(\.colorScheme) private var colorScheme
     let assets: [PhotoAsset]
     let labels: [String]
     @State private var currentIndex: Int
@@ -2132,12 +2133,27 @@ private struct PhotoViewer: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
+            // The image stage is deliberately inset from the sheet so its edges
+            // remain visible even when the system uses a near-black dark surface.
+            .environment(\.colorScheme, .dark)
+            .tint(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(
+                        colorScheme == .dark ? Color.white.opacity(0.30) : Color.black.opacity(0.16),
+                        lineWidth: 1
+                    )
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
 
             if assets.count > 1 {
                 VStack(spacing: 10) {
                     Text("\(currentIndex + 1) / \(assets.count) · \(currentLabel)")
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(GanfanPalette.ink)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
                             ForEach(Array(assets.enumerated()), id: \.offset) { item in
@@ -2150,14 +2166,14 @@ private struct PhotoViewer: View {
                                                 .resizable()
                                                 .scaledToFill()
                                         } else {
-                                            Rectangle().fill(.white.opacity(0.16))
+                                            Rectangle().fill(GanfanPalette.ink.opacity(0.12))
                                         }
                                     }
                                     .frame(width: 58, height: 58)
                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                     .overlay {
                                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .stroke(index == currentIndex ? .white : .clear, lineWidth: 2)
+                                            .stroke(index == currentIndex ? GanfanPalette.forest : .clear, lineWidth: 2)
                                     }
                                 }
                                 .buttonStyle(.plain)
@@ -2168,10 +2184,10 @@ private struct PhotoViewer: View {
                     }
                 }
                 .padding(.vertical, 12)
-                .background(.black)
+                .background(GanfanPalette.card)
             }
         }
-        .background(.black)
+        .background(GanfanPalette.canvas)
         .navigationTitle("照片")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -2189,6 +2205,8 @@ private struct PhotoViewer: View {
     private func loadCurrentAsset() {
         guard assets.indices.contains(currentIndex) else { return }
         let asset = assets[currentIndex]
+        currentImage = nil
+        errorMessage = nil
         do {
             let data = try AppStoragePaths.photoStore.load(asset)
             currentImage = Self.downsample(data, maxPixelSize: 2_400)
