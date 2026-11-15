@@ -1,8 +1,8 @@
-const updatedAt = '2026-10-16';
-const checkedAt = '2026-10-16';
-// Increment this when the bundled brand or drink list changes. The store uses
+const updatedAt = '2026-11-16';
+const checkedAt = '2026-11-16';
+// Increment this when bundled brand, drink, or logo data changes. The store uses
 // it to refresh cached catalogs on existing installations without clearing records.
-const version = '2026-10-16.4';
+const version = '2026-11-16.2';
 
 const publicMenuCandidates = require('./catalog-public-menus');
 
@@ -31,7 +31,7 @@ const gumingPageItems = (page, names) => names.map((name) => ({
 // particular Taobao Flash Sale store. Keep every imported reference pending.
 const catalogSources = [
   {
-    id: 'brand-mixue', name: '蜜雪冰城', aliases: ['蜜雪', 'MXBC'], category: '茶饮',
+    id: 'brand-mixue', name: '蜜雪冰城', aliases: ['蜜雪', 'MXBC'], category: '茶饮', logoAssetName: 'BrandIconMixue',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/mi-xue-bing-cheng/menu/available?page=1',
     products: [
@@ -63,7 +63,7 @@ const catalogSources = [
     ]
   },
   {
-    id: 'brand-heytea', name: '喜茶', aliases: ['HEYTEA', '喜茶'], category: '新茶饮',
+    id: 'brand-heytea', name: '喜茶', aliases: ['HEYTEA', '喜茶'], category: '新茶饮', logoAssetName: 'BrandIconHeytea',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/zh-tw/brands/xi-cha/menu/available?page=1',
     products: [
@@ -101,31 +101,31 @@ const catalogSources = [
     ]
   },
   {
-    id: 'brand-nayuki', name: '奈雪的茶', aliases: ['奈雪', 'NAIXUE'], category: '新茶饮',
+    id: 'brand-nayuki', name: '奈雪的茶', aliases: ['奈雪', 'NAIXUE'], category: '新茶饮', logoAssetName: 'BrandIconNayuki',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/nai-xue-de-cha/menu/available?page=2',
     products: ['霸气橙子', '茉莉初雪', '宝藏茶', '超醒手打柠檬冰砖美式', '超C大橘美式', 'Gelato芭乐冰奶', '冰砖美式', '黄皮蜜桃冰砖美式', 'Gelato乌龙冰茶', '鸭屎香纯茶', 'Gelato香水椰', '霸气杨梅', '初雪芝士蜜桃冰奶', '初雪葡萄冰奶', '霸气小红杏酸奶冰', '霸气一桶美式', '霸气芝士葡萄', '霸气芝士芒果', '霸气青柑柠檬茶']
   },
   {
-    id: 'brand-starbucks', name: '星巴克', aliases: ['STARBUCKS', '星巴克咖啡'], category: '咖啡',
+    id: 'brand-starbucks', name: '星巴克', aliases: ['STARBUCKS', '星巴克咖啡'], category: '咖啡', logoAssetName: 'BrandIconStarbucks',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/zh-tw/brands/xing-ba-ke/menu/available',
     products: ['美式咖啡', '拿铁', '焦糖玛奇朵', '摩卡星冰乐®', '冷萃冰咖啡', '摩卡', '星巴克馥芮白®', '抹茶星冰乐®', '高蛋白馥芮白® PRO', '法式香草风味高蛋白拿铁PRO', '臻选拿铁（水洗埃塞俄比亚耶加雪菲雪冽图）', '臻选美式（水洗埃塞俄比亚耶加雪菲雪冽图）', '臻选馥芮白（水洗埃塞俄比亚耶加雪菲雪冽图）', '奶皮子风味咸奶茶', '抹茶山系茶拿铁', '抹茶山系星冰乐', '经典伯爵冰茶']
   },
   {
-    id: 'brand-chagee', name: '霸王茶姬', aliases: ['CHAGEE', '茶姬'], category: '新茶饮',
+    id: 'brand-chagee', name: '霸王茶姬', aliases: ['CHAGEE', '茶姬'], category: '新茶饮', logoAssetName: 'BrandIconChagee',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/ba-wang-cha-ji/menu/available',
     products: ['伯牙绝弦', '花田乌龙', '桂馥兰香', '寻香山茶', '青青糯山', '白雾红尘', '轻因·桂馥兰香', '轻因·折桂令', '凤栖梧', '黄皮油柑单丛', '荔荔栀椰']
   },
   {
-    id: 'brand-luckin', name: '瑞幸咖啡', aliases: ['瑞幸', 'Luckin', 'Luckin Coffee'], category: '咖啡',
+    id: 'brand-luckin', name: '瑞幸咖啡', aliases: ['瑞幸', 'Luckin', 'Luckin Coffee'], category: '咖啡', logoAssetName: 'BrandIconLuckin',
     sourceType: 'official_brand', sourceName: '瑞幸官网产品页官方样本；分页菜单候选见单品来源',
     sourceUrl: 'https://www.lkcoffee.com/products',
     products: ['生椰拿铁', '茉莉花香拿铁', '拿铁', '冰吸生椰拿铁', '小黄油拿铁', '生椰三重奏拿铁', '轻椰茉莉拿铁', '丝绒拿铁', '钱塘龙井拿铁', '海盐焦糖拿铁', '绿沙沙拿铁', '桂花米酿拿铁']
   },
   {
-    id: 'brand-guming', name: '古茗', aliases: ['古茗奶茶', 'Guming'], category: '新茶饮',
+    id: 'brand-guming', name: '古茗', aliases: ['古茗奶茶', 'Guming'], category: '新茶饮', logoAssetName: 'BrandIconGuming',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/gu-ming/menu/available?page=1',
     products: [
@@ -151,31 +151,31 @@ const catalogSources = [
     ]
   },
   {
-    id: 'brand-chabaidao', name: '茶百道', aliases: ['茶百道奶茶', 'ChaPanda'], category: '新茶饮',
+    id: 'brand-chabaidao', name: '茶百道', aliases: ['茶百道奶茶', 'ChaPanda'], category: '新茶饮', logoAssetName: 'BrandIconChabaidao',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/cha-bai-dao/new-products',
     products: ['豆乳玉麒麟', '茉莉奶绿', '杨枝甘露', '超厚芋泥金牡丹', '苹果派云顶美式', '岭南龙眼珍珠', '芭乐青提酸奶杯', '奶绿旋风', '香草金牡丹鲜奶茶', '岭南龙眼啵啵', '金喜凤梨', '香草金牡丹牛乳', '焦糖饼干奶茶', '生椰西瓜', '葡萄冰浆', '牛油果酸奶', '牛油果羽衣甘蓝', '鲜果橙C美式', '鲜果橙C拿铁', '荔枝冰奶', '杨梅酸奶昔']
   },
   {
-    id: 'brand-manner', name: 'Manner咖啡', aliases: ['Manner', 'MANNER COFFEE'], category: '咖啡',
+    id: 'brand-manner', name: 'Manner咖啡', aliases: ['Manner', 'MANNER COFFEE'], category: '咖啡', logoAssetName: 'BrandIconManner',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/manner-coffee/menu/available',
     products: ['拿铁咖啡', '澳式白咖啡', '美式咖啡', '燕麦拿铁', '埃塞果丁丁可如蜜水洗拿铁', '埃塞果丁丁可如蜜水洗美式', '埃塞果丁丁可如蜜水洗Dirty', 'SOE美式', 'SOE拿铁', '玫瑰米酿拿铁', '黄油SOE拿铁']
   },
   {
-    id: 'brand-cotti', name: '库迪咖啡', aliases: ['COTTI', 'Cotti Coffee'], category: '咖啡',
+    id: 'brand-cotti', name: '库迪咖啡', aliases: ['COTTI', 'Cotti Coffee'], category: '咖啡', logoAssetName: 'BrandIconCotti',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/zh-tw/brands/ku-di-ka-fei/menu/available?page=2',
     products: ['活荔芝云库可冰', '超燃椰青美式', '超燃椰青茉莉冰茶', '小黄油拿铁', '小黄油美式', '小黄油茉香抹茶', '鲜气杨梅燕麦奶昔', '鲜气杨梅库可冰', '鲜气杨梅冰茶', '茉莉花香拿铁', '清爽芭乐提', '胶原莓果美式', '百香橙橙美式', '杨枝甘露拿铁', '黑糖波波牛乳茶', '抹茶拿铁', '晴天茉莉绿茶', '蜂蜜白柚冰柠茶', '柠萃茉莉冰茶']
   },
   {
-    id: 'brand-nowwa', name: '挪瓦咖啡', aliases: ['NOWWA', '挪瓦'], category: '咖啡',
+    id: 'brand-nowwa', name: '挪瓦咖啡', aliases: ['NOWWA', '挪瓦'], category: '咖啡', logoAssetName: 'BrandIconNowwa',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/zh-tw/brands/nuo-wa-ka-fei/menu/available',
     products: ['半熟芝士拿铁', '生椰拿铁', '苹果C果茶', '苹果C美式', '芭乐柠檬水', '葡萄冰柠水', '鸭屎香柚C果茶', '柚C无醇果啤', '柚C燃减轻咖', '橙C燃减轻咖', '超大杯葡萄柠檬水', '超大杯冰爽柠檬水', '冰椰风味茉莉花茶', '超大杯茉莉冰椰茶', '橙C冰柠水']
   },
   {
-    id: 'brand-yidiandian', name: '一点点', aliases: ['1点点', '一点点奶茶'], category: '新茶饮',
+    id: 'brand-yidiandian', name: '一点点', aliases: ['1点点', '一点点奶茶'], category: '新茶饮', logoAssetName: 'BrandIconYidiandian',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/yi-dian-dian/menu/available',
     products: [
@@ -206,7 +206,7 @@ const catalogSources = [
     ]
   },
   {
-    id: 'brand-hushangayi', name: '沪上阿姨', aliases: ['沪上阿姨鲜果茶'], category: '新茶饮',
+    id: 'brand-hushangayi', name: '沪上阿姨', aliases: ['沪上阿姨鲜果茶'], category: '新茶饮', logoAssetName: 'BrandIconHushangayi',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/zh-tw/brands/hu-shang-a-yi/menu/available',
     products: [
@@ -220,31 +220,31 @@ const catalogSources = [
     ]
   },
   {
-    id: 'brand-coco', name: 'CoCo都可', aliases: ['CoCo', '都可'], category: '新茶饮',
+    id: 'brand-coco', name: 'CoCo都可', aliases: ['CoCo', '都可'], category: '新茶饮', logoAssetName: 'BrandIconCoco',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/zh-tw/brands/coco-dou-ke/menu/available',
     products: ['鲜百香双响炮', '珍珠奶茶', '奶茶三兄弟', '莓莓小姐姐', '莓莓冰奶', '葡萄冰奶', '轻轻柠檬冰奶', '蜜恋桃桃', '桃气泡泡', '四季珍珠奶青', '四季春茶', '手打柠檬四季春', '苹果大红袍', '苹果奶绿', '鲜柠檬茶']
   },
   {
-    id: 'brand-yihetang', name: '益禾堂', aliases: ['益禾烤奶'], category: '新茶饮',
+    id: 'brand-yihetang', name: '益禾堂', aliases: ['益禾烤奶'], category: '新茶饮', logoAssetName: 'BrandIconYihetang',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/yi-he-tang/menu/available?page=1',
     products: ['杨枝甘露', '益禾烤奶', '珍珠奶茶', '超级黑桑葚冰奶', '气泡柠檬水', '黄金柚C冰茶', '葡萄冰奶', '芋泥木薯炖奶', '超级黑桑葚冰茶', '葡萄仙芋', '抹茶仙芋', '现制冷泡茶', '粉芭乐香柠拿铁', '奶油粉芭乐', '芭乐柠檬冰茶', '葡萄气泡康普茶', '橙C气泡康普茶', '薄荷冰淇淋拿铁', '莓果四重奏', '超A养颜杯', '小莓好轻乳茶', '黑糖珍珠抹茶', '黑糖珍珠奶茶', '金桔柠檬', '香柠鸭屎香', '哈密瓜轻乳茶', '烤奶牛乳茶', '生椰拿铁', '橙C美式', '翠峰茉莉奶盖', '白芽奇兰', '翠峰茉莉']
   },
   {
-    id: 'brand-chayan-yuese', name: '茶颜悦色', aliases: ['茶颜', '茶颜悦色奶茶'], category: '新茶饮',
+    id: 'brand-chayan-yuese', name: '茶颜悦色', aliases: ['茶颜', '茶颜悦色奶茶'], category: '新茶饮', logoAssetName: 'BrandIconChayanYuese',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/cha-yan-yue-se/menu/available',
     products: ['声声乌龙', '素颜锡兰', '幽兰拿铁', '桂花弄', '麻瓜的黄油世界', '橘子落日', '杨梅过雨', '忙着去撒野', '梨园花腔（拿铁）', '梨园花腔（美式）', '柚得半日闲', '不完蛋挞（拿铁）', '不完蛋挞（美式）', '柚在青云端', '梨园花腔', '有点小梨想', '水蜜桃']
   },
   {
-    id: 'brand-molynb', name: '茉莉奶白', aliases: ['Jasmine Milk White'], category: '新茶饮',
+    id: 'brand-molynb', name: '茉莉奶白', aliases: ['Jasmine Milk White'], category: '新茶饮', logoAssetName: 'BrandIconMollyTea',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/mo-li-nai-bai/menu/available',
     products: ['茉莉奶白', '一朵茉莉花', '针王葡萄', '白兰', '咸奶萃碎银子', '四季酸木瓜橄榄杏', '开心加倍茉莉椰', '三朵玉兰咖啡特调', '玉兰花语咖啡特调', '单丛奶霜苹果', '单丛与苹果', '单丛与苹果杏', '针王橘子', '针王苹果', '三朵玉兰', '玉兰花语', '针王奶霜橘子', '白兰与树番茄']
   },
   {
-    id: 'brand-amasha', name: '阿嬷手作', aliases: ['阿嬷', '阿嬷手作茶饮'], category: '新茶饮',
+    id: 'brand-amasha', name: '阿嬷手作', aliases: ['阿嬷', '阿嬷手作茶饮'], category: '新茶饮', logoAssetName: 'BrandIconAmasha',
     sourceType: 'pending', sourceName: '杭州城市限定新品报道；完整菜单待补',
     sourceUrl: 'https://www.xinhuanet.com/ci/20260920/d577ffc5202d42d19c8eaf763e8e91e8/c.html',
     products: [{
@@ -260,43 +260,43 @@ const catalogSources = [
     }]
   },
   {
-    id: 'brand-happy-sweet-potato', name: '快乐番薯', aliases: ['快乐番薯奶茶'], category: '新茶饮',
+    id: 'brand-happy-sweet-potato', name: '快乐番薯', aliases: ['快乐番薯奶茶'], category: '新茶饮', logoAssetName: 'BrandIconHappySweetPotato',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/kuai-le-fan-shu/menu/available',
     products: ['招牌薯圆奶茶', '老红糖珍珠奶茶', '阳光青提冰奶', '多肉阳光青提', '超长杯青提香水柠', '抹茶琥珀珍奶', '抹茶香柠冰奶', '葡萄芝士胶原冻', '鸭屎香单从', '幽兰奶绿', '葡萄椰果冰', '抹茶粉芭乐', '百香菠萝双重奏', '超长杯西瓜菠萝冰', '霸王桶柠檬红茶', '霸王桶冬瓜烧仙草', '多肉玫珑蜜瓜', '玫珑蜜瓜奶盖', '玫珑蜜瓜雪泡', '霸王桶香柠粉芭乐', '百香金菠萝', '多肉葡萄', '桃桃椰果冰', '莓莓酸奶昔', '桃桃酸奶昔', '桃桃奶绿双皮奶', '杨枝甘露双皮奶', '百香果双响炮', '招牌薯圆牛乳', '老红糖珍珠牛乳', '超长杯满满鲜橙多', '超长杯冰鲜柠檬水']
   },
   {
-    id: 'brand-ye-ye-bu-pao-cha', name: '爷爷不泡茶', aliases: ['爷爷不泡茶茶饮'], category: '新茶饮',
+    id: 'brand-ye-ye-bu-pao-cha', name: '爷爷不泡茶', aliases: ['爷爷不泡茶茶饮'], category: '新茶饮', logoAssetName: 'BrandIconGrandpaTea',
     sourceType: 'official_brand', sourceName: '爷爷不泡茶官网产品系列',
     sourceUrl: 'https://www.yeyebpc.com/products/series/',
     products: ['栀子龙眼椰', '鲜台芒·嚼酸奶', '奇香桃桃', '草莓桃·嚼酸奶', '美十三草莓奶冻', '美十三草莓牛奶冰', '荔枝冰酿', '奶油米酒', '杨梅冰酿', '兰香青柠', '奇香青柠', '西西里柠檬柚', '西班牙红葡萄冰茶', '西瓜冰茶', '鲜·玫瑰荔枝', '爆打十五次·奇兰柠檬茶', '初恋玫瑰青提', '空山栀子', '咸宁桂花', '红苹果', '武汉茉莉', '水蜜桃', '白兰玉露']
   },
   {
-    id: 'brand-shuyi', name: '书亦烧仙草', aliases: ['书亦', '书亦烧仙草奶茶'], category: '新茶饮',
+    id: 'brand-shuyi', name: '书亦烧仙草', aliases: ['书亦', '书亦烧仙草奶茶'], category: '新茶饮', logoAssetName: 'BrandIconShuyi',
     sourceType: 'official_brand', sourceName: '书亦烧仙草官网产品页',
     sourceUrl: 'https://www.shuyisxc.com/home/product/index/id/13.html',
     products: ['红豆夹心糯糯珠', '老红糖珍珠奶茶', '招牌芋圆奶绿']
   },
   {
-    id: 'brand-lucky-coffee', name: '幸运咖', aliases: ['幸运咖啡', 'Lucky Cup'], category: '咖啡',
+    id: 'brand-lucky-coffee', name: '幸运咖', aliases: ['幸运咖啡', 'Lucky Cup'], category: '咖啡', logoAssetName: 'BrandIconLuckyCoffee',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开在售菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/xing-yun-ka/menu/available',
     products: ['经典美式', '椰椰拿铁', '铁观音拿铁', '招牌冰拿铁', '岭南荔枝幸运冰', '杨梅吐气幸运冰', '福云抹茶维也纳', '福云维也纳', '大杯回柑香柠茉莉', '回柑香柠茉莉', '大圣桶杏运冰茶', '可可咖啡', '可可牛奶', '回柑杨桃茉莉', '回柑杨桃美式', '全冰醇香拿铁']
   },
   {
-    id: 'brand-huka', name: '沪咖', aliases: ['沪咖东方拿铁', 'HUKA'], category: '咖啡',
+    id: 'brand-huka', name: '沪咖', aliases: ['沪咖东方拿铁', 'HUKA'], category: '咖啡', logoAssetName: 'BrandIconHuka',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开品牌页与饮品列表',
     sourceUrl: 'https://www.nckfhsm.com/brands/hu-ka',
     products: ['鲜柠美式', '生椰拿铁', '大红袍拿铁', '美式咖啡']
   },
   {
-    id: 'brand-mstand', name: 'M Stand', aliases: ['M Stand Coffee', 'MStand'], category: '咖啡',
+    id: 'brand-mstand', name: 'M Stand', aliases: ['M Stand Coffee', 'MStand'], category: '咖啡', logoAssetName: 'BrandIconMStand',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开在售菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/brands/m-stand/menu/available',
     products: ['澳白', '咸芝士拿铁', '荞麦乌龙水牛乳拿铁', '荞麦乌龙水牛乳Dirty', '香草籽布丁拿铁', '香草籽布丁Dirty', '超大杯冰美式（小蓝莓风味拼配）', '超大杯加浓冰美式（小蓝莓风味拼配）', '超大杯冰拿铁（小蓝莓风味拼配）', '芒果米布丁拿铁', '芒果凤梨云朵', '超大杯芒果凤梨云朵', '芒果凤梨气泡美式', '芒果凤梨冰茶', '冰摇荔枝山竹特饮', '超大杯冷萃（紫葡萄风味）', '超大杯芒果凤梨气泡美式', '超大杯芒果凤梨冰茶', '超大杯冰摇荔枝山竹特饮', '冷萃咖啡（紫葡萄风味）']
   },
   {
-    id: 'brand-bestar', name: '比星咖啡', aliases: ['Bestar', 'Bestar比星咖啡'], category: '咖啡',
+    id: 'brand-bestar', name: '比星咖啡', aliases: ['Bestar', 'Bestar比星咖啡'], category: '咖啡', logoAssetName: 'BrandIconBestar',
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开在售菜单汇编',
     sourceUrl: 'https://www.nckfhsm.com/zh-tw/brands/bestar-bi-xing-ka-fei/menu/available',
     products: ['零下86℃超低温香草Dirty', '琥珀干酪美式', '柠香芝士维也纳', '轻芝士拿铁', '威廉斯香蕉拿铁', '凤梨香桃叶气泡冰萃', '超超超大杯话梅柠檬冰茶', '超超超大杯轻因话梅美式', '滇薄荷油柑气泡冰萃', '油柑青薄荷', '咸奶油美式', '黄油波波乌龙', '柚子乌龙干酪', '青柠茉莉干酪', '黄油波波玛奇朵', '香草锡兰玛奇朵', '抹茶·咸柚丁', '满杯维C柠檬水', '山茶白葡萄冷萃', '紫苏话梅气泡冰萃']
@@ -335,8 +335,40 @@ const catalogSources = [
     sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开在售菜单汇编（需剔除混入的餐食）',
     sourceUrl: 'https://www.nckfhsm.com/brands/jue-ke-ka-fei/menu/available',
     products: ['超超超大桶水果茶', '生椰拿铁', '茉莉奶绿', '香柠冰咖', '香柠冰奶', '茉荔冰美式', '荔枝柠檬冰茶', '经典美式16oz', '果蔬轻拿铁', '冰淇淋拿铁']
+  },
+  {
+    id: 'brand-peets', name: "Peet's Coffee 皮爷咖啡", aliases: ['Peet’s', "Peet's Coffee", '皮爷', '皮爷咖啡'], category: '咖啡', logoAssetName: 'BrandIconPeets',
+    sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开在售菜单汇编（皮爷咖啡）',
+    sourceUrl: 'https://www.nckfhsm.com/brands/peets-coffee/menu/available?page=9',
+    products: ['精粹美式', '当日精选黑咖啡', '京味儿澳白', '熔岩澳洲小白', '蜂蜜黑咖啡', '冰乌龙茶', '葡萄气泡冷萃', '清爽木瓜气泡美式']
+  },
+  {
+    id: 'brand-tims', name: 'Tims天好咖啡', aliases: ['Tims', 'Tim Hortons', '天好咖啡'], category: '咖啡', logoAssetName: 'BrandIconTims',
+    sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开在售菜单汇编（Tims）',
+    sourceUrl: 'https://www.nckfhsm.com/brands/tims/menu/available?page=4',
+    products: ['拿铁', '美式', '不止拿铁', '燕麦拿铁', '燕麦澳白', '西梅黑加仑风味拿铁', '水牛乳拿铁', '柑橘美式', '生椰冷萃', '抹茶拿铁', '鲜萃红茶']
+  },
+  {
+    id: 'brand-blue-bottle', name: '蓝瓶咖啡', aliases: ['Blue Bottle', 'Blue Bottle Coffee', '蓝瓶'], category: '咖啡', logoAssetName: 'BrandIconBlueBottle',
+    sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开在售菜单汇编（蓝瓶咖啡）',
+    sourceUrl: 'https://www.nckfhsm.com/brands/lan-ping-ka-fei/menu/available?page=3',
+    products: ['美式咖啡（热）', '美式咖啡（冰）', '拿铁（热）', '拿铁（冰）', '卡布奇诺', '摩卡（热）', '摩卡（冰）', '冷萃咖啡', '拼配手冲咖啡-张园店限定拼配']
+  },
+  {
+    id: 'brand-algebraist', name: '代数学家', aliases: ['代数学家咖啡', 'Algebraist', 'Algebraist Coffee'], category: '咖啡', logoAssetName: 'BrandIconAlgebraist',
+    sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开在售菜单汇编（代数学家）',
+    sourceUrl: 'https://www.nckfhsm.com/brands/dai-shu-xue-jia/menu/available?page=1',
+    products: ['野草莓拿铁（冰）', '大吉岭风味酪酪茶拿铁（热 无咖啡）', '大吉岭风味酪酪布列夫（热）', 'S11 海南赤忱红蜜美式', 'S11 海南赤忱红蜜拿铁', 'S11 海南赤忱红蜜澳白', 'HPP青苹果气泡水', '乌珀黑芝麻布列夫', '小美式', '金桂麦卢卡蜜拿铁']
+  },
+  {
+    id: 'brand-arabica', name: '% Arabica 百分号', aliases: ['%Arabica', '% ARABICA', 'Arabica', '百分号咖啡'], category: '咖啡', logoAssetName: 'BrandIconArabica',
+    sourceType: 'public_menu', sourceName: '咖啡奶茶喝什么公开在售菜单汇编（% Arabica）',
+    sourceUrl: 'https://www.nckfhsm.com/en/brands/arabica/menu/available?page=1',
+    products: ['美式咖啡（B）', '咖啡拿铁（B）', '西班牙拿铁（B）', '京都拿铁（H）', '灞源蜂蜜拿铁（B）', '夏日气泡美式（B）', '黑咖啡（Sidamo）', '香水柠檬特饮气泡水', '白美式（B）']
   }
 ];
+
+catalogSources.push(...require('./catalog-added-brands'));
 
 catalogSources.find((brand) => brand.id === 'brand-starbucks').products.push(...publicMenuCandidates.starbucks);
 catalogSources.find((brand) => brand.id === 'brand-manner').products.push(...publicMenuCandidates.manner);
@@ -347,6 +379,9 @@ const brands = catalogSources.map((item) => ({
   name: item.name,
   aliases: item.aliases,
   category: item.category,
+  logoAssetName: item.logoAssetName,
+  logoSourceURL: item.logoSourceURL,
+  logoSymbol: item.logoSymbol,
   source: `${item.sourceName}；淘宝闪购具体门店待核验`,
   updatedAt,
   active: true,

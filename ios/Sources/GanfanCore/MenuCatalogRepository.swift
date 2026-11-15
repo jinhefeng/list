@@ -27,6 +27,18 @@ public struct MenuCatalogUserState: Codable, Equatable, Sendable {
         self.globalCupSizes = globalCupSizes
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case brands, drinks, deletedDrinkIDs, globalCupSizes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        brands = try container.decodeIfPresent([MenuBrand].self, forKey: .brands) ?? []
+        drinks = try container.decodeIfPresent([MenuDrink].self, forKey: .drinks) ?? []
+        deletedDrinkIDs = try container.decodeIfPresent(Set<String>.self, forKey: .deletedDrinkIDs) ?? []
+        globalCupSizes = try container.decodeIfPresent([MenuCupSize].self, forKey: .globalCupSizes) ?? Self.defaultCupSizes
+    }
+
     public static let defaultCupSizes = [
         MenuCupSize(cupType: "小杯", sizeML: 350),
         MenuCupSize(cupType: "中杯", sizeML: 500),
@@ -36,6 +48,66 @@ public struct MenuCatalogUserState: Codable, Equatable, Sendable {
 
     public func validate() throws {
         try MenuCatalogRepository.validate(self)
+    }
+
+    public static func restoredCatalogOverlay(
+        from catalog: MenuCatalog,
+        settings: MenuCatalogUserState?
+    ) -> MenuCatalogUserState {
+        let brands = catalog.brands.map { brand in
+            MenuBrand(
+                id: brand.id,
+                name: brand.name,
+                aliases: brand.aliases,
+                category: brand.category,
+                source: brand.source,
+                sourceName: brand.sourceName,
+                sourceURL: brand.sourceURL,
+                updatedAt: brand.updatedAt,
+                status: brand.status,
+                active: brand.active,
+                logoSymbol: brand.logoSymbol,
+                logoAssetName: brand.logoAssetName,
+                logoImageID: brand.logoImageID,
+                logoIsOverridden: brand.logoIsOverridden,
+                logoURL: brand.logoURL,
+                logoSourceURL: brand.logoSourceURL,
+                localOverride: true
+            )
+        }
+        let drinks = catalog.drinks.map { drink in
+            MenuDrink(
+                id: drink.id,
+                brandID: drink.brandID,
+                brandName: drink.brandName,
+                name: drink.name,
+                aliases: drink.aliases,
+                category: drink.category,
+                source: drink.source,
+                sourceType: drink.sourceType,
+                sourceName: drink.sourceName,
+                sourceURL: drink.sourceURL,
+                updatedAt: drink.updatedAt,
+                status: drink.status,
+                active: drink.active,
+                cupTypes: drink.cupTypes,
+                cupSizes: drink.cupSizes,
+                sizesML: drink.sizesML,
+                sweetnessOptions: drink.sweetnessOptions,
+                servingOptions: drink.servingOptions,
+                nutritionPerUnit: drink.nutritionPerUnit,
+                nutritionVariants: drink.nutritionVariants,
+                menuEntries: drink.menuEntries,
+                localOverride: true,
+                custom: drink.custom
+            )
+        }
+        return MenuCatalogUserState(
+            brands: brands,
+            drinks: drinks,
+            deletedDrinkIDs: settings?.deletedDrinkIDs ?? [],
+            globalCupSizes: settings?.globalCupSizes ?? Self.defaultCupSizes
+        )
     }
 }
 
@@ -118,6 +190,7 @@ public final class MenuCatalogRepository {
                 throw MenuCatalogRepositoryError.invalidCupSize(type)
             }
         }
+
     }
 
     private static func initializingDefaultCupSizes(in state: MenuCatalogUserState) -> MenuCatalogUserState {

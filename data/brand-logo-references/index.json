@@ -1,0 +1,200 @@
+[
+  {
+    "brandId": "brand-starbucks",
+    "brandName": "星巴克",
+    "filename": "brand-starbucks-d93cbb9f-23e1-4373-b52e-af4acf410a92.png",
+    "note": "",
+    "createdAt": "2026-11-15T11:04:45.557Z",
+    "size": 357351,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-mixue",
+    "brandName": "蜜雪冰城",
+    "filename": "brand-mixue-22c0caba-d010-44c2-94a4-ad5ad7d8dcaa.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:39:28.610Z",
+    "size": 58990,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-bestar",
+    "brandName": "比星咖啡",
+    "filename": "brand-bestar-03d3ccae-a444-487e-bcf4-e9d56efbc06b.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:38:21.942Z",
+    "size": 325290,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-mstand",
+    "brandName": "M Stand",
+    "filename": "brand-mstand-29ca5e1f-e777-41b3-ac36-16fa6eedd715.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:37:41.384Z",
+    "size": 84324,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-amasha",
+    "brandName": "阿嬷手作",
+    "filename": "brand-amasha-c1613c17-7472-421b-ba7d-e104fee119dd.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:37:11.553Z",
+    "size": 418509,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-yidiandian",
+    "brandName": "一点点",
+    "filename": "brand-yidiandian-d4003757-7b1e-44f4-8be2-eaf564b1357f.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:35:34.188Z",
+    "size": 701006,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-cotti",
+    "brandName": "库迪咖啡",
+    "filename": "brand-cotti-dd1add19-05ec-4e80-ac53-846c017daee5.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:34:59.947Z",
+    "size": 209284,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-lucky-coffee",
+    "brandName": "幸运咖",
+    "filename": "brand-lucky-coffee-0597a65c-f124-413d-8187-a4c2ff53716b.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:34:02.522Z",
+    "size": 41214,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-shuyi",
+    "brandName": "书亦烧仙草",
+    "filename": "brand-shuyi-b0f90ad7-c4f9-4c94-9f8a-5e57e61a5371.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:33:15.065Z",
+    "size": 122089,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-ye-ye-bu-pao-cha",
+    "brandName": "爷爷不泡茶",
+    "filename": "brand-ye-ye-bu-pao-cha-079ce9ab-34a5-4fc8-aabd-ea0f5be1b5e8.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:32:43.673Z",
+    "size": 18088,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-molynb",
+    "brandName": "茉莉奶白",
+    "filename": "brand-molynb-b20ad072-22c8-45d5-8546-a93f815ae59c.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:31:56.922Z",
+    "size": 43036,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-chayan-yuese",
+    "brandName": "茶颜悦色",
+    "filename": "brand-chayan-yuese-8aa88638-35f4-47e6-91da-5433ee9fd2b1.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:31:14.392Z",
+    "size": 93838,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-coco",
+    "brandName": "CoCo 都可",
+    "filename": "brand-coco-e937f48f-922d-4ec8-a80e-bd7730e83758.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:29:53.129Z",
+    "size": 176463,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-hushangayi",
+    "brandName": "沪上阿姨",
+    "filename": "brand-hushangayi-077f41e9-a727-4941-bec7-a4543bd1b8cf.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:28:59.884Z",
+    "size": 45755,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-nowwa",
+    "brandName": "挪瓦咖啡",
+    "filename": "brand-nowwa-4ae4146e-f4d7-469b-a17e-f17eb63a9c07.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:28:19.817Z",
+    "size": 73358,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-manner",
+    "brandName": "Manner 咖啡",
+    "filename": "brand-manner-4bbdda7c-8a40-4946-8ce6-da7f3a9c5ef9.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:27:41.386Z",
+    "size": 30099,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-chabaidao",
+    "brandName": "茶百道",
+    "filename": "brand-chabaidao-c2131ecf-0cd5-4b7f-b9cf-bc51d8b24548.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:27:08.025Z",
+    "size": 282055,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-guming",
+    "brandName": "古茗",
+    "filename": "brand-guming-33e9d8ab-243a-44a4-9945-6086cb87dae6.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:26:44.732Z",
+    "size": 77929,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-luckin",
+    "brandName": "瑞幸咖啡",
+    "filename": "brand-luckin-4ab7ae33-2768-462b-b447-ad82d4c4998a.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:26:03.458Z",
+    "size": 224960,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-chagee",
+    "brandName": "霸王茶姬",
+    "filename": "brand-chagee-e957a8c8-0108-4f98-9a2a-cf755d6e73b0.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:25:28.024Z",
+    "size": 20221,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-nayuki",
+    "brandName": "奈雪的茶",
+    "filename": "brand-nayuki-33b91864-f59c-4bb6-815b-3270eeb652ed.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:23:25.733Z",
+    "size": 12431,
+    "mimeType": "image/png"
+  },
+  {
+    "brandId": "brand-heytea",
+    "brandName": "喜茶",
+    "filename": "brand-heytea-b246013a-0b62-461a-9f25-5f5fe7ae6dc0.png",
+    "note": "",
+    "createdAt": "2026-11-15T10:22:22.126Z",
+    "size": 252411,
+    "mimeType": "image/png"
+  }
+]

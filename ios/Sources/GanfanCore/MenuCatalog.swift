@@ -11,6 +11,12 @@ public struct MenuBrand: Codable, Equatable, Identifiable, Sendable {
     public let updatedAt: String
     public let status: String
     public let active: Bool
+    public let logoSymbol: String?
+    public let logoAssetName: String?
+    public let logoImageID: UUID?
+    public let logoIsOverridden: Bool
+    public let logoURL: String?
+    public let logoSourceURL: String?
     public let localOverride: Bool
 
     public init(
@@ -24,6 +30,12 @@ public struct MenuBrand: Codable, Equatable, Identifiable, Sendable {
         updatedAt: String = "",
         status: String = "pending",
         active: Bool = true,
+        logoSymbol: String? = nil,
+        logoAssetName: String? = nil,
+        logoImageID: UUID? = nil,
+        logoIsOverridden: Bool = false,
+        logoURL: String? = nil,
+        logoSourceURL: String? = nil,
         localOverride: Bool = false
     ) {
         self.id = id
@@ -36,11 +48,19 @@ public struct MenuBrand: Codable, Equatable, Identifiable, Sendable {
         self.updatedAt = updatedAt
         self.status = status
         self.active = active
+        self.logoSymbol = logoSymbol
+        self.logoAssetName = logoAssetName
+        self.logoImageID = logoImageID
+        self.logoIsOverridden = logoIsOverridden
+        self.logoURL = logoURL
+        self.logoSourceURL = logoSourceURL
         self.localOverride = localOverride
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, aliases, category, source, sourceName, updatedAt, status, active, localOverride
+        case id, name, aliases, category, source, sourceName, updatedAt, status, active
+        case logoSymbol, logoAssetName, logoImageID, logoIsOverridden
+        case logoURL = "logoUrl", logoSourceURL = "logoSourceUrl", localOverride
         case sourceURL = "sourceUrl"
     }
 
@@ -56,6 +76,12 @@ public struct MenuBrand: Codable, Equatable, Identifiable, Sendable {
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt) ?? ""
         status = try container.decodeIfPresent(String.self, forKey: .status) ?? "pending"
         active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? true
+        logoSymbol = try container.decodeIfPresent(String.self, forKey: .logoSymbol)
+        logoAssetName = try container.decodeIfPresent(String.self, forKey: .logoAssetName)
+        logoImageID = try container.decodeIfPresent(UUID.self, forKey: .logoImageID)
+        logoIsOverridden = try container.decodeIfPresent(Bool.self, forKey: .logoIsOverridden) ?? false
+        logoURL = try container.decodeIfPresent(String.self, forKey: .logoURL)
+        logoSourceURL = try container.decodeIfPresent(String.self, forKey: .logoSourceURL)
         localOverride = try container.decodeIfPresent(Bool.self, forKey: .localOverride) ?? false
     }
 }
@@ -414,7 +440,34 @@ public struct MenuCatalog: Codable, Equatable, Sendable {
             localBrands.filter(\.localOverride).map { ($0.id, $0) },
             uniquingKeysWith: { _, latest in latest }
         )
-        var mergedBrands = brands.map { brandOverrides[$0.id] ?? $0 }
+        var mergedBrands = brands.map { bundledBrand in
+            guard let override = brandOverrides[bundledBrand.id] else { return bundledBrand }
+            // Bundled asset names and empty deletion markers are not durable user logos.
+            // Keep only an explicitly selected user image as an override; otherwise
+            // always inherit the current bundled logo for this brand.
+            guard override.logoIsOverridden, override.logoImageID != nil else {
+                return MenuBrand(
+                    id: override.id,
+                    name: override.name,
+                    aliases: override.aliases,
+                    category: override.category,
+                    source: override.source,
+                    sourceName: override.sourceName,
+                    sourceURL: override.sourceURL,
+                    updatedAt: override.updatedAt,
+                    status: override.status,
+                    active: override.active,
+                    logoSymbol: bundledBrand.logoSymbol,
+                    logoAssetName: bundledBrand.logoAssetName,
+                    logoImageID: nil,
+                    logoIsOverridden: false,
+                    logoURL: override.logoURL,
+                    logoSourceURL: bundledBrand.logoSourceURL,
+                    localOverride: override.localOverride
+                )
+            }
+            return override
+        }
         let existingBrandIDs = Set(mergedBrands.map(\.id))
         mergedBrands.append(contentsOf: localBrands.filter { $0.localOverride && !existingBrandIDs.contains($0.id) })
 

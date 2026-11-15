@@ -45,6 +45,7 @@ struct DrinkRecordForm: View {
     @State private var activeSheet: DrinkRecordSheet?
     @State private var notes: String
     @State private var selectedMenuDrink: MenuDrink?
+    @State private var selectedCatalogBrand: MenuBrand?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedPhotoData: Data?
     @State private var selectedPhotoPreview: UIImage?
@@ -95,6 +96,29 @@ struct DrinkRecordForm: View {
         _notes = State(initialValue: originalRecord?.notes ?? "")
     }
 
+    private func brandLogo(for brandID: String, dimension: CGFloat) -> some View {
+        let brand = menuCatalog?.brands.first(where: { $0.id == brandID })
+        return GanfanBrandLogoIcon(
+            assetName: brand?.logoAssetName,
+            symbol: brand?.logoSymbol,
+            imageID: brand?.logoImageID,
+            dimension: dimension
+        )
+    }
+
+    @ViewBuilder
+    private var selectedMenuBrandLabel: some View {
+        if let selectedMenuDrink,
+           !selectedMenuDrink.brandName.isEmpty {
+            HStack(spacing: 4) {
+                brandLogo(for: selectedMenuDrink.brandID, dimension: 16)
+                Text(selectedMenuDrink.brandName)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+    }
+
     var body: some View {
         Form {
             Section {
@@ -142,19 +166,11 @@ struct DrinkRecordForm: View {
 
                     if let selectedMenuDrink {
                         HStack(spacing: 6) {
-                            Label {
-                                (
-                                    Text("菜单已关联")
-                                    + (selectedMenuDrink.brandName.isEmpty
-                                       ? Text("")
-                                       : Text(" · \(selectedMenuDrink.brandName)"))
-                                )
+                            Label("菜单已关联", systemImage: "checkmark.circle.fill")
                                 .lineLimit(1)
                                 .truncationMode(.tail)
-                            } icon: {
-                                Image(systemName: "checkmark.circle.fill")
-                            }
-                            .layoutPriority(1)
+                            selectedMenuBrandLabel
+                                .layoutPriority(1)
                             Spacer(minLength: 4)
                             Text(selectedMenuDrink.status == "verified" ? "已核验" : "待核验")
                                 .lineLimit(1)
@@ -191,9 +207,12 @@ struct DrinkRecordForm: View {
                                             Text(drink.name)
                                                 .font(.subheadline.weight(.semibold))
                                                 .foregroundStyle(.primary)
-                                            Text(drink.brandName)
-                                                .font(.footnote)
-                                                .foregroundStyle(.secondary)
+                                            HStack(spacing: 4) {
+                                                brandLogo(for: drink.brandID, dimension: 14)
+                                                Text(drink.brandName)
+                                                    .font(.footnote)
+                                                    .foregroundStyle(.secondary)
+                                            }
                                         }
                                         Spacer(minLength: 8)
                                         Text(drink.status == "verified" ? "已核验" : "菜单")
@@ -216,9 +235,77 @@ struct DrinkRecordForm: View {
                 }
 
                 if selectedMenuDrink == nil {
-                    TextField("品牌（可选）", text: $brandName)
-                        .textContentType(.organizationName)
-                        .focused($focusedField, equals: .brandName)
+                    VStack(alignment: .leading, spacing: 0) {
+                        TextField("品牌（可选）", text: $brandName)
+                            .textContentType(.organizationName)
+                            .focused($focusedField, equals: .brandName)
+                            .onChange(of: brandName) { _, newValue in
+                                guard let selectedCatalogBrand,
+                                      Self.normalizedCatalogValue(newValue) != Self.normalizedCatalogValue(selectedCatalogBrand.name) else { return }
+                                self.selectedCatalogBrand = nil
+                            }
+
+                        if let selectedCatalogBrand,
+                           Self.normalizedCatalogValue(brandName) == Self.normalizedCatalogValue(selectedCatalogBrand.name) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "checkmark.circle.fill")
+                                brandLogo(for: selectedCatalogBrand.id, dimension: 14)
+                                Text("已匹配目录品牌：\(selectedCatalogBrand.name)")
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                            .font(.caption)
+                            .foregroundStyle(GanfanPalette.forest)
+                            .padding(.top, 4)
+                        } else if focusedField == .brandName,
+                                  !brandName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            if brandSuggestions.isEmpty {
+                                Label("未匹配目录，可按自定义品牌记录", systemImage: "pencil.and.outline")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.top, 6)
+                            } else {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text("匹配的品牌")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                        .padding(.bottom, 6)
+
+                                    ForEach(brandSuggestions) { brand in
+                                        Button {
+                                            chooseCatalogBrand(brand)
+                                        } label: {
+                                            HStack(spacing: 8) {
+                                                brandLogo(for: brand.id, dimension: 20)
+                                                Text(brand.name)
+                                                    .font(.subheadline)
+                                                    .foregroundStyle(.primary)
+                                                    .lineLimit(1)
+                                                Spacer(minLength: 8)
+                                                if !brand.category.isEmpty {
+                                                    Text(brand.category)
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(1)
+                                                }
+                                            }
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .contentShape(Rectangle())
+                                            .padding(.vertical, 8)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        if brand.id != brandSuggestions.last?.id {
+                                            Divider()
+                                        }
+                                    }
+                                }
+                                .padding(12)
+                                .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .padding(.top, 6)
+                            }
+                        }
+                    }
                 }
 
                 Button("浏览完整饮品目录", systemImage: "list.bullet") {
@@ -232,7 +319,6 @@ struct DrinkRecordForm: View {
 
             Section {
                 OptionChipPicker(title: "杯型", options: [""] + cupTypeOptions, selection: $cupType, onSelect: dismissDrinkNameFocus)
-                OptionChipPicker(title: "甜度", options: [""] + sweetnessOptions, selection: $sweetness, onSelect: dismissDrinkNameFocus, minimumChipWidth: 108)
                 OptionChipPicker(
                     title: "温度",
                     options: [""] + Self.temperatureChoices,
@@ -240,6 +326,7 @@ struct DrinkRecordForm: View {
                     onSelect: dismissDrinkNameFocus,
                     minimumChipWidth: 84
                 )
+                OptionChipPicker(title: "甜度", options: [""] + sweetnessOptions, selection: $sweetness, onSelect: dismissDrinkNameFocus, minimumChipWidth: 108)
             } header: {
                 formSectionTitle("这一杯的细节")
             }
@@ -376,14 +463,56 @@ struct DrinkRecordForm: View {
         return Array(menuCatalog.searchDrinks(query: query).prefix(5))
     }
 
+    private var brandSuggestions: [MenuBrand] {
+        let query = brandName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty, selectedCatalogBrand == nil, selectedMenuDrink == nil,
+              let menuCatalog else { return [] }
+        return Array(menuCatalog.searchBrands(query).prefix(5))
+    }
+
+    private func matchingCatalogBrand(named name: String) -> MenuBrand? {
+        let query = Self.normalizedCatalogValue(name)
+        guard !query.isEmpty else { return nil }
+        return menuCatalog?.brands.first { brand in
+            ([brand.name] + brand.aliases).contains {
+                Self.normalizedCatalogValue($0) == query
+            }
+        }
+    }
+
+    private func matchingCatalogDrink(name: String, brandID: String, brandName: String) -> MenuDrink? {
+        let nameKey = Self.normalizedCatalogValue(name)
+        guard !nameKey.isEmpty else { return nil }
+        let brandNameKey = Self.normalizedCatalogValue(brandName)
+        return menuCatalog?.drinks.first { drink in
+            guard Self.normalizedCatalogValue(drink.name) == nameKey else { return false }
+            if !brandID.isEmpty {
+                return drink.brandID == brandID
+            }
+            return Self.normalizedCatalogValue(drink.brandName) == brandNameKey
+        }
+    }
+
+    private static func normalizedCatalogValue(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .filter { !$0.isWhitespace && !$0.isPunctuation }
+    }
+
     private func chooseMenuDrink(_ drink: MenuDrink) {
         focusedField = nil
+        selectedCatalogBrand = nil
         selectedMenuDrink = drink
         brandName = drink.brandName
         drinkName = drink.name
         if cupType.isEmpty, let menuCup = drink.cupTypes.first, cupTypeOptions.contains(menuCup) {
             cupType = menuCup
         }
+    }
+
+    private func chooseCatalogBrand(_ brand: MenuBrand) {
+        selectedCatalogBrand = brand
+        brandName = brand.name
     }
 
     private var cupTypeOptions: [String] {
@@ -610,6 +739,7 @@ struct DrinkRecordForm: View {
 
         Task { @MainActor in
             var newAsset: PhotoAsset?
+            var previousCatalogState: MenuCatalogUserState?
             do {
                 let photo: PhotoAsset?
                 if let selectedPhotoData {
@@ -626,16 +756,58 @@ struct DrinkRecordForm: View {
                     photo = originalRecord?.photo
                 }
 
-                let selectedMenuIsCurrent = selectedMenuDrink?.brandName == brandName
-                    && selectedMenuDrink?.name == drinkName
-                let existingSelectionIsCurrent = originalRecord?.brandName == brandName
-                    && originalRecord?.drinkName == drinkName
+                let cleanedBrandName = brandName.trimmingCharacters(in: .whitespacesAndNewlines)
+                let cleanedDrinkName = drinkName.trimmingCharacters(in: .whitespacesAndNewlines)
+                let selectedMenuIsCurrent = selectedMenuDrink.map {
+                    Self.normalizedCatalogValue($0.brandName) == Self.normalizedCatalogValue(cleanedBrandName)
+                        && Self.normalizedCatalogValue($0.name) == Self.normalizedCatalogValue(cleanedDrinkName)
+                } ?? false
+                let selectedBrandIsCurrent = selectedCatalogBrand.map {
+                    Self.normalizedCatalogValue($0.name) == Self.normalizedCatalogValue(cleanedBrandName)
+                } ?? false
+                let existingSelectionIsCurrent = originalRecord.map {
+                    Self.normalizedCatalogValue($0.brandName) == Self.normalizedCatalogValue(cleanedBrandName)
+                        && Self.normalizedCatalogValue($0.drinkName) == Self.normalizedCatalogValue(cleanedDrinkName)
+                } ?? false
+                let matchedBrand = selectedBrandIsCurrent
+                    ? selectedCatalogBrand
+                    : matchingCatalogBrand(named: cleanedBrandName)
+                let inheritedBrandID = existingSelectionIsCurrent
+                    ? originalRecord?.brandID.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    : ""
+                let newLocalBrandID = !cleanedBrandName.isEmpty && matchedBrand == nil && inheritedBrandID.isEmpty
+                    ? "local-brand-\(UUID().uuidString)"
+                    : ""
                 let brandID = selectedMenuIsCurrent
                     ? selectedMenuDrink?.brandID ?? ""
-                    : (existingSelectionIsCurrent ? originalRecord?.brandID ?? "" : "")
-                let drinkID = selectedMenuIsCurrent
-                    ? selectedMenuDrink?.id ?? ""
-                    : (existingSelectionIsCurrent ? originalRecord?.drinkID ?? "" : "")
+                    : (selectedBrandIsCurrent
+                        ? selectedCatalogBrand?.id ?? ""
+                        : (!inheritedBrandID.isEmpty ? inheritedBrandID : (matchedBrand?.id ?? newLocalBrandID)))
+                let resolvedBrandName = selectedMenuIsCurrent
+                    ? selectedMenuDrink?.brandName ?? cleanedBrandName
+                    : (matchedBrand?.name ?? cleanedBrandName)
+                let matchingDrink = matchingCatalogDrink(
+                    name: cleanedDrinkName,
+                    brandID: brandID,
+                    brandName: resolvedBrandName
+                )
+                let originalDrinkID = existingSelectionIsCurrent
+                    ? originalRecord?.drinkID.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    : ""
+                let shouldSaveCustomDrink = (selectedMenuIsCurrent && selectedMenuDrink?.custom == true)
+                    || (!selectedMenuIsCurrent && (matchingDrink == nil || matchingDrink?.custom == true))
+                let drinkID: String
+                if selectedMenuIsCurrent {
+                    drinkID = selectedMenuDrink?.id ?? ""
+                } else if let matchingDrink {
+                    drinkID = matchingDrink.id
+                } else if !originalDrinkID.isEmpty {
+                    drinkID = originalDrinkID
+                } else if shouldSaveCustomDrink {
+                    drinkID = "local-drink-\(UUID().uuidString)"
+                } else {
+                    drinkID = ""
+                }
                 let nutrition = calculatedNutrition
                 let recordSize = recordSizeML
 
@@ -643,9 +815,9 @@ struct DrinkRecordForm: View {
                     id: originalRecord?.id ?? UUID(),
                     consumedAt: consumedAt,
                     brandID: brandID,
-                    brandName: brandName,
+                    brandName: resolvedBrandName,
                     drinkID: drinkID,
-                    drinkName: drinkName,
+                    drinkName: cleanedDrinkName,
                     cupType: cupType,
                     sizeML: recordSize,
                     sweetness: sweetness,
@@ -660,7 +832,22 @@ struct DrinkRecordForm: View {
                     photo: photo,
                     nutrition: nutrition
                 )
+
+                if shouldSaveCustomDrink {
+                    previousCatalogState = try saveCustomDrinkToCatalog(
+                        id: drinkID,
+                        brandID: brandID,
+                        brandName: resolvedBrandName,
+                        name: cleanedDrinkName,
+                        cupType: cupType,
+                        sizeML: recordSize,
+                        sweetness: sweetness
+                    )
+                }
                 try persist(.drink(record), createdPhotoAssets: newAsset.map { [$0] } ?? [])
+                if previousCatalogState != nil {
+                    BackupChangeTracker().markChanged()
+                }
 
                 if let oldPhoto = originalRecord?.photo, oldPhoto != photo {
                     try? AppStoragePaths.photoStore.remove(oldPhoto)
@@ -668,6 +855,10 @@ struct DrinkRecordForm: View {
                 onSave?()
                 dismiss()
             } catch {
+                if let previousCatalogState {
+                    try? MenuCatalogRepository().saveUserState(previousCatalogState)
+                    menuCatalog = Self.loadBundledCatalog()
+                }
                 if let newAsset { try? AppStoragePaths.photoStore.remove(newAsset) }
                 if selectedPhotoData != nil {
                     PhotoStorageDiagnosticsStore().record(
@@ -680,6 +871,113 @@ struct DrinkRecordForm: View {
                 isSaving = false
             }
         }
+    }
+
+    private func saveCustomDrinkToCatalog(
+        id: String,
+        brandID: String,
+        brandName: String,
+        name: String,
+        cupType: String,
+        sizeML: Int?,
+        sweetness: String
+    ) throws -> MenuCatalogUserState {
+        let repository = MenuCatalogRepository()
+        let previousState = try repository.loadUserState()
+        let previousDrink = menuCatalog?.drinks.first(where: { $0.id == id })
+            ?? previousState.drinks.first(where: { $0.id == id })
+        let currentBrand = menuCatalog?.brands.first(where: { $0.id == brandID })
+            ?? previousState.brands.first(where: { $0.id == brandID })
+
+        var brands = previousState.brands
+        if !brandID.isEmpty,
+           currentBrand == nil,
+           !brandName.isEmpty,
+           !brands.contains(where: { $0.id == brandID }) {
+            brands.append(MenuBrand(
+                id: brandID,
+                name: brandName,
+                category: "自定义",
+                source: "用户记录",
+                sourceName: "用户记录",
+                updatedAt: Self.catalogToday,
+                status: "pending",
+                localOverride: true
+            ))
+        }
+
+        let cleanedCupType = cupType.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedSweetness = sweetness.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cupTypes = Self.uniqueCatalogValues((previousDrink?.cupTypes ?? []) + [cleanedCupType])
+        let sweetnessOptions = Self.uniqueCatalogValues((previousDrink?.sweetnessOptions ?? []) + [cleanedSweetness])
+        let sizesML = Array(Set((previousDrink?.sizesML ?? []) + (sizeML.map { [$0] } ?? []))).sorted()
+        var cupSizes = previousDrink?.cupSizes ?? []
+        if !cleanedCupType.isEmpty, let sizeML, sizeML > 0 {
+            cupSizes.removeAll { $0.cupType == cleanedCupType }
+            cupSizes.append(MenuCupSize(cupType: cleanedCupType, sizeML: sizeML))
+        }
+
+        let entry = MenuEntry(
+            scope: "brand",
+            status: previousDrink?.status ?? "pending",
+            sourceType: "user_record",
+            sourceName: "用户记录",
+            cupTypes: cupTypes,
+            cupSizes: cupSizes,
+            sizesML: sizesML,
+            sweetnessOptions: sweetnessOptions,
+            servingOptions: previousDrink?.servingOptions ?? []
+        )
+        let updatedDrink = MenuDrink(
+            id: id,
+            brandID: brandID,
+            brandName: brandName,
+            name: name,
+            aliases: previousDrink?.aliases ?? [],
+            category: previousDrink?.category ?? currentBrand?.category ?? "自定义饮品",
+            source: "用户记录",
+            sourceType: "user_record",
+            sourceName: "用户记录",
+            updatedAt: Self.catalogToday,
+            status: previousDrink?.status ?? "pending",
+            active: previousDrink?.active ?? true,
+            cupTypes: cupTypes,
+            cupSizes: cupSizes,
+            sizesML: sizesML,
+            sweetnessOptions: sweetnessOptions,
+            servingOptions: previousDrink?.servingOptions ?? [],
+            nutritionPerUnit: previousDrink?.nutritionPerUnit,
+            nutritionVariants: previousDrink?.nutritionVariants ?? [],
+            menuEntries: (previousDrink?.menuEntries.filter { $0.scope != "brand" } ?? []) + [entry],
+            localOverride: true,
+            custom: true
+        )
+
+        var drinks = previousState.drinks.filter { $0.id != id }
+        drinks.append(updatedDrink)
+        let updatedState = MenuCatalogUserState(
+            brands: brands,
+            drinks: drinks,
+            deletedDrinkIDs: previousState.deletedDrinkIDs.subtracting([id]),
+            globalCupSizes: previousState.globalCupSizes
+        )
+        try repository.saveUserState(updatedState)
+        menuCatalog = Self.loadBundledCatalog()
+        return previousState
+    }
+
+    private static var catalogToday: String {
+        ISO8601DateFormatter().string(from: .now).prefix(10).description
+    }
+
+    private static func uniqueCatalogValues(_ values: [String]) -> [String] {
+        var result: [String] = []
+        for value in values {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !result.contains(trimmed) else { continue }
+            result.append(trimmed)
+        }
+        return result
     }
 
     private func persist(_ record: JournalRecord, createdPhotoAssets: [PhotoAsset]) throws {

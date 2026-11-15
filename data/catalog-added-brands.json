@@ -1,0 +1,1189 @@
+[
+  {
+    "id": "brand-coca-cola",
+    "name": "可口可乐",
+    "aliases": [
+      "Coca-Cola",
+      "Coke"
+    ],
+    "category": "饮料",
+    "logoAssetName": "BrandIconCocaCola",
+    "sourceName": "用户提供品牌 Logo；菜单待补",
+    "products": []
+  },
+  {
+    "id": "brand-juan-cha",
+    "name": "眷茶",
+    "aliases": [
+      "眷茶臻选",
+      "Juàn Chá"
+    ],
+    "category": "新茶饮",
+    "logoAssetName": "BrandIconJuanCha",
+    "sourceName": "咖啡奶茶喝什么公开在售菜单汇编（眷茶）",
+    "sourceType": "public_menu",
+    "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1",
+    "products": [
+      {
+        "name": "满庭芳",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "仲夏梦",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "锡兰红茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "花想容",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "玉玲珑",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "丹秋雪",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "茉香瀑布咖啡",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "早早好鲜牛奶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "两掺儿",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "红满天",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "蜜橘颂",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "秋色里",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "日光橘",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "玉生烟",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "胭脂梅",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "天香桂",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "绿绮香",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "解千愁",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "故乡遥",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=1"
+      },
+      {
+        "name": "琳琅雪",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "晚晴天",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "西江月",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "坦洋红茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "回乡回响·茴香苹果白朗姆",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "暖玉一半月·山竹青芒",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "芳菲尽·山竹无花果",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "乌木与深谷·沉香金桔白朗姆",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "橙留香",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "椰语芒",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "须尽欢",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "映日熟",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "南山夏",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "梦桃源",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "嚯藿藿",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "超好藿",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "岩上雪",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "红莓渡夜·树莓金酒",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "月下葡影·葡香百利甜",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "青椰听茶·抹茶茉莉青椰金酒",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=2"
+      },
+      {
+        "name": "三彩赋",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "冰雪凉",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "叹流云（带雪顶）",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "郁金酪",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "莓涧雪",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "红莓引",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "望山野",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "敦煌飞天·杏皮茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "空山雨",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "叹流云",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "金满枝",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "惊鸿曲",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "万重山",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "岩韵红袍",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "杏月醺",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "晴光好",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "绯云酪",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "纯牛奶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "冬雪融",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "金芒露",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=3"
+      },
+      {
+        "name": "春酿盏",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "凤玉山",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "马蹄落雪·草莓香草芭菲",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "岁启春福·紫苏柳橙茉莉",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "芭蕉雨",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "春几许",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "兰舟雪",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "一叶川",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "金玉案",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "红袍岩茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "臻选红茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "霜满地",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "祥云至",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "采桑甜",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "红莓馥",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "满晴川",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "故乡雪",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "千秋岁",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "云起时",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "香满路",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=4"
+      },
+      {
+        "name": "糯香绿茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "晚来秋",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "入梦时",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "香如故",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "赞无花",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "凤梨金桔奶绿",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "（冰沙）香浓杨枝甘露",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "穗满川",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "浮云卷",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "望春山",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "青山隐",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "粉雪莓",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "柏舟·白茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "鸣琴·毛尖",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "孤鸿·红茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "客来·三泡台",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "西域少年",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "古巴比伦行星",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "波斯湾日落",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "为我寻诗篇",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=5"
+      },
+      {
+        "name": "醉卧榆林河·陇西甜胚杏仁酒",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "156号特窟外的日落·敦煌飞天杏皮茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "平沙落日·茉莉姜黄",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "橙黄橘绿时·秋橙披萨草",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "陇西杏雨醉·杏皮紫苏朗姆",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "玛莎拉锡兰",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "肉桂乌龙",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "小种红茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "玉璎珞",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "望春山不含雪顶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "芒果牛乳",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "糯香信阳红",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "茉莉绿茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "月华浓",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "草木生",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "紫苏令",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "汴京梦",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "念凤梨",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "糯山行",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "艳阳曲",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=6"
+      },
+      {
+        "name": "少年游",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=7"
+      },
+      {
+        "name": "琥珀浓",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=7"
+      },
+      {
+        "name": "相映红",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=7"
+      },
+      {
+        "name": "飞花令",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=7"
+      },
+      {
+        "name": "千金裘",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=7"
+      },
+      {
+        "name": "月下诗",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=7"
+      },
+      {
+        "name": "河阴酿",
+        "sourceUrl": "https://www.nckfhsm.com/brands/juan-cha/menu/available?page=7"
+      }
+    ]
+  },
+  {
+    "id": "brand-sui-yin-ji-liang",
+    "name": "碎银几两",
+    "aliases": [
+      "嘉欣碎银几两",
+      "Seeing Tea"
+    ],
+    "category": "新茶饮",
+    "logoAssetName": "BrandIconSuiYinJiLiang",
+    "sourceName": "咖啡奶茶喝什么公开在售菜单汇编（嘉欣碎银几两；已筛除餐食与周边）",
+    "sourceType": "public_menu",
+    "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1",
+    "products": [
+      {
+        "name": "紫芋冰杯Dirty",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "白兰.开心Dirty",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "拿铁·抹茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "满江红·茶布奇诺",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "龙井肆叁·茶布奇诺 Longjing 43",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "碎米银子·茶布奇诺",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "花香小种·茶布奇诺",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "凤凰单丛·茶布奇诺",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "拿铁·鸭屎香单丛",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "柿月浮云",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "草原茯韵·雪山淇淋",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "桂影醪香",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "芋紫云绒",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "秋金云绒",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "拿铁·碎银普洱",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=1"
+      },
+      {
+        "name": "拿铁·武夷大红袍",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "拿铁·茉莉山岚",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "银露为霜·碎银子三食",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "清香铁观音",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "南糯山古树红茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "桂香乌龙",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "梅家坞龙井",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "澜沧荒野白茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "蜜香金骏眉",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "美式",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "拿铁 Caffè",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "澳白",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "Dirty",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "野放老枞红茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "橙花香单丛",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "守山人·马头岩",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "吴三地老枞水仙",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "管阳野放牡丹",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "乌岽山的春天 Spring on Wudong Mountain (Dancong Oolong)",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=2"
+      },
+      {
+        "name": "明前龙井",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=3"
+      },
+      {
+        "name": "鸭屎香单丛",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=3"
+      },
+      {
+        "name": "铁观音",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=3"
+      },
+      {
+        "name": "烟熏甜菜三文鱼",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=3"
+      },
+      {
+        "name": "蒜香黑虎虾",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "泰式香煎猪排生菜包",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "昔绿·抹茶三食 Heritage Green · Matcha,",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "茉莉.卡曼橘",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "奇兰·威廉梨",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "奇兰·柚子木瓜",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "奇兰·森林浆果",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "芭乐青柠",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "松间月",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "枕春眠",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "醉李沉银",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "油柑茉莉",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "佛手青芒",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "海盐荔夏",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=4"
+      },
+      {
+        "name": "羽衣青提",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=5"
+      },
+      {
+        "name": "碎银子巧克力",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=5"
+      },
+      {
+        "name": "柚子白茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=5"
+      },
+      {
+        "name": "桂花乌龙",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=5"
+      },
+      {
+        "name": "开心果龙井",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=5"
+      },
+      {
+        "name": "惊玉荷花水牛乳",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=5"
+      },
+      {
+        "name": "粽玉倾心",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=5"
+      },
+      {
+        "name": "海盐大红袍水牛乳",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=5"
+      },
+      {
+        "name": "热牛乳",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=5"
+      },
+      {
+        "name": "桂影醪香（含酒精）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=5"
+      },
+      {
+        "name": "茉柑回书",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=5"
+      },
+      {
+        "name": "青榄浮白",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=6"
+      },
+      {
+        "name": "咸香柚Dirty",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=6"
+      },
+      {
+        "name": "桂影醪香 （秋季新品）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=6"
+      },
+      {
+        "name": "昔绿·抹茶三食",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=6"
+      },
+      {
+        "name": "柿月浮云（秋季新品）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=6"
+      },
+      {
+        "name": "拿铁",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=6"
+      },
+      {
+        "name": "乌岽山的春天",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=7"
+      },
+      {
+        "name": "桂花奇兰水牛乳",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=7"
+      },
+      {
+        "name": "秋金云绒{秋季新品}",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=7"
+      },
+      {
+        "name": "芋紫云绒{秋季新品}",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=7"
+      },
+      {
+        "name": "桂花乌龙（秋季新品）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "自然·凤梨维c胡萝卜",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "槜李沉银",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "树莓开心果巧克力",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "清韵玉兰",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "阿勒泰的夏（可加酒）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "二一年福鼎白毫银针",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "颜颜刮油茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "冰啤萃(无酒精)",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "马头岩肉桂",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "仙毫特级牡丹",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "茉莉·蓝莓紫甘蓝【新品上线】",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "纯水牛乳",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=8"
+      },
+      {
+        "name": "桂花奇兰水牛乳（冷饮）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "葡萄与柚子",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "龙井肆叁·茶布奇诺",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "入云海",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "兰妃",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "花香寿眉",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "澜沧白茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "番石榴香水柠檬茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "鲜榨橙汁",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "海盐大红袍水牛乳（标准杯）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "2013年班盆古树",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "古法陈皮山楂茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "吴三地百年老枞水仙",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "庐山云雾",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "烟雨楼前",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=9"
+      },
+      {
+        "name": "梅占金骏眉",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "寻青碧露青提",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "纯茶加杯子",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "冰感茉莉麒麟西瓜",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "蜜桃恬",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "瓦罐烤奶—玫瑰大红袍水牛乳",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "金桂乌龙",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "松烟正山小种",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "龙井肆叁（瓶）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "不知春（瓶）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "青山序（有罗勒香料！请慎点！）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "茉莉.卡曼橘【新品上线】",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "阿里山青心乌龙",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "人间碎银半壶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=10"
+      },
+      {
+        "name": "香水单丛",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "青橄榄单从（雪葩）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "太平猴魁",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "漳平水仙",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "蜜瓜乌龙",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "金芽小青柑",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "冻顶乌龙",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "乌栋通天香",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "荔枝仙露奶云",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "熬夜神仙水",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "青枫录·一茶三喝",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "冰萃小青柑",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "昔绿·抹茶三吃",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=11"
+      },
+      {
+        "name": "月光银针",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "茉柑回书【夏季新品】",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "热红酒风味晚安茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "梅溪安吉白茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "桂花奇兰水牛乳（热饮）",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "冷萃铁观音",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "奶白恬一八年一级牡丹",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "青榄浮白【夏季新品】",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "老树龙井",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "祁红香螺",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "花香奇兰",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "瓦罐烤奶—开心果茉莉水牛乳",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "天山蜜桃云雾茉莉",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "荒野老枞正山小种",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "茉莉香水菠萝",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "茉莉.紫甘蓝 {新品上线}",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "醒狮玲珑蜜瓜果茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "鲜榨柳橙汁",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "遇春山",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=12"
+      },
+      {
+        "name": "五窨茉莉毛尖·茶布奇诺",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=13"
+      },
+      {
+        "name": "奇兰·百香果",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=13"
+      },
+      {
+        "name": "自然·羽衣甘蓝奇异果",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=13"
+      },
+      {
+        "name": "奇兰·月皎皎",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=13"
+      },
+      {
+        "name": "厝头狮凝乳茶",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=13"
+      },
+      {
+        "name": "翠云清露",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=13"
+      },
+      {
+        "name": "【限定特惠】有机茶信",
+        "sourceUrl": "https://www.nckfhsm.com/ja/brands/sui-yin-ji-liang/menu/available?page=13"
+      }
+    ]
+  },
+  {
+    "id": "brand-mcdonalds",
+    "name": "麦当劳",
+    "aliases": [
+      "McDonald’s",
+      "McDonald's",
+      "Mcdonald’s"
+    ],
+    "category": "快餐饮品",
+    "logoAssetName": "BrandIconMcDonalds",
+    "sourceName": "用户提供品牌 Logo；菜单待补",
+    "products": []
+  },
+  {
+    "id": "brand-kfc",
+    "name": "肯德基",
+    "aliases": [
+      "KFC",
+      "肯德基宅急送"
+    ],
+    "category": "快餐饮品",
+    "logoAssetName": "BrandIconKFC",
+    "sourceName": "用户提供品牌 Logo；菜单待补",
+    "products": []
+  }
+]

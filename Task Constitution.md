@@ -1,7 +1,7 @@
 # Task Constitution
 
 ## 1. Mission
-Build the meal-logging product, with the current release direction as the native iOS app “干饭手册”: local-first drink and meal records, user-selected iCloud Drive backup, and no historical-data migration.
+Build the meal-logging product, with the current release direction as the native iOS app “食光记”: local-first drink and meal records, user-selected iCloud Drive backup, and no historical-data migration.
 
 ## 2. Success Criteria
 - [ ] Menu data has a stable structure for brands, drinks, city/store availability, options, nutrition variants, sources, and verification dates.
@@ -17,12 +17,12 @@ Build the meal-logging product, with the current release direction as the native
 - [ ] The iOS app reproduces the Mini Program's nine page and data behaviors, applies the approved Logo and visual language, and keeps the first release single-user while retaining stable-ID/versioned-data seams for a future shared list.
 
 ## 3. Task Tree
-### T6 — Native iOS app「干饭手册」
+### T6 — Native iOS app「食光记」
 - Status: 进行中（品牌及九页部分代码已接入；全功能和页面/设备验收仍待完成）
 - Objective: Deliver a branded, local-first iPhone app reproducing all nine Mini Program pages and their data behavior, without importing Mini Program history; preserve the user's existing iOS records and keep a bounded extension path for future shared lists.
 - Acceptance: Nine pages/data contracts are mapped and accepted; offline records/photos, menu, history, nutrition insights, diagnostics, and backup/restore work; iOS data survives upgrades; no login/sharing in v1; stable IDs and versioned boundaries support future architecture work.
 - Details: `docs/ios-development-plan.md`; page/data map `docs/ios-miniprogram-parity-map.md`; core checks in `tests/mvp.test.md` sections G–I and full parity checks in section J.
-- Current result: Native SwiftUI target includes local-first drink/meal flows, selected-folder backup/restore, the approved Logo/AppIcon, all nine page shells, and the first drink-data parity increment. Temperature/ice fields are backward-decodable; nutrition variants and per-unit baselines preserve confidence and source URL. Catalog overrides and global cup settings are now included in versioned backup snapshots, with legacy-snapshot compatibility; drink and meal forms support MapKit selection and manual address fallback. Swift core automation passes 54/54, and unsigned iOS/device-SDK and simulator builds succeed. The latest iPhone 18 Pro simulator screenshot confirms one visible brand title, an in-content search field, and a compact drink-count/cup/nutrition summary. Full page interaction/visual parity, physical iPhone launch (previous attempt stopped at the untrusted Developer App certificate), and actual iCloud delivery remain unverified.
+- Current result: Native SwiftUI target includes local-first drink/meal flows, selected-folder backup/restore, the approved Logo/AppIcon, all nine page shells, and the first drink-data parity increment. Temperature/ice fields are backward-decodable; nutrition variants and per-unit baselines preserve confidence and source URL. Full effective drink catalog, nutrition data pack, custom logo assets, and logo visibility/overrides are now included in backup/restore, with legacy-snapshot compatibility; drink and meal forms support MapKit selection and manual address fallback. Swift core automation passes 54/54, and unsigned iOS/device-SDK and simulator builds succeed. The latest iPhone 18 Pro simulator screenshot confirms one visible brand title, an in-content search field, and a compact drink-count/cup/nutrition summary. Full page interaction/visual parity, physical iPhone launch (previous attempt stopped at the untrusted Developer App certificate), and actual iCloud delivery remain unverified.
 - Next action: Continue page-by-page interaction and visual checks, then verify the selected-folder backup flow and empty-library restore on the physical iPhone after its developer certificate is trusted.
 
 #### T6.1 — 页面/数据基线与品牌视觉
@@ -33,13 +33,13 @@ Build the meal-logging product, with the current release direction as the native
 - Evidence: `docs/ios-miniprogram-parity-map.md`; `tests/mvp.test.md` J-01/J-02.
 
 #### T6.2 — 数据契约与本机仓储边界
-- Status: 进行中（记录温度/冰量、营养计算和来源兼容、菜单/杯型设置备份兼容已实现；本机仓储抽象和全量兼容验收仍待完成）
+- Status: 进行中（菜单、完整饮品目录和营养数据的备份恢复兼容已接入；重复快照抑制及旧备份预览清理已实现；本机仓储抽象和全量兼容验收仍待完成）
 - Objective: Complete the catalog/nutrition/local override contract and isolate local persistence behind a replaceable boundary, with versioned IDs and backup compatibility.
 - Acceptance: Domain tests cover catalog, nutrition provenance, custom overrides and stable record/photo IDs; existing iOS data stays readable; no account, membership or online sync is introduced.
 - Depends on: T6.1
 
 #### T6.3 — 九页功能与数据补齐
-- Status: 进行中（九页首轮代码已接入；饮品/用餐地图选择、手动地点回退和菜品排序代码已具备，页面交互与视觉验收仍待完成）
+- Status: 进行中（Logo 直接归属品牌，标题使用品牌名；可在品牌内添加、裁切、替换或删除图片；页面交互与视觉验收仍待完成）
 - Objective: Complete Today, drink entry, catalog, meal entry, photo preview, storage diagnostics, history, record detail and nutrition insights.
 - Acceptance: IOS-3-02–15 pass their behavior and page gates; single-user navigation and filtering match the agreed scope.
 - Depends on: T6.1, T6.2
@@ -90,7 +90,7 @@ Build the meal-logging product, with the current release direction as the native
 - Task: T6.3
 - Parent path: T6 → T6.3
 - Objective: Complete and verify the nine iOS page flows against the Mini Program's behavior and data contracts.
-- Next action: Continue simulator review of drink and meal forms, map selection/manual fallback, meal dish ordering, and navigation; keep each page gate TODO until its full behavior and visual criteria are checked.
+- Next action: 验收内置与自定义 Logo 管理、含饮品目录及营养数据的备份恢复，再继续模拟器检查饮品/用餐表单、地图回退、菜品排序和导航；页面门未完整通过前保持 TODO。
 
 ## 5. Decision Log
 | Date | Decision | Rationale | Impact |
@@ -125,12 +125,14 @@ Build the meal-logging product, with the current release direction as the native
 | Date | Change | Reason | Affected tasks |
 |---|---|---|---|
 | 2026-10-26 | Added read-only photo/cache diagnostics and exact photo errors. | User approved diagnosis; device check pending. | T5 |
-| 2026-11-13 | Started native iOS app “干饭手册” as a fresh local-first product with selected-folder iCloud Drive backups; no historical-data migration. | User approved the iOS direction and development plan. | T6 |
+| 2026-11-13 | Started native iOS app “食光记” as a fresh local-first product with selected-folder iCloud Drive backups; no historical-data migration. | User approved the iOS direction and development plan. | T6 |
 | 2026-11-13 | Implemented the first local-record UI/core and advanced T6 to backup/restore; 21 Swift core tests pass and iOS/Simulator SDK builds succeed, with device runtime gates still pending. | Continued the approved implementation plan and kept automated evidence separate from device acceptance. | T6 |
 | 2026-11-13 | Implemented versioned file snapshots, original-photo verification, automatic/manual backup triggers, snapshot listing, and transactional restore to an empty SwiftData library; 38 Swift core tests pass and both SDK builds succeed. | Continued T6 through the backup/restore code package while preserving device gates for real iCloud behavior. | T6 |
 | 2026-11-13 | Expanded the approved iOS scope to all nine Mini Program pages and data behaviors, retained single-user v1, and recorded future shared-list constraints without enabling collaboration; added the parity map and IOS-3 acceptance cases. | User requested eventual full page/data reproduction, Logo use and future multi-person extensibility, then approved the iteration plan. | T6, T6.1–T6.4 |
 | 2026-11-13 | Added backward-compatible drink temperature/ice fields, legacy serving normalization, nutrition variant/per-unit calculation with provenance, and form/detail display; 51 core tests and the latest iOS SDK build pass. | Continued the approved nine-page iOS implementation and filled an identified drink-data gap. | T6.2, T6.3 |
 | 2026-11-13 | Added menu/cup settings to versioned backup restore, MapKit selection and manual address fallback to drink/meal forms, map display in details, and Home title/search/summary-card refinements; 54 core tests pass and the latest iPhone 18 Pro simulator screenshot was reviewed. | Continued the approved page-parity iteration while keeping physical-device, iCloud-delivery, and remaining page gates distinct. | T6.1–T6.3 |
+| 2026-11-15 | Suppressed duplicate snapshots; added retention preview/confirmation, 7-day grace, and cleanup for unreferenced backup images. | User approved reducing redundant snapshot growth while preserving a review step and recovery history. | T6.2, T6.4 |
+| 2026-11-16 | Fixed backup snapshot result typing, SwiftUI snapshot summary type-check complexity, and byte-count formatter usage; Swift package and iOS Simulator builds pass. | User reported compile errors after backup retention implementation. | T6.2, T6.4 |
 | 2026-10-14 | Created initial task tree for the catalog expansion and update work. | User approved the catalog foundation and three-city verification approach. | T1–T3 |
 | 2026-10-15 | Corrected platform source references and recorded the Taobao Flash Sale page-access blocker. | User clarified that current research must use Taobao Flash Sale. | T2 |
 | 2026-10-15 | Added 15 brands and public menu reference products with source links; all stay pending. | User requested public online menu research after direct Taobao access was unavailable. | T2 |

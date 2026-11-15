@@ -12,6 +12,9 @@ const brands = source.brands.map((brand) => ({
   source: String(brand.source || ''),
   sourceName: String(brand.sourceName || ''),
   sourceUrl: String(brand.sourceUrl || ''),
+  ...(brand.logoAssetName ? { logoAssetName: String(brand.logoAssetName) } : {}),
+  ...(brand.logoSourceURL ? { logoSourceUrl: String(brand.logoSourceURL) } : {}),
+  ...(brand.logoSymbol ? { logoSymbol: String(brand.logoSymbol) } : {}),
   updatedAt: String(brand.updatedAt || source.updatedAt || ''),
   status: String(brand.status || 'pending'),
   active: brand.active !== false
@@ -39,5 +42,5 @@ const drinks = source.drinks.map((drink) => {
 const catalog = { version: source.version, updatedAt: source.updatedAt, brands, drinks };
 const outputPath = path.resolve(__dirname, '../GanfanHandbook/Resources/catalog.json');
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-fs.writeFileSync(outputPath, `${JSON.stringify(catalog)}\n`);
+fs.writeFileSync(outputPath, `${JSON.stringify(catalog, null, 2)}\n`);
 process.stdout.write(`Exported ${brands.length} brands and ${drinks.length} drinks to ${outputPath}\n`);

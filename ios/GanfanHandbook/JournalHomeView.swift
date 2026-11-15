@@ -1,3 +1,4 @@
+import CryptoKit
 import SwiftData
 import SwiftUI
 import UIKit
@@ -8,6 +9,19 @@ private struct TimelineItem: Identifiable {
     let record: JournalRecord
 
     var id: UUID { record.id }
+}
+
+private enum JournalBrandLogoCatalog {
+    static func loadBrands() -> [String: MenuBrand] {
+        guard let url = Bundle.main.url(forResource: "catalog", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let bundledCatalog = try? MenuCatalog.decode(data) else {
+            return [:]
+        }
+
+        let catalog = (try? MenuCatalogRepository().catalog(from: bundledCatalog)) ?? bundledCatalog
+        return Dictionary(catalog.brands.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
+    }
 }
 
 struct GanfanMainTabView: View {
@@ -64,6 +78,7 @@ struct JournalHomeView: View {
     @State private var isCreatingDrink = false
     @State private var isCreatingMeal = false
     @State private var successfulSaveCount = 0
+    @State private var brandCatalog: [String: MenuBrand] = [:]
 
     private var timelineItems: [TimelineItem] {
         let items = storedRecords.compactMap { storedRecord -> TimelineItem? in
@@ -71,12 +86,7 @@ struct JournalHomeView: View {
             return TimelineItem(storedRecord: storedRecord, record: record)
         }
 
-        return items.sorted {
-            if $0.record.consumedAt != $1.record.consumedAt {
-                return $0.record.consumedAt > $1.record.consumedAt
-            }
-            return $0.id.uuidString < $1.id.uuidString
-        }
+        return items.sorted(by: JournalRecordListFormatting.precedes)
     }
 
     private var todayItems: [TimelineItem] {
@@ -123,12 +133,11 @@ struct JournalHomeView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: GanfanSpacing.large) {
-                    todayHeader
+                    todayIntro
                     captureActions
                     todayRecordsHeading
                     unreadableRecordsNotice
                     todayRecordResults
-                    TodayDrinkSummaryCard(summary: dailyNutritionSummary)
                 }
                 .padding(.horizontal, GanfanSpacing.pageHorizontal)
                 .padding(.vertical, 12)
@@ -141,14 +150,16 @@ struct JournalHomeView: View {
             .tint(GanfanPalette.forest)
             .background(GanfanPalette.canvas.ignoresSafeArea())
             .task {
+                brandCatalog = JournalBrandLogoCatalog.loadBrands()
                 mergeLegacyMicroSweetness()
                 backupWorkflow.restoreSavedFolderAccess()
                 backupWorkflow.backupIfNeeded(storedRecords: storedRecords, context: modelContext)
             }
-            .onChange(of: libraryChangeGeneration) { _ in
+            .onChange(of: libraryChangeGeneration) { _, _ in
+                brandCatalog = JournalBrandLogoCatalog.loadBrands()
                 backupWorkflow.backupIfNeeded(storedRecords: storedRecords, context: modelContext)
             }
-            .onChange(of: scenePhase) { phase in
+            .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
                 backupWorkflow.restoreSavedFolderAccess()
                 backupWorkflow.backupIfNeeded(storedRecords: storedRecords, context: modelContext)
@@ -167,47 +178,24 @@ struct JournalHomeView: View {
         }
     }
 
-    private var todayHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("今天")
-                        .font(.largeTitle.weight(.bold))
-                        .foregroundStyle(GanfanPalette.ink)
-                    dateLabel
-                    backupLink
-                        .padding(.top, 4)
-                }
-            } else {
-                HStack(spacing: 8) {
-                    brandIdentity
-                    Spacer(minLength: 8)
-                    backupLink
-                }
-
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text("今天")
-                        .font(.largeTitle.weight(.bold))
-                        .foregroundStyle(GanfanPalette.ink)
-                    dateLabel
-                }
-            }
+    private var todayIntro: some View {
+        VStack(alignment: .leading, spacing: GanfanSpacing.mediumSmall) {
+            todayHeader
+            TodayDrinkNutritionSummary(summary: dailyNutritionSummary)
         }
     }
 
-    private var brandIdentity: some View {
-        HStack(spacing: 8) {
-            Image("BrandLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 24, height: 24)
-                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-
-            Text("干饭手册")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+    private var todayHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("今天")
+                .font(.largeTitle.weight(.bold))
+                .foregroundStyle(GanfanPalette.ink)
+            dateLabel
+            if let notice = backupHomeNotice {
+                backupLink(for: notice)
+                    .padding(.top, 4)
+            }
         }
-        .accessibilityElement(children: .combine)
     }
 
     private var dateLabel: some View {
@@ -217,23 +205,38 @@ struct JournalHomeView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var backupLink: some View {
+    private func backupLink(for notice: HomeBackupNotice) -> some View {
         NavigationLink {
             BackupSettingsView()
         } label: {
-            Label(isBackupPending ? "待备份" : "备份", systemImage: "icloud.and.arrow.up")
+            Label(notice.title, systemImage: notice.symbol)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(isBackupPending ? GanfanPalette.forest : GanfanPalette.ink.opacity(0.72))
+                .foregroundStyle(notice.isWarning ? Color.orange : GanfanPalette.forest)
                 .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(isBackupPending ? GanfanPalette.paleLeaf : GanfanPalette.card, in: Capsule())
+                .padding(.vertical, 7)
+                .background(
+                    notice.isWarning ? Color.orange.opacity(0.10) : GanfanPalette.paleLeaf,
+                    in: Capsule()
+                )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isBackupPending ? "备份与恢复，存在待备份内容" : "备份与恢复")
+        .accessibilityLabel("备份状态：\(notice.title)，点按打开备份与恢复设置")
     }
 
     private var isBackupPending: Bool {
         pendingBackupCount > 0 || hasPendingLibraryChanges
+    }
+
+    private var backupHomeNotice: HomeBackupNotice? {
+        if backupWorkflow.folderBookmark.isEmpty { return .notConfigured }
+        if let failure = backupWorkflow.homeFailure {
+            switch failure {
+            case .directoryUnavailable: return .directoryUnavailable
+            case .backupFailed: return .backupFailed
+            }
+        }
+        guard !backupWorkflow.isWorking, isBackupPending else { return nil }
+        return .pending
     }
 
     @ViewBuilder
@@ -303,7 +306,11 @@ struct JournalHomeView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(todayItems.enumerated()), id: \.element.id) { entry in
-                        JournalRecordCardRow(item: entry.element, style: .today)
+                        JournalRecordCardRow(
+                            item: entry.element,
+                            style: .today,
+                            brandCatalog: brandCatalog
+                        )
                             .padding(.vertical, 12)
                             .transition(.asymmetric(
                                 insertion: .move(edge: .top).combined(with: .opacity),
@@ -330,18 +337,27 @@ struct JournalHomeView: View {
 
 private struct JournalTimelineRow: View {
     let record: JournalRecord
+    let brandCatalog: [String: MenuBrand]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 switch record {
                 case .drink(let drink):
-                    Label(drink.drinkName, systemImage: "cup.and.saucer")
+                    Text(drink.drinkName)
                         .font(.headline)
                     Spacer(minLength: 8)
-                    Text(drink.brandName)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 5) {
+                        GanfanBrandLogoIcon(
+                            assetName: brandCatalog[drink.brandID]?.logoAssetName,
+                            symbol: brandCatalog[drink.brandID]?.logoSymbol,
+                            imageID: brandCatalog[drink.brandID]?.logoImageID,
+                            dimension: 16
+                        )
+                        Text(drink.brandName)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 case .meal(let meal):
                     Label(meal.storeName.isEmpty ? "用餐记录" : meal.storeName, systemImage: "fork.knife")
                         .font(.headline)
@@ -356,7 +372,9 @@ private struct JournalTimelineRow: View {
                         ice: drink.ice,
                         legacyServingOption: drink.temperature == nil && drink.ice == nil ? drink.servingOption : nil
                     )
-                    Text([drink.cupType, drink.sweetness, serving.displayLabel].filter { !$0.isEmpty }.joined(separator: " · "))
+                    Text([drink.cupType, serving.displayLabel, drink.sweetness].filter { !$0.isEmpty }.joined(separator: " · "))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 case .meal(let meal):
                     Text(meal.dishes.map(\.name).joined(separator: "、"))
                         .lineLimit(2)
@@ -396,12 +414,39 @@ private struct JournalPhotoEntry: Identifiable {
     var id: UUID { asset.id }
 }
 
+private enum JournalRecordOverlayRoute: Identifiable {
+    case detail(id: UUID, storedRecord: StoredJournalRecord)
+    case photos(id: UUID, assets: [PhotoAsset], labels: [String], initialIndex: Int)
+
+    var id: UUID {
+        switch self {
+        case .detail(let id, _), .photos(let id, _, _, _): id
+        }
+    }
+
+    static func record(_ storedRecord: StoredJournalRecord) -> Self {
+        .detail(id: UUID(), storedRecord: storedRecord)
+    }
+
+    static func photoViewer(assets: [PhotoAsset], labels: [String], initialIndex: Int = 0) -> Self {
+        .photos(id: UUID(), assets: assets, labels: labels, initialIndex: initialIndex)
+    }
+}
+
+private struct JournalNutritionMetric: Identifiable {
+    let symbol: String
+    let label: String
+    let value: String
+
+    var id: String { label }
+}
+
 private struct JournalRecordCardRow: View {
     let item: TimelineItem
     let style: JournalRecordRowStyle
+    let brandCatalog: [String: MenuBrand]
 
-    @State private var isShowingPhotoViewer = false
-    @State private var selectedPhotoIndex = 0
+    @State private var activeOverlay: JournalRecordOverlayRoute?
 
     private var photoEntries: [JournalPhotoEntry] {
         switch item.record {
@@ -418,26 +463,25 @@ private struct JournalRecordCardRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             photoColumn
+            detailAction
+        }
+        .sheet(item: $activeOverlay) { route in
+            JournalRecordOverlaySheet(route: route)
+        }
+    }
 
-            NavigationLink {
-                RecordDetailView(storedRecord: item.storedRecord)
-            } label: {
-                recordDetails
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("查看\(recordTitle)详情")
+    @ViewBuilder
+    private var detailAction: some View {
+        Button {
+            activeOverlay = .record(item.storedRecord)
+        } label: {
+            recordDetails
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
         }
-        .sheet(isPresented: $isShowingPhotoViewer) {
-            NavigationStack {
-                PhotoViewer(
-                    assets: photoEntries.map(\.asset),
-                    labels: photoEntries.map(\.label),
-                    initialIndex: selectedPhotoIndex
-                )
-            }
-        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("查看\(recordTitle)详情")
+        .accessibilityHint("从底部打开记录详情")
     }
 
     @ViewBuilder
@@ -454,19 +498,19 @@ private struct JournalRecordCardRow: View {
                 photoPlaceholder("菜")
             } else {
                 let visibleCount = min(photoEntries.count, 4)
-                ZStack(alignment: .leading) {
+                ZStack(alignment: .topLeading) {
                     ForEach(0..<visibleCount, id: \.self) { index in
                         photoButton(at: index)
-                            .offset(x: CGFloat(index) * style.photoLayerOffset)
+                            .offset(y: CGFloat(index) * style.photoLayerOffset)
                             .zIndex(Double(visibleCount - index))
                     }
                 }
-                .frame(width: photoStackWidth, height: style.photoSize, alignment: .leading)
+                .frame(width: style.photoSize, height: photoStackHeight, alignment: .topLeading)
             }
         }
     }
 
-    private var photoStackWidth: CGFloat {
+    private var photoStackHeight: CGFloat {
         let visibleCount = min(photoEntries.count, 4)
         return style.photoSize + CGFloat(max(0, visibleCount - 1)) * style.photoLayerOffset
     }
@@ -476,8 +520,11 @@ private struct JournalRecordCardRow: View {
         let showsCount = isMeal && index == 0 && photoEntries.count > 1
 
         return Button {
-            selectedPhotoIndex = index
-            isShowingPhotoViewer = true
+            activeOverlay = .photoViewer(
+                assets: photoEntries.map(\.asset),
+                labels: photoEntries.map(\.label),
+                initialIndex: index
+            )
         } label: {
             JournalPhotoThumbnail(asset: entry.asset, dimension: style.photoSize)
                 .overlay {
@@ -532,7 +579,7 @@ private struct JournalRecordCardRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(drink.drinkName)
                     .font(.headline)
-                    .foregroundStyle(GanfanPalette.ink)
+                    .foregroundStyle(GanfanPalette.forest)
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 if style.showsTimeInCard {
@@ -543,27 +590,60 @@ private struct JournalRecordCardRow: View {
                 }
             }
 
-            Text("\(drink.brandName.isEmpty ? "自定义饮品" : drink.brandName) · \(drink.cupType.isEmpty ? "杯型未记录" : drink.cupType)")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            let nutritionMetrics = Self.nutritionMetrics(drink.nutrition)
+            if !nutritionMetrics.isEmpty {
+                nutritionSummary(nutritionMetrics)
+            }
+
+            HStack(alignment: .center, spacing: 6) {
+                GanfanBrandLogoIcon(
+                    assetName: brandCatalog[drink.brandID]?.logoAssetName,
+                    symbol: brandCatalog[drink.brandID]?.logoSymbol,
+                    imageID: brandCatalog[drink.brandID]?.logoImageID,
+                    dimension: 16
+                )
+                Text(drink.brandName.isEmpty ? "自定义饮品" : drink.brandName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .fixedSize(horizontal: false, vertical: true)
 
             let servingLabel = Self.servingLabel(for: drink)
             let missingServingLabel = style == .today ? "冰度未记" : "未选择"
-            Text("\(drink.sweetness.isEmpty ? "甜度未记" : drink.sweetness) · \(servingLabel.isEmpty ? missingServingLabel : servingLabel)")
+            let cupTypeLabel = drink.cupType.isEmpty ? "杯型未记录" : drink.cupType
+            let sweetnessLabel = drink.sweetness.isEmpty ? "甜度未记" : drink.sweetness
+            Text("\(cupTypeLabel) · \(servingLabel.isEmpty ? missingServingLabel : servingLabel) · \(sweetnessLabel)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if style != .today || Self.hasNutritionData(drink.nutrition) {
-                Text(Self.nutritionLabel(drink.nutrition))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
 
             if let location = Self.drinkLocationLabel(drink, style: style) {
                 locationLine(location)
+            }
+        }
+    }
+
+    private func nutritionSummary(_ metrics: [JournalNutritionMetric]) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: style == .timeline ? 8 : 12) {
+            ForEach(metrics) { metric in
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Image(systemName: metric.symbol)
+                        .font(.system(size: style == .timeline ? 9 : 10, weight: .semibold))
+                    if style != .timeline {
+                        Text(metric.label)
+                            .lineLimit(1)
+                    }
+                    Text(metric.value)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .font(style == .timeline ? .caption2 : .caption)
+                .foregroundStyle(GanfanPalette.leaf)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(metric.label) \(metric.value)")
             }
         }
     }
@@ -573,8 +653,8 @@ private struct JournalRecordCardRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(meal.storeName.isEmpty ? "用餐记录" : meal.storeName)
                     .font(.headline)
-                    .foregroundStyle(GanfanPalette.ink)
-                    .lineLimit(1)
+                    .foregroundStyle(GanfanPalette.forest)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 4)
 
                 if style.showsTimeInCard {
@@ -582,34 +662,17 @@ private struct JournalRecordCardRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize()
-                } else {
-                    Text("吃饭")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(GanfanPalette.leaf)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(GanfanPalette.paleLeaf, in: Capsule())
-                        .fixedSize()
                 }
             }
 
-            if style.showsTimeInCard {
-                let dishNames = meal.dishes.map(\.name).joined(separator: "、")
-                Text(dishNames.isEmpty ? "\(meal.dishes.count) 道菜" : "\(meal.dishes.count) 道菜 · \(dishNames)")
-                    .font(.footnote)
+            let dishNames = meal.dishes.map(\.name).filter { !$0.isEmpty }.joined(separator: "、")
+            if !dishNames.isEmpty {
+                Text(dishNames)
+                    .font(style.showsTimeInCard ? .footnote : .caption2)
                     .foregroundStyle(.secondary)
+                    .lineSpacing(style == .timeline ? 2 : 0)
+                    .lineLimit(style == .timeline ? 4 : nil)
                     .fixedSize(horizontal: false, vertical: true)
-            } else {
-                DishChipFlowLayout(spacing: 6) {
-                    ForEach(meal.dishes) { dish in
-                        Text(dish.name)
-                            .font(.caption)
-                            .foregroundStyle(GanfanPalette.ink.opacity(0.78))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(GanfanPalette.paleLeaf, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
-                }
             }
 
             if !meal.locationAddress.isEmpty {
@@ -621,10 +684,10 @@ private struct JournalRecordCardRow: View {
     private func locationLine(_ label: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: "mappin.and.ellipse")
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: style == .timeline ? 10 : 11, weight: .medium))
                 .foregroundStyle(GanfanPalette.leaf)
             Text(label)
-                .font(.footnote)
+                .font(style == .timeline ? .caption2 : .caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -663,35 +726,40 @@ private struct JournalRecordCardRow: View {
         return DrinkServingSelection(temperature: drink.temperature, ice: drink.ice).displayLabel
     }
 
-    private static func nutritionLabel(_ nutrition: NutritionSnapshot?) -> String {
-        guard let nutrition else { return "暂无数据" }
+    private static func nutritionMetrics(_ nutrition: NutritionSnapshot?) -> [JournalNutritionMetric] {
+        guard let nutrition else { return [] }
         let isEstimated: Bool
         switch nutrition.confidence {
         case .estimated, .rough: isEstimated = true
         case .official, .unavailable: isEstimated = false
         }
 
-        var parts: [String] = []
+        var metrics: [JournalNutritionMetric] = []
         if let energy = nutrition.energyKcal {
             let step = isEstimated ? 10.0 : 1.0
-            parts.append("\(compactNumber(rounded(energy, to: step))) kcal")
+            metrics.append(JournalNutritionMetric(
+                symbol: "flame.fill",
+                label: "能量",
+                value: "\(compactNumber(rounded(energy, to: step))) kcal"
+            ))
         }
         if let sugar = nutrition.sugarGrams {
             let step = isEstimated ? 5.0 : 0.1
-            parts.append("\(compactNumber(rounded(sugar, to: step)))g 糖")
+            metrics.append(JournalNutritionMetric(
+                symbol: "cube.fill",
+                label: "糖",
+                value: "\(compactNumber(rounded(sugar, to: step)))g"
+            ))
         }
         if let caffeine = nutrition.caffeineMilligrams {
             let step = isEstimated ? 10.0 : 1.0
-            parts.append("\(compactNumber(rounded(caffeine, to: step)))mg 咖啡因")
+            metrics.append(JournalNutritionMetric(
+                symbol: "cup.and.saucer.fill",
+                label: "咖啡因",
+                value: "\(compactNumber(rounded(caffeine, to: step)))mg"
+            ))
         }
-        return parts.isEmpty ? "暂无数据" : parts.joined(separator: " · ")
-    }
-
-    private static func hasNutritionData(_ nutrition: NutritionSnapshot?) -> Bool {
-        guard let nutrition else { return false }
-        return nutrition.energyKcal != nil
-            || nutrition.sugarGrams != nil
-            || nutrition.caffeineMilligrams != nil
+        return metrics
     }
 
     private static func rounded(_ value: Double, to step: Double) -> Double {
@@ -763,63 +831,11 @@ private enum JournalPhotoThumbnailLoader {
     }
 }
 
-private struct DishChipFlowLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let availableWidth = proposal.width ?? subviews.reduce(CGFloat.zero) { total, subview in
-            total + subview.sizeThatFits(.unspecified).width + spacing
-        }
-        guard availableWidth.isFinite else { return .zero }
-
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var usedWidth: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(ProposedViewSize(width: availableWidth, height: nil))
-            if x > 0, x + size.width > availableWidth {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            if x > 0 { x += spacing }
-            usedWidth = max(usedWidth, x + size.width)
-            rowHeight = max(rowHeight, size.height)
-            x += size.width
-        }
-        return CGSize(width: min(availableWidth, usedWidth), height: y + rowHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let availableWidth = bounds.width
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(ProposedViewSize(width: availableWidth, height: nil))
-            if x > 0, x + size.width > availableWidth {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            if x > 0 { x += spacing }
-            subview.place(
-                at: CGPoint(x: bounds.minX + x, y: bounds.minY + y),
-                proposal: ProposedViewSize(width: size.width, height: size.height)
-            )
-            x += size.width
-            rowHeight = max(rowHeight, size.height)
-        }
-    }
-}
-
 private struct JournalHistoryTimelineEntry: View {
     let item: TimelineItem
     let dateLabel: String?
     let isLast: Bool
+    let brandCatalog: [String: MenuBrand]
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -838,7 +854,11 @@ private struct JournalHistoryTimelineEntry: View {
             Color.clear
                 .frame(width: 24)
 
-            JournalRecordCardRow(item: item, style: .timeline)
+            JournalRecordCardRow(
+                item: item,
+                style: .timeline,
+                brandCatalog: brandCatalog
+            )
         }
         .padding(.vertical, 12)
         .overlay(alignment: .topLeading) {
@@ -862,6 +882,23 @@ private struct JournalHistoryTimelineEntry: View {
 }
 
 private enum JournalRecordListFormatting {
+    static func precedes(_ lhs: TimelineItem, _ rhs: TimelineItem) -> Bool {
+        precedes(
+            lhs.record.consumedAt,
+            id: lhs.id.uuidString,
+            rhs.record.consumedAt,
+            id: rhs.id.uuidString
+        )
+    }
+
+    static func precedes(_ lhsDate: Date, id lhsID: String, _ rhsDate: Date, id rhsID: String) -> Bool {
+        let lhsDay = Calendar.current.startOfDay(for: lhsDate)
+        let rhsDay = Calendar.current.startOfDay(for: rhsDate)
+        if lhsDay != rhsDay { return lhsDay > rhsDay }
+        if lhsDate != rhsDate { return lhsDate < rhsDate }
+        return lhsID < rhsID
+    }
+
     static func time(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_GB")
@@ -929,79 +966,148 @@ private struct DailyNutritionHero: View {
     }
 }
 
-private struct TodayDrinkSummaryCard: View {
-    let summary: DailyNutritionSummary
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+private enum HomeBackupNotice {
+    case notConfigured
+    case pending
+    case directoryUnavailable
+    case backupFailed
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("饮品摄入")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(GanfanPalette.ink)
-                Spacer()
-                Text("\(summary.drinkCount) 杯")
-                    .font(.footnote.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-
-            metrics
-
-            Text(qualityText)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+    var title: String {
+        switch self {
+        case .notConfigured: "未设置备份"
+        case .pending: "待备份"
+        case .directoryUnavailable: "目录不可访问"
+        case .backupFailed: "备份异常"
         }
-        .padding(.top, 12)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Color(uiColor: .separator).opacity(0.55))
-                .frame(height: 0.5)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("饮品摄入，\(summary.drinkCount) 杯。能量 \(valueLabel(summary.energyKcal.value)) 千卡，糖 \(valueLabel(summary.sugarGrams.value)) 克，咖啡因 \(valueLabel(summary.caffeineMilligrams.value)) 毫克。\(qualityText)")
     }
 
-    private var qualityText: String {
-        guard summary.drinkCount > 0 else { return "记录饮品后显示摄入汇总" }
-        let known = [summary.energyKcal.value, summary.sugarGrams.value, summary.caffeineMilligrams.value]
-            .contains { $0 != nil }
-        guard known else { return "营养数据暂缺" }
-        return "官方 \(summary.officialCount) · 估算 \(summary.estimatedCount) · 粗估 \(summary.roughCount) · 暂无 \(summary.unavailableCount)"
+    var symbol: String {
+        switch self {
+        case .notConfigured: "icloud.slash"
+        case .pending: "clock.arrow.circlepath"
+        case .directoryUnavailable, .backupFailed: "exclamationmark.triangle.fill"
+        }
     }
 
-    private func valueLabel(_ value: Double?) -> String {
-        guard let value else { return "暂无数据" }
+    var isWarning: Bool {
+        switch self {
+        case .pending: false
+        default: true
+        }
+    }
+}
+
+private struct DrinkNutritionMetric: Identifiable {
+    let title: String
+    let value: Double?
+    let unit: String
+
+    var id: String { title }
+
+    var formattedValue: String {
+        guard let value, value.isFinite, value >= 0 else { return "—" }
         return value.formatted(.number.precision(.fractionLength(0...1)))
     }
 
-    @ViewBuilder
-    private var metrics: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: 8) {
-                metricRow(title: "能量 · kcal", value: summary.energyKcal.value)
-                metricRow(title: "糖 · g", value: summary.sugarGrams.value)
-                metricRow(title: "咖啡因 · mg", value: summary.caffeineMilligrams.value)
-            }
-        } else {
-            HStack(alignment: .top, spacing: 10) {
-                NutritionMetricColumn(title: "能量 · kcal", value: summary.energyKcal.value, unit: "")
-                NutritionMetricColumn(title: "糖 · g", value: summary.sugarGrams.value, unit: "")
-                NutritionMetricColumn(title: "咖啡因 · mg", value: summary.caffeineMilligrams.value, unit: "")
-            }
-        }
+    var spokenValue: String {
+        guard value != nil else { return "暂无数据" }
+        return "\(formattedValue) \(unit)"
+    }
+}
+
+private struct TodayDrinkNutritionSummary: View {
+    let summary: DailyNutritionSummary
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var metrics: [DrinkNutritionMetric] {
+        [
+            DrinkNutritionMetric(title: "能量", value: summary.energyKcal.value, unit: "kcal"),
+            DrinkNutritionMetric(title: "糖", value: summary.sugarGrams.value, unit: "g"),
+            DrinkNutritionMetric(title: "咖啡因", value: summary.caffeineMilligrams.value, unit: "mg")
+        ]
     }
 
-    private func metricRow(title: String, value: Double?) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .font(.subheadline)
+    var body: some View {
+        VStack(alignment: .leading, spacing: GanfanSpacing.mediumSmall) {
+            HStack {
+                Label("今日饮品", systemImage: "cup.and.saucer.fill")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(GanfanPalette.forest)
+                Spacer(minLength: 8)
+                Text("\(summary.drinkCount) 杯")
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(GanfanPalette.ink)
+            }
+
+            if summary.drinkCount == 0 {
+                Text("记录饮品后显示摄入汇总")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: GanfanSpacing.small) {
+                    ForEach(metrics) { metric in
+                        metricRow(metric)
+                    }
+                }
+            } else {
+                HStack(alignment: .top, spacing: GanfanSpacing.small) {
+                    ForEach(metrics) { metric in
+                        metricColumn(metric)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            GanfanPalette.paleLeaf.opacity(0.42),
+            in: RoundedRectangle(cornerRadius: GanfanShape.surface, style: .continuous)
+        )
+        .accessibilityElement(children: .contain)
+    }
+
+    private func metricColumn(_ metric: DrinkNutritionMetric) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(metric.title)
+                .font(.caption)
                 .foregroundStyle(.secondary)
-            Spacer(minLength: 12)
-            Text(value.map { $0.formatted(.number.precision(.fractionLength(0...1))) } ?? "—")
-                .font(.title3.weight(.semibold).monospacedDigit())
-                .foregroundStyle(GanfanPalette.ink)
+                .lineLimit(1)
+
+            metricAmount(metric, font: .title3.weight(.semibold))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(metric.title)，\(metric.spokenValue)")
+    }
+
+    private func metricRow(_ metric: DrinkNutritionMetric) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(metric.title)
+                .font(.body)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 12)
+            metricAmount(metric, font: .body.weight(.semibold))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(metric.title)，\(metric.spokenValue)")
+    }
+
+    private func metricAmount(
+        _ metric: DrinkNutritionMetric,
+        font: Font
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(metric.formattedValue)
+                .font(font.monospacedDigit())
+                .foregroundStyle(GanfanPalette.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Text(metric.unit)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -1080,6 +1186,7 @@ private struct NutritionMetricColumn: View {
 }
 
 private struct HistoryView: View {
+    @AppStorage(BackupChangeTracker.generationKey) private var libraryChangeGeneration = 0
     @Query(sort: \StoredJournalRecord.consumedAt, order: .reverse)
     private var storedRecords: [StoredJournalRecord]
     @State private var startDate = Calendar.current.date(byAdding: .day, value: -29, to: .now) ?? .now
@@ -1087,6 +1194,7 @@ private struct HistoryView: View {
     @State private var selectedTypes: Set<String> = ["drink", "meal"]
     @State private var searchText = ""
     @State private var isShowingFilters = false
+    @State private var brandCatalog: [String: MenuBrand] = [:]
 
     private var filterSummary: String {
         let formatter = DateIntervalFormatter()
@@ -1113,12 +1221,7 @@ private struct HistoryView: View {
             guard Self.matchesSearch(record, query: searchText) else { return nil }
             return TimelineItem(storedRecord: storedRecord, record: record)
         }
-        return items.sorted {
-            if $0.record.consumedAt != $1.record.consumedAt {
-                return $0.record.consumedAt > $1.record.consumedAt
-            }
-            return $0.id.uuidString < $1.id.uuidString
-        }
+        return items.sorted(by: JournalRecordListFormatting.precedes)
     }
 
     private var unreadableRecords: [StoredJournalRecord] {
@@ -1126,6 +1229,13 @@ private struct HistoryView: View {
             storedRecord.consumedAt >= Calendar.current.startOfDay(for: startDate)
                 && storedRecord.consumedAt < (Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: endDate)) ?? endDate)
                 && (try? storedRecord.decodeRecord()) == nil
+        }.sorted {
+            JournalRecordListFormatting.precedes(
+                $0.consumedAt,
+                id: $0.recordID,
+                $1.consumedAt,
+                id: $1.recordID
+            )
         }
     }
 
@@ -1169,7 +1279,8 @@ private struct HistoryView: View {
                     JournalHistoryTimelineEntry(
                         item: item,
                         dateLabel: startsNewDay ? JournalRecordListFormatting.date(item.record.consumedAt) : nil,
-                        isLast: index == visibleItems.count - 1
+                        isLast: index == visibleItems.count - 1,
+                        brandCatalog: brandCatalog
                     )
                     .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
                     .listRowSeparator(.hidden)
@@ -1179,6 +1290,10 @@ private struct HistoryView: View {
         }
         .listSectionSpacing(.compact)
         .scrollContentBackground(.hidden)
+        .task { brandCatalog = JournalBrandLogoCatalog.loadBrands() }
+        .onChange(of: libraryChangeGeneration) { _, _ in
+            brandCatalog = JournalBrandLogoCatalog.loadBrands()
+        }
         .background(GanfanPalette.canvas)
         .tint(GanfanPalette.forest)
         .navigationTitle("全部记录")
@@ -1300,17 +1415,20 @@ private struct HistoryFiltersView: View {
 }
 
 private struct InsightsView: View {
+    @AppStorage(BackupChangeTracker.generationKey) private var libraryChangeGeneration = 0
     @Query(sort: \StoredJournalRecord.consumedAt, order: .reverse)
     private var storedRecords: [StoredJournalRecord]
     @State private var selectedDate = Date.now
+    @State private var brandCatalog: [String: MenuBrand] = [:]
 
     private var itemsForDate: [TimelineItem] {
-        storedRecords.compactMap { storedRecord -> TimelineItem? in
+        let items = storedRecords.compactMap { storedRecord -> TimelineItem? in
             guard let record = try? storedRecord.decodeRecord(),
                   Calendar.current.isDate(record.consumedAt, inSameDayAs: selectedDate),
                   case .drink = record else { return nil }
             return TimelineItem(storedRecord: storedRecord, record: record)
         }
+        return items.sorted(by: JournalRecordListFormatting.precedes)
     }
 
     private var summary: DailyNutritionSummary {
@@ -1370,7 +1488,7 @@ private struct InsightsView: View {
                                 RecordDetailView(storedRecord: entry.element.storedRecord)
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    JournalTimelineRow(record: entry.element.record)
+                                    JournalTimelineRow(record: entry.element.record, brandCatalog: brandCatalog)
                                     if case .drink(let drink) = entry.element.record {
                                         Text(nutritionDetail(drink.nutrition))
                                             .font(.footnote)
@@ -1397,6 +1515,10 @@ private struct InsightsView: View {
             .frame(maxWidth: .infinity)
         }
         .background(GanfanPalette.canvas)
+        .task { brandCatalog = JournalBrandLogoCatalog.loadBrands() }
+        .onChange(of: libraryChangeGeneration) { _, _ in
+            brandCatalog = JournalBrandLogoCatalog.loadBrands()
+        }
         .navigationTitle("摄入洞察")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -1437,6 +1559,7 @@ struct StorageDiagnosticsView: View {
     @State private var usage: StorageUsageSnapshot?
     @State private var failures: [PhotoStorageFailureEvent] = []
     @State private var copyMessage: String?
+    @State private var activePhotoOverlay: JournalRecordOverlayRoute?
 
     private let failureStore = PhotoStorageDiagnosticsStore()
     private let catalogRepository = MenuCatalogRepository()
@@ -1485,8 +1608,8 @@ struct StorageDiagnosticsView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(recentPhotos) { item in
-                        NavigationLink {
-                            PhotoViewer(assets: [item.asset], labels: [item.label])
+                        Button {
+                            activePhotoOverlay = .photoViewer(assets: [item.asset], labels: [item.label])
                         } label: {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(item.label).font(.subheadline.weight(.medium))
@@ -1495,6 +1618,7 @@ struct StorageDiagnosticsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -1529,6 +1653,9 @@ struct StorageDiagnosticsView: View {
         .tint(GanfanPalette.forest)
         .navigationTitle("本机存储")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $activePhotoOverlay) { route in
+            JournalRecordOverlaySheet(route: route)
+        }
         .task { refresh() }
         .alert("诊断摘要", isPresented: Binding(
             get: { copyMessage != nil },
@@ -1557,7 +1684,7 @@ struct StorageDiagnosticsView: View {
             return
         }
         let report = [
-            "干饭手册本机存储诊断",
+            "食光记本机存储诊断",
             "照片文件：\(usage.photoBytes.map(Self.byteLabel) ?? "无法读取")",
             "照片文件数：\(usage.photoFileCount.map(String.init) ?? "无法读取")",
             "记录数据估算：\(Self.byteLabel(usage.recordPayloadBytes))",
@@ -1644,6 +1771,8 @@ private struct RecordDetailView: View {
     @State private var isEditing = false
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
+    @State private var brandCatalog: [String: MenuBrand] = [:]
+    @State private var activePhotoOverlay: JournalRecordOverlayRoute?
 
     private var decodedRecord: JournalRecord? {
         try? storedRecord.decodeRecord()
@@ -1664,6 +1793,7 @@ private struct RecordDetailView: View {
         .navigationTitle("记录详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .task { brandCatalog = JournalBrandLogoCatalog.loadBrands() }
         .toolbar {
             if decodedRecord != nil {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -1722,15 +1852,23 @@ private struct RecordDetailView: View {
                             .font(.largeTitle.weight(.bold))
                             .foregroundStyle(GanfanPalette.ink)
                         if !drink.brandName.isEmpty {
-                            Text(drink.brandName)
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
+                            HStack(spacing: 8) {
+                                GanfanBrandLogoIcon(
+                                    assetName: brandCatalog[drink.brandID]?.logoAssetName,
+                                    symbol: brandCatalog[drink.brandID]?.logoSymbol,
+                                    imageID: brandCatalog[drink.brandID]?.logoImageID,
+                                    dimension: 20
+                                )
+                                Text(drink.brandName)
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
 
                     if let photo = drink.photo {
-                        NavigationLink {
-                            PhotoViewer(assets: [photo], labels: [drink.drinkName])
+                        Button {
+                            activePhotoOverlay = .photoViewer(assets: [photo], labels: [drink.drinkName])
                         } label: {
                             RecordDetailPhoto(asset: photo)
                         }
@@ -1741,9 +1879,9 @@ private struct RecordDetailView: View {
                     RecordDetailSection(title: "点单信息") {
                         VStack(alignment: .leading, spacing: 10) {
                             detailLine("杯型", drink.cupType)
-                            detailLine("容量", drink.sizeML.map { "\($0) ml" } ?? "")
-                            detailLine("甜度", drink.sweetness)
                             detailLine("温度", serving.temperature)
+                            detailLine("甜度", drink.sweetness)
+                            detailLine("容量", drink.sizeML.map { "\($0) ml" } ?? "")
                             detailLine("冰量", serving.ice)
                         }
                     }
@@ -1866,6 +2004,9 @@ private struct RecordDetailView: View {
             .frame(maxWidth: .infinity)
         }
         .background(GanfanPalette.canvas)
+        .sheet(item: $activePhotoOverlay) { route in
+            JournalRecordOverlaySheet(route: route)
+        }
     }
 
     @ViewBuilder
@@ -1907,8 +2048,8 @@ private struct RecordDetailView: View {
 
         if let photo = dish.photo {
             let photoIndex = photoEntries.firstIndex { $0.asset.id == photo.id } ?? 0
-            NavigationLink {
-                PhotoViewer(
+            Button {
+                activePhotoOverlay = .photoViewer(
                     assets: photoEntries.map(\.asset),
                     labels: photoEntries.map(\.label),
                     initialIndex: photoIndex
@@ -1999,9 +2140,41 @@ private struct RecordDetailPhoto: View {
     }
 }
 
+private struct JournalRecordOverlaySheet: View {
+    let route: JournalRecordOverlayRoute
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            switch route {
+            case .detail(_, let storedRecord):
+                RecordDetailView(storedRecord: storedRecord)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("关闭") { dismiss() }
+                        }
+                    }
+            case .photos(_, let assets, let labels, let initialIndex):
+                PhotoViewer(assets: assets, labels: labels, initialIndex: initialIndex)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("关闭", systemImage: "xmark") { dismiss() }
+                        }
+                    }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(28)
+        .presentationBackground(GanfanPalette.canvas)
+    }
+}
+
 private struct PhotoViewer: View {
     let assets: [PhotoAsset]
     let labels: [String]
+    @Environment(\.colorScheme) private var colorScheme
     @State private var currentIndex: Int
     @State private var currentImage: UIImage?
     @State private var thumbnailImages: [UUID: UIImage] = [:]
@@ -2081,6 +2254,15 @@ private struct PhotoViewer: View {
             }
         }
         .background(.black)
+        .padding(10)
+        .background(GanfanPalette.canvas)
+        .overlay {
+            if colorScheme != .dark {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Color.white.opacity(0.28), lineWidth: 1)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .navigationTitle("照片")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -2153,5 +2335,57 @@ enum AppStoragePaths {
                 .appendingPathComponent("GanfanHandbook", isDirectory: true)
                 .appendingPathComponent("Photos", isDirectory: true)
         )
+    }
+
+    static var brandLogoPhotoStore: LocalPhotoStore {
+        let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return LocalPhotoStore(
+            directoryURL: applicationSupport
+                .appendingPathComponent("GanfanHandbook", isDirectory: true)
+                .appendingPathComponent("BrandLogos", isDirectory: true)
+        )
+    }
+
+    static func brandLogoImageData(for id: UUID) -> Data? {
+        let url = brandLogoPhotoStore.directoryURL
+            .appendingPathComponent("\(id.uuidString).png", isDirectory: false)
+        return try? Data(contentsOf: url, options: [.mappedIfSafe])
+    }
+
+    static func brandLogoIDs() -> [UUID] {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: brandLogoPhotoStore.directoryURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+        return files.compactMap { file in
+            guard file.pathExtension.lowercased() == "png" else { return nil }
+            return UUID(uuidString: file.deletingPathExtension().lastPathComponent)
+        }
+        .sorted { $0.uuidString < $1.uuidString }
+    }
+
+    static func brandLogoAssets() throws -> [PhotoAsset] {
+        try brandLogoIDs().map { id in
+            let fileName = "\(id.uuidString).png"
+            let data = try Data(contentsOf: brandLogoPhotoStore.directoryURL.appendingPathComponent(fileName))
+            let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            return try PhotoAsset(
+                id: id,
+                fileName: fileName,
+                fileExtension: "png",
+                byteCount: data.count,
+                sha256: digest
+            )
+        }
+    }
+
+    static func removeBrandLogo(_ id: UUID) throws {
+        let url = brandLogoPhotoStore.directoryURL
+            .appendingPathComponent("\(id.uuidString).png", isDirectory: false)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try FileManager.default.removeItem(at: url)
     }
 }

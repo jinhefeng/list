@@ -7,6 +7,8 @@ public enum BackupSnapshotError: Error, Equatable {
     case duplicateRecordIdentifier(UUID)
     case conflictingPhotoAsset(UUID)
     case invalidPhotoManifest
+    case invalidBrandLogoManifest
+    case invalidCatalogManifest
 }
 
 public struct BackupSnapshot: Codable, Equatable, Sendable {
@@ -18,11 +20,17 @@ public struct BackupSnapshot: Codable, Equatable, Sendable {
     public let records: [JournalRecord]
     public let photos: [PhotoAsset]
     public let catalogState: MenuCatalogUserState?
+    public let brandLogoAssets: [PhotoAsset]?
+    public let catalog: MenuCatalog?
+    public let nutritionDataPack: NutritionDataPack?
 
     public init(
         libraryID: UUID,
         records: [JournalRecord],
         catalogState: MenuCatalogUserState? = nil,
+        brandLogoAssets: [PhotoAsset] = [],
+        catalog: MenuCatalog? = nil,
+        nutritionDataPack: NutritionDataPack? = nil,
         createdAt: Date = .now
     ) throws {
         self.formatVersion = Self.currentFormatVersion
@@ -36,6 +44,9 @@ public struct BackupSnapshot: Codable, Equatable, Sendable {
         try catalogState?.validate()
         self.catalogState = catalogState
         self.photos = try Self.photoManifest(for: normalizedRecords)
+        self.brandLogoAssets = brandLogoAssets
+        self.catalog = catalog
+        self.nutritionDataPack = nutritionDataPack
         try validate()
     }
 
@@ -67,6 +78,40 @@ public struct BackupSnapshot: Codable, Equatable, Sendable {
         }
         try catalogState?.validate()
 
+        let brandLogos = brandLogoAssets ?? []
+        var brandLogoIDs = Set<UUID>()
+        for asset in brandLogos {
+            try asset.validate()
+            guard asset.fileExtension == "png", brandLogoIDs.insert(asset.id).inserted else {
+                throw BackupSnapshotError.invalidBrandLogoManifest
+            }
+        }
+        let referencedLogoIDs = Set(catalogState?.brands.compactMap(\.logoImageID) ?? [])
+        guard referencedLogoIDs.isSubset(of: brandLogoIDs) else {
+            throw BackupSnapshotError.invalidBrandLogoManifest
+        }
+
+        if let catalog {
+            var brandIDs = Set<String>()
+            for brand in catalog.brands {
+                guard !brand.id.isEmpty, brandIDs.insert(brand.id).inserted else {
+                    throw BackupSnapshotError.invalidCatalogManifest
+                }
+            }
+            var drinkIDs = Set<String>()
+            for drink in catalog.drinks {
+                guard !drink.id.isEmpty, !drink.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      drinkIDs.insert(drink.id).inserted else {
+                    throw BackupSnapshotError.invalidCatalogManifest
+                }
+            }
+            let catalogLogoIDs = Set(catalog.brands.compactMap(\.logoImageID))
+            guard catalogLogoIDs.isSubset(of: brandLogoIDs) else {
+                throw BackupSnapshotError.invalidBrandLogoManifest
+            }
+        }
+        try nutritionDataPack?.validate()
+
         for asset in photos {
             try asset.validate()
         }
@@ -74,6 +119,17 @@ public struct BackupSnapshot: Codable, Equatable, Sendable {
         guard manifest.count == photos.count, manifest == referencedPhotos else {
             throw BackupSnapshotError.invalidPhotoManifest
         }
+    }
+
+    fileprivate func hasSameContent(as other: BackupSnapshot) -> Bool {
+        formatVersion == other.formatVersion
+            && libraryID == other.libraryID
+            && records == other.records
+            && photos == other.photos
+            && catalogState == other.catalogState
+            && (brandLogoAssets ?? []) == (other.brandLogoAssets ?? [])
+            && catalog == other.catalog
+            && nutritionDataPack == other.nutritionDataPack
     }
 
     private static func photoManifest(for records: [JournalRecord]) throws -> [PhotoAsset] {
@@ -110,7 +166,11 @@ public enum BackupDirectoryStoreError: Error, Equatable {
     case snapshotNotFound
     case photoDataMismatch(UUID)
     case photoIntegrityMismatch(UUID)
+    case brandLogoDataMismatch(UUID)
+    case brandLogoIntegrityMismatch(UUID)
     case coordinatedReadFailed(String)
+    case cleanupPlanChanged
+    case cleanupRequiresVerifiedSnapshot
 }
 
 public struct BackupWriteResult: Equatable, Sendable {
@@ -118,6 +178,21 @@ public struct BackupWriteResult: Equatable, Sendable {
     public let createdAt: Date
     public let recordCount: Int
     public let photoCount: Int
+    public let brandLogoCount: Int
+    public let brandCount: Int
+    public let drinkCount: Int
+    public let nutritionEntryCount: Int
+    public let didCreateSnapshot: Bool
+}
+
+public struct BackupCleanupPreview: Equatable, Sendable {
+    public let snapshotFileNames: [String]
+    public let snapshotBytes: Int64
+    public let orphanedPhotoCount: Int
+    public let orphanedPhotoBytes: Int64
+
+    public var snapshotCount: Int { snapshotFileNames.count }
+    public var estimatedBytesFreed: Int64 { snapshotBytes + orphanedPhotoBytes }
 }
 
 public struct BackupSnapshotSummary: Equatable, Identifiable, Sendable {
@@ -125,6 +200,11 @@ public struct BackupSnapshotSummary: Equatable, Identifiable, Sendable {
     public let createdAt: Date
     public let recordCount: Int
     public let photoCount: Int
+    public let brandLogoCount: Int
+    public let includesCatalog: Bool
+    public let brandCount: Int
+    public let drinkCount: Int
+    public let nutritionEntryCount: Int
 
     public var id: String { fileName }
 }
@@ -132,6 +212,13 @@ public struct BackupSnapshotSummary: Equatable, Identifiable, Sendable {
 public struct VerifiedBackupArchive: Equatable, Sendable {
     public let snapshot: BackupSnapshot
     public let photoData: [UUID: Data]
+    public let brandLogoData: [UUID: Data]
+
+    public init(snapshot: BackupSnapshot, photoData: [UUID: Data], brandLogoData: [UUID: Data] = [:]) {
+        self.snapshot = snapshot
+        self.photoData = photoData
+        self.brandLogoData = brandLogoData
+    }
 }
 
 public struct BackupDirectoryStore: Sendable {
@@ -142,17 +229,47 @@ public struct BackupDirectoryStore: Sendable {
     }
 
     public var backupDirectoryURL: URL {
-        userSelectedFolderURL.appendingPathComponent("干饭手册", isDirectory: true)
+        let currentDirectory = userSelectedFolderURL.appendingPathComponent("食光记", isDirectory: true)
+        let legacyDirectory = userSelectedFolderURL.appendingPathComponent("干饭手册", isDirectory: true)
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: currentDirectory.path)
+            || !fileManager.fileExists(atPath: legacyDirectory.path) {
+            return currentDirectory
+        }
+        return legacyDirectory
     }
 
-    public func write(snapshot: BackupSnapshot, photoData: [UUID: Data]) throws -> BackupWriteResult {
+    public func write(
+        snapshot: BackupSnapshot,
+        photoData: [UUID: Data],
+        brandLogoData: [UUID: Data] = [:]
+    ) throws -> BackupWriteResult {
         try snapshot.validate()
         try validatePhotoData(photoData, for: snapshot)
+        try validateBrandLogoData(brandLogoData, for: snapshot)
         try prepareLibraryDirectory(for: snapshot.libraryID)
 
+        if let existing = try latestSnapshot(matching: snapshot) {
+            return BackupWriteResult(
+                fileName: existing.summary.fileName,
+                createdAt: existing.snapshot.createdAt,
+                recordCount: existing.snapshot.records.count,
+                photoCount: existing.snapshot.photos.count,
+                brandLogoCount: (existing.snapshot.brandLogoAssets ?? []).count,
+                brandCount: existing.snapshot.catalog?.brands.count ?? 0,
+                drinkCount: existing.snapshot.catalog?.drinks.count ?? 0,
+                nutritionEntryCount: existing.snapshot.nutritionDataPack?.entries.count ?? 0,
+                didCreateSnapshot: false
+            )
+        }
+
         let photosDirectory = backupDirectoryURL.appendingPathComponent("photos", isDirectory: true)
+        let brandLogosDirectory = backupDirectoryURL.appendingPathComponent("brand-logos", isDirectory: true)
         let snapshotsDirectory = backupDirectoryURL.appendingPathComponent("snapshots", isDirectory: true)
         try createDirectoryIfNeeded(at: photosDirectory)
+        if !(snapshot.brandLogoAssets ?? []).isEmpty {
+            try createDirectoryIfNeeded(at: brandLogosDirectory)
+        }
         try createDirectoryIfNeeded(at: snapshotsDirectory)
 
         for asset in snapshot.photos {
@@ -160,6 +277,12 @@ public struct BackupDirectoryStore: Sendable {
                 throw BackupDirectoryStoreError.photoDataMismatch(asset.id)
             }
             try writeOrReusePhoto(data, asset: asset, in: photosDirectory)
+        }
+        for asset in snapshot.brandLogoAssets ?? [] {
+            guard let data = brandLogoData[asset.id] else {
+                throw BackupDirectoryStoreError.brandLogoDataMismatch(asset.id)
+            }
+            try writeOrReuseBrandLogo(data, asset: asset, in: brandLogosDirectory)
         }
 
         let snapshotData = try Self.encode(snapshot)
@@ -176,8 +299,60 @@ public struct BackupDirectoryStore: Sendable {
             fileName: fileName,
             createdAt: savedSnapshot.createdAt,
             recordCount: savedSnapshot.records.count,
-            photoCount: savedSnapshot.photos.count
+            photoCount: savedSnapshot.photos.count,
+            brandLogoCount: (savedSnapshot.brandLogoAssets ?? []).count,
+            brandCount: savedSnapshot.catalog?.brands.count ?? 0,
+            drinkCount: savedSnapshot.catalog?.drinks.count ?? 0,
+            nutritionEntryCount: savedSnapshot.nutritionDataPack?.entries.count ?? 0,
+            didCreateSnapshot: true
         )
+    }
+
+    public func previewCleanup(now: Date = .now, calendar: Calendar = .current) throws -> BackupCleanupPreview {
+        let plan = try cleanupPlan(now: now, calendar: calendar)
+        return plan.preview
+    }
+
+    @discardableResult
+    public func cleanupOldSnapshots(now: Date = .now, calendar: Calendar = .current) throws -> BackupCleanupPreview {
+        let plan = try cleanupPlan(now: now, calendar: calendar)
+        return try performCleanup(plan)
+    }
+
+    public func cleanupOldSnapshots(matching expectedPreview: BackupCleanupPreview, now: Date = .now, calendar: Calendar = .current) throws -> BackupCleanupPreview {
+        let plan = try cleanupPlan(now: now, calendar: calendar)
+        guard plan.preview == expectedPreview else { throw BackupDirectoryStoreError.cleanupPlanChanged }
+        return try performCleanup(plan)
+    }
+
+    private func performCleanup(_ plan: (
+        preview: BackupCleanupPreview,
+        retainedSnapshots: [BackupSnapshot],
+        canCollectOrphanedAssets: Bool
+    )) throws -> BackupCleanupPreview {
+        guard plan.preview.snapshotCount > 0 || plan.preview.orphanedPhotoCount > 0 else { return plan.preview }
+
+        let snapshotsDirectory = backupDirectoryURL.appendingPathComponent("snapshots", isDirectory: true)
+        for fileName in plan.preview.snapshotFileNames {
+            try removeCoordinated(at: snapshotsDirectory.appendingPathComponent(fileName, isDirectory: false))
+        }
+
+        if plan.canCollectOrphanedAssets {
+            let photosDirectory = backupDirectoryURL.appendingPathComponent("photos", isDirectory: true)
+            let brandLogosDirectory = backupDirectoryURL.appendingPathComponent("brand-logos", isDirectory: true)
+            let actualOrphanedPhotos = try orphanedAssetURLs(
+                in: photosDirectory,
+                retainingFileNames: Set(plan.retainedSnapshots.flatMap(\.photos).map(\.fileName))
+            )
+            let actualOrphanedLogos = try orphanedAssetURLs(
+                in: brandLogosDirectory,
+                retainingFileNames: Set(plan.retainedSnapshots.flatMap { $0.brandLogoAssets ?? [] }.map(\.fileName))
+            )
+            for url in actualOrphanedPhotos + actualOrphanedLogos {
+                try removeCoordinated(at: url)
+            }
+        }
+        return plan.preview
     }
 
     public func listSnapshots() throws -> [BackupSnapshotSummary] {
@@ -205,7 +380,12 @@ public struct BackupDirectoryStore: Sendable {
                 fileName: fileURL.lastPathComponent,
                 createdAt: snapshot.createdAt,
                 recordCount: snapshot.records.count,
-                photoCount: snapshot.photos.count
+                photoCount: snapshot.photos.count,
+                brandLogoCount: (snapshot.brandLogoAssets ?? []).count,
+                includesCatalog: snapshot.catalog != nil,
+                brandCount: snapshot.catalog?.brands.count ?? 0,
+                drinkCount: snapshot.catalog?.drinks.count ?? 0,
+                nutritionEntryCount: snapshot.nutritionDataPack?.entries.count ?? 0
             )
         }
         .sorted {
@@ -247,7 +427,21 @@ public struct BackupDirectoryStore: Sendable {
             photoData[asset.id] = data
         }
 
-        return VerifiedBackupArchive(snapshot: snapshot, photoData: photoData)
+        let brandLogosDirectory = backupDirectoryURL.appendingPathComponent("brand-logos", isDirectory: true)
+        var brandLogoData: [UUID: Data] = [:]
+        for asset in snapshot.brandLogoAssets ?? [] {
+            let logoURL = brandLogosDirectory.appendingPathComponent(asset.fileName, isDirectory: false)
+            guard FileManager.default.fileExists(atPath: logoURL.path) else {
+                throw BackupDirectoryStoreError.brandLogoIntegrityMismatch(asset.id)
+            }
+            let data = try readCoordinated(from: logoURL)
+            guard data.count == asset.byteCount, Self.digest(data) == asset.sha256 else {
+                throw BackupDirectoryStoreError.brandLogoIntegrityMismatch(asset.id)
+            }
+            brandLogoData[asset.id] = data
+        }
+
+        return VerifiedBackupArchive(snapshot: snapshot, photoData: photoData, brandLogoData: brandLogoData)
     }
 
     private func validatePhotoData(_ photoData: [UUID: Data], for snapshot: BackupSnapshot) throws {
@@ -263,6 +457,170 @@ public struct BackupDirectoryStore: Sendable {
                 throw BackupDirectoryStoreError.photoDataMismatch(asset.id)
             }
         }
+    }
+
+    private func validateBrandLogoData(_ dataByID: [UUID: Data], for snapshot: BackupSnapshot) throws {
+        let assets = snapshot.brandLogoAssets ?? []
+        let expectedIDs = Set(assets.map(\.id))
+        guard Set(dataByID.keys) == expectedIDs else {
+            let mismatchID = expectedIDs.symmetricDifference(Set(dataByID.keys))
+                .sorted { $0.uuidString < $1.uuidString }
+                .first ?? UUID()
+            throw BackupDirectoryStoreError.brandLogoDataMismatch(mismatchID)
+        }
+        for asset in assets {
+            guard let data = dataByID[asset.id], data.count == asset.byteCount, Self.digest(data) == asset.sha256 else {
+                throw BackupDirectoryStoreError.brandLogoDataMismatch(asset.id)
+            }
+        }
+    }
+
+    private func latestSnapshot(matching incoming: BackupSnapshot) throws -> (summary: BackupSnapshotSummary, snapshot: BackupSnapshot)? {
+        guard incoming.libraryID == (try readLibraryMarker()) else {
+            throw BackupDirectoryStoreError.differentLibrary
+        }
+        guard let latest = try listSnapshots().first else { return nil }
+        let url = backupDirectoryURL
+            .appendingPathComponent("snapshots", isDirectory: true)
+            .appendingPathComponent(latest.fileName, isDirectory: false)
+        guard let existing = try? Self.decode(readCoordinated(from: url)),
+              existing.hasSameContent(as: incoming),
+              try storedAssetsExistAndMatch(for: existing) else { return nil }
+        return (latest, existing)
+    }
+
+    private func storedAssetsExistAndMatch(for snapshot: BackupSnapshot) throws -> Bool {
+        let photosDirectory = backupDirectoryURL.appendingPathComponent("photos", isDirectory: true)
+        let logosDirectory = backupDirectoryURL.appendingPathComponent("brand-logos", isDirectory: true)
+        for (assets, directory) in [(snapshot.photos, photosDirectory), (snapshot.brandLogoAssets ?? [], logosDirectory)] {
+            for asset in assets {
+                let url = directory.appendingPathComponent(asset.fileName, isDirectory: false)
+                guard FileManager.default.fileExists(atPath: url.path) else { return false }
+                let data = try readCoordinated(from: url)
+                guard data.count == asset.byteCount, Self.digest(data) == asset.sha256 else { return false }
+            }
+        }
+        return true
+    }
+
+    private func cleanupPlan(now: Date, calendar: Calendar) throws -> (
+        preview: BackupCleanupPreview,
+        retainedSnapshots: [BackupSnapshot],
+        canCollectOrphanedAssets: Bool
+    ) {
+        let libraryID = try readLibraryMarker()
+        let snapshotsDirectory = backupDirectoryURL.appendingPathComponent("snapshots", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: snapshotsDirectory.path) else {
+            return (BackupCleanupPreview(snapshotFileNames: [], snapshotBytes: 0, orphanedPhotoCount: 0, orphanedPhotoBytes: 0), [], true)
+        }
+
+        let files = try contentsOfDirectory(at: snapshotsDirectory).filter { Self.isSnapshotName($0.lastPathComponent) }
+        var valid: [(url: URL, snapshot: BackupSnapshot)] = []
+        var hasUnverifiedSnapshot = false
+        for url in files {
+            guard let snapshot = try? Self.decode(readCoordinated(from: url)), snapshot.libraryID == libraryID else {
+                hasUnverifiedSnapshot = true
+                continue
+            }
+            valid.append((url, snapshot))
+        }
+        valid.sort {
+            if $0.snapshot.createdAt != $1.snapshot.createdAt { return $0.snapshot.createdAt > $1.snapshot.createdAt }
+            return $0.url.lastPathComponent > $1.url.lastPathComponent
+        }
+        guard !hasUnverifiedSnapshot,
+              let newest = valid.first,
+              try storedAssetsExistAndMatch(for: newest.snapshot) else {
+            throw BackupDirectoryStoreError.cleanupRequiresVerifiedSnapshot
+        }
+
+        var retained = Set(valid.prefix(10).map { $0.url.lastPathComponent })
+        let recentCutoff = calendar.date(byAdding: .day, value: -30, to: now) ?? now.addingTimeInterval(-30 * 86_400)
+        let monthlyCutoff = calendar.date(byAdding: .month, value: -12, to: now) ?? now.addingTimeInterval(-365 * 86_400)
+        var keptDays = Set<Date>()
+        var keptMonths = Set<Date>()
+        for item in valid {
+            let date = item.snapshot.createdAt
+            if date >= recentCutoff, date <= now {
+                let day = calendar.startOfDay(for: date)
+                if keptDays.insert(day).inserted { retained.insert(item.url.lastPathComponent) }
+            } else if date >= monthlyCutoff, date < recentCutoff {
+                let components = calendar.dateComponents([.year, .month], from: date)
+                if let month = calendar.date(from: components), keptMonths.insert(month).inserted {
+                    retained.insert(item.url.lastPathComponent)
+                }
+            } else if date > now {
+                retained.insert(item.url.lastPathComponent)
+            }
+        }
+
+        let graceCutoff = calendar.date(byAdding: .day, value: -7, to: now) ?? now.addingTimeInterval(-7 * 86_400)
+        let deletable = valid.filter {
+            !retained.contains($0.url.lastPathComponent) && $0.snapshot.createdAt < graceCutoff
+        }
+        // Rebuild without the deletable names; malformed or foreign snapshots remain untouched.
+        let deletableNames = Set(deletable.map { $0.url.lastPathComponent })
+        let keptSnapshots = valid.filter { !deletableNames.contains($0.url.lastPathComponent) }.map(\.snapshot)
+        let snapshotBytes = deletable.reduce(Int64(0)) { $0 + fileSize(at: $1.url) }
+
+        var orphanedURLs: [URL] = []
+        if !hasUnverifiedSnapshot {
+            let retainedPhotoNames = Set(keptSnapshots.flatMap(\.photos).map(\.fileName))
+            let retainedLogoNames = Set(keptSnapshots.flatMap { $0.brandLogoAssets ?? [] }.map(\.fileName))
+            orphanedURLs += try orphanedAssetURLs(
+                in: backupDirectoryURL.appendingPathComponent("photos", isDirectory: true),
+                retainingFileNames: retainedPhotoNames
+            )
+            orphanedURLs += try orphanedAssetURLs(
+                in: backupDirectoryURL.appendingPathComponent("brand-logos", isDirectory: true),
+                retainingFileNames: retainedLogoNames
+            )
+        }
+        let preview = BackupCleanupPreview(
+            snapshotFileNames: deletable.map { $0.url.lastPathComponent },
+            snapshotBytes: snapshotBytes,
+            orphanedPhotoCount: orphanedURLs.count,
+            orphanedPhotoBytes: orphanedURLs.reduce(Int64(0)) { $0 + fileSize(at: $1) }
+        )
+        return (preview, keptSnapshots, !hasUnverifiedSnapshot)
+    }
+
+    private func orphanedAssetURLs(in directory: URL, retainingFileNames: Set<String>) throws -> [URL] {
+        guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
+        return try contentsOfDirectory(at: directory).filter { url in
+            let name = url.lastPathComponent
+            guard UUID(uuidString: url.deletingPathExtension().lastPathComponent) != nil,
+                  !url.pathExtension.isEmpty,
+                  name == "\(url.deletingPathExtension().lastPathComponent).\(url.pathExtension.lowercased())" else { return false }
+            return !retainingFileNames.contains(name)
+        }
+    }
+
+    private func fileSize(at url: URL) -> Int64 {
+        Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+    }
+
+    private func removeCoordinated(at url: URL) throws {
+        #if os(iOS)
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        var operationError: Error?
+        coordinator.coordinate(writingItemAt: url, options: [.forDeleting], error: &coordinationError) { coordinatedURL in
+            do {
+                if FileManager.default.fileExists(atPath: coordinatedURL.path) {
+                    try FileManager.default.removeItem(at: coordinatedURL)
+                }
+            } catch {
+                operationError = error
+            }
+        }
+        if let coordinationError {
+            throw BackupDirectoryStoreError.coordinatedReadFailed(coordinationError.localizedDescription)
+        }
+        if let operationError { throw operationError }
+        #else
+        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        #endif
     }
 
     private func prepareLibraryDirectory(for libraryID: UUID) throws {
@@ -310,6 +668,18 @@ public struct BackupDirectoryStore: Sendable {
             let saved = try readCoordinated(from: destination)
             guard saved.count == asset.byteCount, Self.digest(saved) == asset.sha256 else {
                 throw BackupDirectoryStoreError.photoIntegrityMismatch(asset.id)
+            }
+            return
+        }
+        _ = try LocalFolderProbe.writeAndVerify(data, fileName: asset.fileName, in: directory)
+    }
+
+    private func writeOrReuseBrandLogo(_ data: Data, asset: PhotoAsset, in directory: URL) throws {
+        let destination = directory.appendingPathComponent(asset.fileName, isDirectory: false)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            let saved = try readCoordinated(from: destination)
+            guard saved.count == asset.byteCount, Self.digest(saved) == asset.sha256 else {
+                throw BackupDirectoryStoreError.brandLogoIntegrityMismatch(asset.id)
             }
             return
         }

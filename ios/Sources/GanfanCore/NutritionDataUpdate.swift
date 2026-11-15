@@ -208,6 +208,16 @@ public final class NutritionUpdateRepository {
         return pack
     }
 
+    /// Restores a previously backed-up nutrition pack without applying the version-update gate.
+    public func restore(_ pack: NutritionDataPack?) throws {
+        guard let pack else {
+            store.removeObject(forKey: Self.dataKey)
+            return
+        }
+        try pack.validate()
+        store.set(try JSONEncoder().encode(pack), forKey: Self.dataKey)
+    }
+
     /// Validates before persisting; the previous valid pack survives failed updates.
     @discardableResult
     public func install(_ data: Data, bundled: MenuCatalog) throws -> NutritionDataPack {

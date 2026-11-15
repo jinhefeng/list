@@ -35,6 +35,89 @@ enum GanfanPalette {
     })
 }
 
+struct GanfanBrandLogoIcon: View {
+    private static let assetsWithOwnBackground: Set<String> = [
+        "BrandIconAmasha",
+        "BrandIconCoco",
+        "BrandIconYidiandian",
+        "BrandIconNayuki",
+        "BrandIconPeets",
+        "BrandIconTims",
+        "BrandIconCocaCola",
+        "BrandIconMcDonalds",
+        "BrandIconKFC",
+        "BrandIconSuiYinJiLiang"
+    ]
+
+    let assetName: String?
+    let symbol: String?
+    let imageID: UUID?
+    var dimension: CGFloat = 20
+    @State private var customImage: UIImage?
+
+    init(assetName: String? = nil, symbol: String?, imageID: UUID? = nil, dimension: CGFloat = 20) {
+        self.assetName = assetName
+        self.symbol = symbol
+        self.imageID = imageID
+        self.dimension = dimension
+        _customImage = State(initialValue: nil)
+    }
+
+    private var resolvedAssetName: String? {
+        guard let assetName = assetName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !assetName.isEmpty,
+              UIImage(named: assetName) != nil else {
+            return nil
+        }
+        return assetName
+    }
+
+    private var needsWhiteBacking: Bool {
+        guard let resolvedAssetName else { return false }
+        return !Self.assetsWithOwnBackground.contains(resolvedAssetName)
+    }
+
+    var body: some View {
+        Group {
+            if let customImage {
+                Image(uiImage: customImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: dimension, height: dimension)
+            } else if let resolvedAssetName {
+                Image(resolvedAssetName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: dimension, height: dimension)
+                    .background(needsWhiteBacking ? Color.white : Color.clear)
+            } else {
+                fallbackIcon
+            }
+        }
+        .frame(width: dimension, height: dimension)
+        .clipShape(RoundedRectangle(cornerRadius: dimension * 0.24, style: .continuous))
+        .task(id: imageID) {
+            guard let imageID else {
+                customImage = nil
+                return
+            }
+            let data = await Task.detached(priority: .utility) {
+                AppStoragePaths.brandLogoImageData(for: imageID)
+            }.value
+            customImage = data.flatMap(UIImage.init(data:))
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var fallbackIcon: some View {
+        Image("BrandIconGenericLion")
+            .resizable()
+            .scaledToFit()
+            .frame(width: dimension, height: dimension)
+            .background(Color.white)
+    }
+}
+
 enum GanfanSpacing {
     static let xSmall: CGFloat = 4
     static let small: CGFloat = 8
@@ -63,7 +146,7 @@ struct GanfanBrandHeader: View {
                 .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("干饭手册")
+                Text("食光记")
                     .font(.title3.weight(.bold))
                     .foregroundStyle(GanfanPalette.ink)
                 if let subtitle {
