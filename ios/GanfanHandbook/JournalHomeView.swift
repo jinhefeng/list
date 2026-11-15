@@ -396,12 +396,92 @@ private struct JournalPhotoEntry: Identifiable {
     var id: UUID { asset.id }
 }
 
+// Shared selection and presentation for every saved-photo viewer entry point.
+private struct JournalPhotoSelection: Identifiable {
+    let id = UUID()
+    let assets: [PhotoAsset]
+    let labels: [String]
+    let initialIndex: Int
+
+    init(assets: [PhotoAsset], labels: [String], initialIndex: Int = 0) {
+        self.assets = assets
+        self.labels = labels
+        self.initialIndex = initialIndex
+    }
+}
+
+private struct JournalPhotoSheetModifier: ViewModifier {
+    @Binding var selection: JournalPhotoSelection?
+
+    func body(content: Content) -> some View {
+        content.sheet(item: $selection) { selection in
+            PhotoViewerSheet(
+                assets: selection.assets,
+                labels: selection.labels,
+                initialIndex: selection.initialIndex
+            )
+        }
+    }
+}
+
+private extension View {
+    func journalPhotoSheet(selection: Binding<JournalPhotoSelection?>) -> some View {
+        modifier(JournalPhotoSheetModifier(selection: selection))
+    }
+}
+
+// Today's list, history and insights all open the same detail sheet.
+private struct RecordDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let storedRecord: StoredJournalRecord
+
+    var body: some View {
+        NavigationStack {
+            RecordDetailView(storedRecord: storedRecord)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("关闭") { dismiss() }
+                    }
+                }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(GanfanPalette.canvas)
+    }
+}
+
+// All saved photos use this same presentation, including diagnostics.
+private struct PhotoViewerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let assets: [PhotoAsset]
+    let labels: [String]
+    let initialIndex: Int
+
+    var body: some View {
+        NavigationStack {
+            PhotoViewer(assets: assets, labels: labels, initialIndex: initialIndex)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("完成") { dismiss() }
+                    }
+                }
+                .toolbarBackground(GanfanPalette.card, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(GanfanPalette.card)
+    }
+}
+
 private struct JournalRecordCardRow: View {
     let item: TimelineItem
     let style: JournalRecordRowStyle
 
-    @State private var isShowingPhotoViewer = false
-    @State private var selectedPhotoIndex = 0
+    @State private var isShowingDetail = false
+    @State private var photoSelection: JournalPhotoSelection?
 
     private var photoEntries: [JournalPhotoEntry] {
         switch item.record {
@@ -419,8 +499,8 @@ private struct JournalRecordCardRow: View {
         HStack(alignment: .top, spacing: 12) {
             photoColumn
 
-            NavigationLink {
-                RecordDetailView(storedRecord: item.storedRecord)
+            Button {
+                isShowingDetail = true
             } label: {
                 recordDetails
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -429,15 +509,10 @@ private struct JournalRecordCardRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel("查看\(recordTitle)详情")
         }
-        .sheet(isPresented: $isShowingPhotoViewer) {
-            NavigationStack {
-                PhotoViewer(
-                    assets: photoEntries.map(\.asset),
-                    labels: photoEntries.map(\.label),
-                    initialIndex: selectedPhotoIndex
-                )
-            }
+        .sheet(isPresented: $isShowingDetail) {
+            RecordDetailSheet(storedRecord: item.storedRecord)
         }
+        .journalPhotoSheet(selection: $photoSelection)
     }
 
     @ViewBuilder
@@ -445,13 +520,17 @@ private struct JournalRecordCardRow: View {
         switch item.record {
         case .drink:
             if photoEntries.isEmpty {
-                photoPlaceholder("杯")
+                Button { isShowingDetail = true } label: { photoPlaceholder("杯") }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("查看\(recordTitle)详情")
             } else {
                 photoButton(at: 0)
             }
         case .meal:
             if photoEntries.isEmpty {
-                photoPlaceholder("菜")
+                Button { isShowingDetail = true } label: { photoPlaceholder("菜") }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("查看\(recordTitle)详情")
             } else {
                 let visibleCount = min(photoEntries.count, 4)
                 ZStack(alignment: .leading) {
@@ -476,8 +555,11 @@ private struct JournalRecordCardRow: View {
         let showsCount = isMeal && index == 0 && photoEntries.count > 1
 
         return Button {
-            selectedPhotoIndex = index
-            isShowingPhotoViewer = true
+            photoSelection = JournalPhotoSelection(
+                assets: photoEntries.map(\.asset),
+                labels: photoEntries.map(\.label),
+                initialIndex: index
+            )
         } label: {
             JournalPhotoThumbnail(asset: entry.asset, dimension: style.photoSize)
                 .overlay {
@@ -1303,6 +1385,7 @@ private struct InsightsView: View {
     @Query(sort: \StoredJournalRecord.consumedAt, order: .reverse)
     private var storedRecords: [StoredJournalRecord]
     @State private var selectedDate = Date.now
+    @State private var selectedRecord: StoredJournalRecord?
 
     private var itemsForDate: [TimelineItem] {
         storedRecords.compactMap { storedRecord -> TimelineItem? in
@@ -1366,8 +1449,8 @@ private struct InsightsView: View {
                 } else {
                     VStack(spacing: 0) {
                         ForEach(Array(itemsForDate.enumerated()), id: \.element.id) { entry in
-                            NavigationLink {
-                                RecordDetailView(storedRecord: entry.element.storedRecord)
+                            Button {
+                                selectedRecord = entry.element.storedRecord
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
                                     JournalTimelineRow(record: entry.element.record)
@@ -1400,6 +1483,9 @@ private struct InsightsView: View {
         .navigationTitle("摄入洞察")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .sheet(item: $selectedRecord) { record in
+            RecordDetailSheet(storedRecord: record)
+        }
     }
 
     private func nutritionDetail(_ nutrition: NutritionSnapshot?) -> String {
@@ -1437,6 +1523,7 @@ struct StorageDiagnosticsView: View {
     @State private var usage: StorageUsageSnapshot?
     @State private var failures: [PhotoStorageFailureEvent] = []
     @State private var copyMessage: String?
+    @State private var photoSelection: JournalPhotoSelection?
 
     private let failureStore = PhotoStorageDiagnosticsStore()
     private let catalogRepository = MenuCatalogRepository()
@@ -1485,8 +1572,8 @@ struct StorageDiagnosticsView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(recentPhotos) { item in
-                        NavigationLink {
-                            PhotoViewer(assets: [item.asset], labels: [item.label])
+                        Button {
+                            photoSelection = JournalPhotoSelection(assets: [item.asset], labels: [item.label])
                         } label: {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(item.label).font(.subheadline.weight(.medium))
@@ -1495,6 +1582,7 @@ struct StorageDiagnosticsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -1530,6 +1618,7 @@ struct StorageDiagnosticsView: View {
         .navigationTitle("本机存储")
         .navigationBarTitleDisplayMode(.inline)
         .task { refresh() }
+        .journalPhotoSheet(selection: $photoSelection)
         .alert("诊断摘要", isPresented: Binding(
             get: { copyMessage != nil },
             set: { if !$0 { copyMessage = nil } }
@@ -1644,6 +1733,7 @@ private struct RecordDetailView: View {
     @State private var isEditing = false
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
+    @State private var photoSelection: JournalPhotoSelection?
 
     private var decodedRecord: JournalRecord? {
         try? storedRecord.decodeRecord()
@@ -1692,6 +1782,7 @@ private struct RecordDetailView: View {
                 }
             }
         }
+        .journalPhotoSheet(selection: $photoSelection)
         .alert("操作未完成", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -1729,8 +1820,8 @@ private struct RecordDetailView: View {
                     }
 
                     if let photo = drink.photo {
-                        NavigationLink {
-                            PhotoViewer(assets: [photo], labels: [drink.drinkName])
+                        Button {
+                            photoSelection = JournalPhotoSelection(assets: [photo], labels: [drink.drinkName])
                         } label: {
                             RecordDetailPhoto(asset: photo)
                         }
@@ -1907,8 +1998,8 @@ private struct RecordDetailView: View {
 
         if let photo = dish.photo {
             let photoIndex = photoEntries.firstIndex { $0.asset.id == photo.id } ?? 0
-            NavigationLink {
-                PhotoViewer(
+            Button {
+                photoSelection = JournalPhotoSelection(
                     assets: photoEntries.map(\.asset),
                     labels: photoEntries.map(\.label),
                     initialIndex: photoIndex
@@ -2000,6 +2091,7 @@ private struct RecordDetailPhoto: View {
 }
 
 private struct PhotoViewer: View {
+    @Environment(\.colorScheme) private var colorScheme
     let assets: [PhotoAsset]
     let labels: [String]
     @State private var currentIndex: Int
@@ -2041,12 +2133,27 @@ private struct PhotoViewer: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
+            // The image stage is deliberately inset from the sheet so its edges
+            // remain visible even when the system uses a near-black dark surface.
+            .environment(\.colorScheme, .dark)
+            .tint(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(
+                        colorScheme == .dark ? Color.white.opacity(0.30) : Color.black.opacity(0.16),
+                        lineWidth: 1
+                    )
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
 
             if assets.count > 1 {
                 VStack(spacing: 10) {
                     Text("\(currentIndex + 1) / \(assets.count) · \(currentLabel)")
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(GanfanPalette.ink)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
                             ForEach(Array(assets.enumerated()), id: \.offset) { item in
@@ -2059,14 +2166,14 @@ private struct PhotoViewer: View {
                                                 .resizable()
                                                 .scaledToFill()
                                         } else {
-                                            Rectangle().fill(.white.opacity(0.16))
+                                            Rectangle().fill(GanfanPalette.ink.opacity(0.12))
                                         }
                                     }
                                     .frame(width: 58, height: 58)
                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                     .overlay {
                                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .stroke(index == currentIndex ? .white : .clear, lineWidth: 2)
+                                            .stroke(index == currentIndex ? GanfanPalette.forest : .clear, lineWidth: 2)
                                     }
                                 }
                                 .buttonStyle(.plain)
@@ -2077,10 +2184,10 @@ private struct PhotoViewer: View {
                     }
                 }
                 .padding(.vertical, 12)
-                .background(.black)
+                .background(GanfanPalette.card)
             }
         }
-        .background(.black)
+        .background(GanfanPalette.card)
         .navigationTitle("照片")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -2098,6 +2205,8 @@ private struct PhotoViewer: View {
     private func loadCurrentAsset() {
         guard assets.indices.contains(currentIndex) else { return }
         let asset = assets[currentIndex]
+        currentImage = nil
+        errorMessage = nil
         do {
             let data = try AppStoragePaths.photoStore.load(asset)
             currentImage = Self.downsample(data, maxPixelSize: 2_400)
