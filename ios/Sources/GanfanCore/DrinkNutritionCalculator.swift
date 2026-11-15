@@ -236,7 +236,11 @@ public enum DrinkNutritionCalculator {
 
     private static func normalizedSweetness(_ value: String?) -> String {
         let result = normalized(value)
-        return result == "无糖" ? "不另外加糖" : result
+        switch result {
+        case "无糖": return "不另外加糖"
+        case "微糖": return "三分糖"
+        default: return result
+        }
     }
 
     private static func nonEmpty(_ value: String?) -> String? {

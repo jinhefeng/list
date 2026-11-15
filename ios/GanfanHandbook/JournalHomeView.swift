@@ -83,6 +83,30 @@ struct JournalHomeView: View {
         timelineItems.filter { Calendar.current.isDateInToday($0.record.consumedAt) }
     }
 
+    private func mergeLegacyMicroSweetness() {
+        var replacements: [(StoredJournalRecord, DrinkRecord)] = []
+        for storedRecord in storedRecords {
+            guard let record = try? storedRecord.decodeRecord(),
+                  case .drink(let drink) = record,
+                  drink.sweetness == "微糖",
+                  let migratedDrink = try? drink.replacingSweetness("三分糖") else {
+                continue
+            }
+            replacements.append((storedRecord, migratedDrink))
+        }
+        guard !replacements.isEmpty else { return }
+
+        do {
+            for (storedRecord, drink) in replacements {
+                try storedRecord.replace(with: .drink(drink))
+            }
+            try modelContext.save()
+            BackupChangeTracker().markChanged()
+        } catch {
+            modelContext.rollback()
+        }
+    }
+
     private var unreadableRecordCount: Int {
         storedRecords.count - timelineItems.count
     }
@@ -117,6 +141,7 @@ struct JournalHomeView: View {
             .tint(GanfanPalette.forest)
             .background(GanfanPalette.canvas.ignoresSafeArea())
             .task {
+                mergeLegacyMicroSweetness()
                 backupWorkflow.restoreSavedFolderAccess()
                 backupWorkflow.backupIfNeeded(storedRecords: storedRecords, context: modelContext)
             }

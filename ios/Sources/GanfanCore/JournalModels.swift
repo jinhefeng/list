@@ -188,7 +188,7 @@ public struct DrinkRecord: Codable, Equatable, Identifiable, Sendable {
         self.drinkName = drinkName.trimmingCharacters(in: .whitespacesAndNewlines)
         self.cupType = cupType.trimmingCharacters(in: .whitespacesAndNewlines)
         self.sizeML = sizeML
-        self.sweetness = sweetness.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.sweetness = Self.canonicalSweetness(sweetness)
         self.servingOption = servingOption.trimmingCharacters(in: .whitespacesAndNewlines)
         self.temperature = Self.normalizedOptional(temperature)
         self.ice = Self.normalizedOptional(ice)
@@ -199,6 +199,35 @@ public struct DrinkRecord: Codable, Equatable, Identifiable, Sendable {
         self.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         self.photo = photo
         self.nutrition = nutrition
+    }
+
+    public func replacingSweetness(_ sweetness: String) throws -> DrinkRecord {
+        try DrinkRecord(
+            id: id,
+            consumedAt: consumedAt,
+            brandID: brandID,
+            brandName: brandName,
+            drinkID: drinkID,
+            drinkName: drinkName,
+            cupType: cupType,
+            sizeML: sizeML,
+            sweetness: sweetness,
+            servingOption: servingOption,
+            temperature: temperature,
+            ice: ice,
+            locationName: locationName,
+            locationAddress: locationAddress,
+            latitude: latitude,
+            longitude: longitude,
+            notes: notes,
+            photo: photo,
+            nutrition: nutrition
+        )
+    }
+
+    private static func canonicalSweetness(_ value: String) -> String {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized == "微糖" ? "三分糖" : normalized
     }
 
     private static func validCoordinates(latitude: Double?, longitude: Double?) -> Bool {

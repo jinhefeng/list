@@ -9,6 +9,8 @@ private final class CurrentLocationModel: NSObject, ObservableObject, @preconcur
     @Published private(set) var statusMessage: String?
 
     private let manager: CLLocationManager
+    private var isRequestingLocation = false
+    private var locationWaiters: [UUID: CheckedContinuation<CLLocationCoordinate2D?, Never>] = [:]
 
     override init() {
         manager = CLLocationManager()
@@ -22,11 +24,34 @@ private final class CurrentLocationModel: NSObject, ObservableObject, @preconcur
         case .notDetermined:
             manager.requestWhenInUseAuthorization()
         case .authorizedAlways, .authorizedWhenInUse:
+            if let location = manager.location,
+               location.horizontalAccuracy >= 0,
+               abs(location.timestamp.timeIntervalSinceNow) < 300 {
+                updateLocation(location.coordinate)
+            }
+            guard !isRequestingLocation else { return }
+            isRequestingLocation = true
             manager.requestLocation()
         case .denied, .restricted:
             statusMessage = "定位权限未开启；仍可搜索或直接点选地图。"
+            finishLocationWaiters(with: nil)
         @unknown default:
             statusMessage = "暂时无法定位；仍可搜索或直接点选地图。"
+            finishLocationWaiters(with: nil)
+        }
+    }
+
+    func coordinate(waiting timeout: Duration = .seconds(2)) async -> CLLocationCoordinate2D? {
+        if let coordinate { return coordinate }
+
+        let waiterID = UUID()
+        return await withCheckedContinuation { continuation in
+            locationWaiters[waiterID] = continuation
+            requestCurrentLocation()
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: timeout)
+                self?.finishLocationWaiter(waiterID, with: self?.coordinate)
+            }
         }
     }
 
@@ -39,16 +64,36 @@ private final class CurrentLocationModel: NSObject, ObservableObject, @preconcur
         let latitude = location.coordinate.latitude
         let longitude = location.coordinate.longitude
         Task { @MainActor [weak self] in
-            self?.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-            self?.updateID += 1
-            self?.statusMessage = "已定位到当前位置；搜索结果优先显示附近地点。"
+            self?.isRequestingLocation = false
+            self?.updateLocation(CLLocationCoordinate2D(latitude: latitude, longitude: longitude))
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor [weak self] in
+            self?.isRequestingLocation = false
             self?.statusMessage = "暂时无法获取当前位置；仍可搜索或直接点选地图。"
+            self?.finishLocationWaiters(with: nil)
         }
+    }
+
+    private func updateLocation(_ coordinate: CLLocationCoordinate2D) {
+        self.coordinate = coordinate
+        updateID += 1
+        statusMessage = "已定位到当前位置；搜索结果优先显示附近地点。"
+        finishLocationWaiters(with: coordinate)
+    }
+
+    private func finishLocationWaiters(with coordinate: CLLocationCoordinate2D?) {
+        let waiterIDs = Array(locationWaiters.keys)
+        for waiterID in waiterIDs {
+            finishLocationWaiter(waiterID, with: coordinate)
+        }
+    }
+
+    private func finishLocationWaiter(_ waiterID: UUID, with coordinate: CLLocationCoordinate2D?) {
+        guard let continuation = locationWaiters.removeValue(forKey: waiterID) else { return }
+        continuation.resume(returning: coordinate)
     }
 }
 
@@ -72,6 +117,17 @@ private struct MapLocationCandidate: Identifiable {
             latitude: coordinate.latitude,
             longitude: coordinate.longitude
         )
+    }
+}
+
+struct MapLocationPickerSheet: View {
+    let onSelect: (MapLocationSelection) -> Void
+
+    var body: some View {
+        NavigationStack {
+            MapLocationPickerView(onSelect: onSelect)
+        }
+        .presentationDetents([.large])
     }
 }
 
@@ -100,7 +156,7 @@ struct MapLocationPickerView: View {
             center: center,
             span: MKCoordinateSpan(latitudeDelta: 18, longitudeDelta: 18)
         )
-        _cameraPosition = State(initialValue: .region(region))
+        _cameraPosition = State(initialValue: .userLocation(followsHeading: false, fallback: .region(region)))
     }
 
     var body: some View {
@@ -250,13 +306,15 @@ struct MapLocationPickerView: View {
         isSearching = true
         defer { isSearching = false }
 
+        let origin = await currentLocation.coordinate()
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = searchText
-        if let coordinate = currentLocation.coordinate {
-            request.region = Self.region(centeredOn: coordinate, span: 0.15)
+        if let origin {
+            request.region = Self.region(centeredOn: origin, span: 0.15)
         }
         do {
             let response = try await MKLocalSearch(request: request).start()
+            let searchOrigin = currentLocation.coordinate ?? origin
             let candidates = response.mapItems.map { item in
                 MapLocationCandidate(
                     name: item.name ?? "",
@@ -264,11 +322,11 @@ struct MapLocationPickerView: View {
                     coordinate: item.placemark.coordinate
                 )
             }
-            if let coordinate = currentLocation.coordinate {
-                let origin = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            if let searchOrigin {
+                let currentCoordinate = CLLocation(latitude: searchOrigin.latitude, longitude: searchOrigin.longitude)
                 searchResults = candidates.sorted {
-                    origin.distance(from: CLLocation(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude))
-                        < origin.distance(from: CLLocation(latitude: $1.coordinate.latitude, longitude: $1.coordinate.longitude))
+                    currentCoordinate.distance(from: CLLocation(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude))
+                        < currentCoordinate.distance(from: CLLocation(latitude: $1.coordinate.latitude, longitude: $1.coordinate.longitude))
                 }
             } else {
                 searchResults = candidates

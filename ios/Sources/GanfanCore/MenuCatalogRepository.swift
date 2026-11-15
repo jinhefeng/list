@@ -27,7 +27,12 @@ public struct MenuCatalogUserState: Codable, Equatable, Sendable {
         self.globalCupSizes = globalCupSizes
     }
 
-    public static let defaultCupSizes = ["小杯", "中杯", "大杯", "超大杯"].map { MenuCupSize(cupType: $0) }
+    public static let defaultCupSizes = [
+        MenuCupSize(cupType: "小杯", sizeML: 350),
+        MenuCupSize(cupType: "中杯", sizeML: 500),
+        MenuCupSize(cupType: "大杯", sizeML: 650),
+        MenuCupSize(cupType: "超大杯", sizeML: 750)
+    ]
 
     public func validate() throws {
         try MenuCatalogRepository.validate(self)
@@ -37,6 +42,7 @@ public struct MenuCatalogUserState: Codable, Equatable, Sendable {
 /// Owns the local catalog overlay. A future shared-list repository can replace this boundary without changing menu consumers.
 public final class MenuCatalogRepository {
     private static let stateKey = "ganfan-handbook.catalog-user-state.v1"
+    private static let cupSizeDefaultsMigrationKey = "ganfan-handbook.catalog-cup-size-defaults-migrated.v1"
     private let userDefaults: UserDefaults
 
     public init(userDefaults: UserDefaults = .standard) {
@@ -45,13 +51,27 @@ public final class MenuCatalogRepository {
 
     public func loadUserState() throws -> MenuCatalogUserState {
         guard let data = userDefaults.data(forKey: Self.stateKey) else {
-            return MenuCatalogUserState()
+            let initialState = MenuCatalogUserState()
+            try saveUserState(initialState)
+            userDefaults.set(true, forKey: Self.cupSizeDefaultsMigrationKey)
+            return initialState
         }
+
+        let savedState: MenuCatalogUserState
         do {
-            return try JSONDecoder().decode(MenuCatalogUserState.self, from: data)
+            savedState = try JSONDecoder().decode(MenuCatalogUserState.self, from: data)
         } catch {
             throw MenuCatalogRepositoryError.invalidSavedState
         }
+
+        guard !userDefaults.bool(forKey: Self.cupSizeDefaultsMigrationKey) else {
+            return savedState
+        }
+
+        let migratedState = Self.initializingDefaultCupSizes(in: savedState)
+        try saveUserState(migratedState)
+        userDefaults.set(true, forKey: Self.cupSizeDefaultsMigrationKey)
+        return migratedState
     }
 
     public func saveUserState(_ state: MenuCatalogUserState) throws {
@@ -98,5 +118,22 @@ public final class MenuCatalogRepository {
                 throw MenuCatalogRepositoryError.invalidCupSize(type)
             }
         }
+    }
+
+    private static func initializingDefaultCupSizes(in state: MenuCatalogUserState) -> MenuCatalogUserState {
+        let cupSizes = state.globalCupSizes.map { configuredSize in
+            guard configuredSize.sizeML == nil,
+                  let defaultSize = MenuCatalogUserState.defaultCupSizes.first(where: { $0.cupType == configuredSize.cupType }) else {
+                return configuredSize
+            }
+            return defaultSize
+        }
+
+        return MenuCatalogUserState(
+            brands: state.brands,
+            drinks: state.drinks,
+            deletedDrinkIDs: state.deletedDrinkIDs,
+            globalCupSizes: cupSizes
+        )
     }
 }
