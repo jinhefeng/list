@@ -46,7 +46,9 @@ struct GanfanBrandLogoIcon: View {
         "BrandIconCocaCola",
         "BrandIconMcDonalds",
         "BrandIconKFC",
-        "BrandIconSuiYinJiLiang"
+        "BrandIconSuiYinJiLiang",
+        "BrandIconQuchashan",
+        "BrandIconTaiBenNiu"
     ]
 
     let assetName: String?
@@ -77,6 +79,10 @@ struct GanfanBrandLogoIcon: View {
         return !Self.assetsWithOwnBackground.contains(resolvedAssetName)
     }
 
+    private var logoContentInset: CGFloat {
+        resolvedAssetName == "BrandIconCharlieTown" ? dimension * 0.06 : 0
+    }
+
     var body: some View {
         Group {
             if let customImage {
@@ -88,6 +94,7 @@ struct GanfanBrandLogoIcon: View {
                 Image(resolvedAssetName)
                     .resizable()
                     .scaledToFit()
+                    .padding(logoContentInset)
                     .frame(width: dimension, height: dimension)
                     .background(needsWhiteBacking ? Color.white : Color.clear)
             } else {
@@ -146,7 +153,7 @@ struct GanfanBrandHeader: View {
                 .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("食光记")
+                Text("吃吃喝喝")
                     .font(.title3.weight(.bold))
                     .foregroundStyle(GanfanPalette.ink)
                 if let subtitle {

@@ -50,23 +50,28 @@ final class NutritionV2Tests: XCTestCase {
         let catalog = MenuCatalog(version: "1", updatedAt: "2026-01-01",
             brands: [MenuBrand(id: "brand1", name: "示例品牌")],
             drinks: [MenuDrink(id: "tea1", brandID: "brand1", brandName: "示例品牌", name: "鲜奶茶",
-                nutritionPerUnit: MenuNutritionPerUnit(amount: 100, unit: "ml", energyKcal: 40))])
+                nutritionPerUnit: MenuNutritionPerUnit(amount: 100, unit: "ml", energyKcal: 40)),
+                MenuDrink(id: "local-legacy", legacyIDs: ["tea-legacy"], brandID: "brand1", brandName: "示例品牌", name: "旧本地菜单")])
         let remote = NutritionDataPack(version: "2026.11.14.1", generatedAt: "2026-11-14",
             entries: [
                 NutritionUpdateEntry(id: "tea1", nutritionPerUnit:
                     MenuNutritionPerUnit(amount: 100, unit: "ml", energyKcal: 68, sugarG: 6)),
+                NutritionUpdateEntry(id: "tea-legacy", nutritionPerUnit:
+                    MenuNutritionPerUnit(amount: 100, unit: "ml", sugarG: 9)),
                 NutritionUpdateEntry(id: "tea2", brandID: "brand1", brandName: "示例品牌", name: "新款",
                     nutritionPerUnit: MenuNutritionPerUnit(amount: 100, unit: "ml", energyKcal: 20))
             ])
         let updated = try remote.merging(into: catalog)
-        XCTAssertEqual(updated.drinks.count, 2)
+        XCTAssertEqual(updated.drinks.count, 3)
         XCTAssertEqual(updated.drinks.first?.nutritionPerUnit?.energyKcal, 68)
+        XCTAssertEqual(updated.drinks.first(where: { $0.id == "local-legacy" })?.nutritionPerUnit?.sugarG, 9)
+        XCTAssertEqual(updated.drinks.first(where: { $0.id == "local-legacy" })?.legacyIDs, ["tea-legacy"])
         let custom = MenuDrink(id: "tea1", brandID: "brand1", brandName: "示例品牌",
                                name: "用户修改的鲜奶茶", localOverride: true, custom: true)
         let state = MenuCatalogUserState(drinks: [custom])
         let final = updated.merging(localBrands: [], localDrinks: state.drinks, deletedDrinkIDs: [])
         XCTAssertEqual(final.drinks.first?.name, "用户修改的鲜奶茶")
-        XCTAssertEqual(final.drinks.count, 2)
+        XCTAssertEqual(final.drinks.count, 3)
     }
 
     func testFailedAndOutdatedPackDoNotReplaceCurrent() throws {

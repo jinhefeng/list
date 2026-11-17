@@ -397,7 +397,14 @@ public enum JournalRecordCodec {
     public static func decode(_ data: Data) throws -> JournalRecord {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let record = try decoder.decode(JournalRecord.self, from: data)
+        let decodedRecord = try decoder.decode(JournalRecord.self, from: data)
+        let record: JournalRecord
+        switch decodedRecord {
+        case .drink(let drink) where drink.sweetness == "微糖":
+            record = .drink(try drink.replacingSweetness("三分糖"))
+        default:
+            record = decodedRecord
+        }
         try record.validate()
         return record
     }

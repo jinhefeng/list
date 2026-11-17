@@ -1,7 +1,7 @@
 # Task Constitution
 
 ## 1. Mission
-Build the meal-logging product, with the current release direction as the native iOS app “食光记”: local-first drink and meal records, user-selected iCloud Drive backup, and no historical-data migration.
+Build the meal-logging product, with the current release direction as the native iOS app “吃吃喝喝”: local-first drink and meal records, user-selected iCloud Drive backup, and no historical-data migration.
 
 ## 2. Success Criteria
 - [ ] Menu data has a stable structure for brands, drinks, city/store availability, options, nutrition variants, sources, and verification dates.
@@ -12,12 +12,12 @@ Build the meal-logging product, with the current release direction as the native
 - [ ] A user can still record a drink immediately when a brand or new item is missing from the catalog, and that gap can be reviewed for catalog follow-up.
 - [ ] Drink and meal records have separate entry points and appear together in one time-ordered history.
 - [ ] Meal records save an address, store name, automatic time, and multiple named dishes with individual photos.
-- [ ] Drink nutrition summaries exclude meal records; existing local drink records remain readable.
+- [ ] Mini Program and beverage-only totals exclude meals; native iOS Insights combines shared meal/drink nutrients per T6.3 while keeping beverage volume and caffeine drink-only; existing local drink records remain readable.
 - [ ] The iOS app starts with an empty local library, saves records and photos on-device, and can back up to and restore from a user-selected iCloud Drive folder.
 - [ ] The iOS app reproduces the Mini Program's nine page and data behaviors, applies the approved Logo and visual language, and keeps the first release single-user while retaining stable-ID/versioned-data seams for a future shared list.
 
 ## 3. Task Tree
-### T6 — Native iOS app「食光记」
+### T6 — Native iOS app「吃吃喝喝」
 - Status: 进行中（品牌及九页部分代码已接入；全功能和页面/设备验收仍待完成）
 - Objective: Deliver a branded, local-first iPhone app reproducing all nine Mini Program pages and their data behavior, without importing Mini Program history; preserve the user's existing iOS records and keep a bounded extension path for future shared lists.
 - Acceptance: Nine pages/data contracts are mapped and accepted; offline records/photos, menu, history, nutrition insights, diagnostics, and backup/restore work; iOS data survives upgrades; no login/sharing in v1; stable IDs and versioned boundaries support future architecture work.
@@ -33,19 +33,20 @@ Build the meal-logging product, with the current release direction as the native
 - Evidence: `docs/ios-miniprogram-parity-map.md`; `tests/mvp.test.md` J-01/J-02.
 
 #### T6.2 — 数据契约与本机仓储边界
-- Status: 进行中（菜单、完整饮品目录和营养数据的备份恢复兼容已接入；重复快照抑制及旧备份预览清理已实现；本机仓储抽象和全量兼容验收仍待完成）
+- Status: 进行中（菜单、完整饮品目录和营养数据的备份恢复兼容已接入；重复快照抑制、旧备份预览清理及本机旧品牌/菜单自动合并已实现；本机仓储抽象和全量兼容验收仍待完成）
 - Objective: Complete the catalog/nutrition/local override contract and isolate local persistence behind a replaceable boundary, with versioned IDs and backup compatibility.
 - Acceptance: Domain tests cover catalog, nutrition provenance, custom overrides and stable record/photo IDs; existing iOS data stays readable; no account, membership or online sync is introduced.
 - Depends on: T6.1
 
 #### T6.3 — 九页功能与数据补齐
-- Status: 进行中（Logo 直接归属品牌，标题使用品牌名；可在品牌内添加、裁切、替换或删除图片；页面交互与视觉验收仍待完成）
+- Status: 进行中（新增品牌、网页菜单/Logo 候选、裁切保存及旧目录合并已接入；摄入洞察趋势页已实现，页面交互与视觉验收仍待完成）
 - Objective: Complete Today, drink entry, catalog, meal entry, photo preview, storage diagnostics, history, record detail and nutrition insights.
-- Acceptance: IOS-3-02–15 pass their behavior and page gates; single-user navigation and filtering match the agreed scope.
+- Acceptance: IOS-3-02–15 pass their behavior and page gates; IOS-3-13 defaults to 7 days with 30/90-day options and orders metrics as 热量、咖啡因、糖、脂肪、蛋白质、碳水化合物、水分（饮品）; combines shared meal/drink nutrients, keeps beverage volume/caffeine drink-only, includes estimates, preserves missing values as gaps, and supports date/value scrubbing without a record list; single-user navigation and filtering match scope.
 - Depends on: T6.1, T6.2
+- Current result: 饮品目录提供“新增品牌”向导，可在百度/Bing 的 App 内网页中读取结构化商品名、菜单列表和图片候选；用户可编辑菜单并选择、裁切 Logo 后保存。检索不调用 AI 或搜索 API，菜单候选保留网页来源并标记待核验。目录加载会把旧本地品牌按唯一名称/别名迁到内置 ID，合并同名菜单并保留旧饮品 ID；用户 Logo 优先，无用户 Logo 时继承软件包图案，恢复出的目录也会处理。今日页已按日查询并缓存解码结果，备份 I/O 和目录首次读取移到后台；核心测试 67/67、iOS 模拟器 Debug 构建和空态启动通过。历史数据量、备份目录与完整页面交互及 Release/Profile 性能采样仍待验收。
 
 #### T6.4 — 集成与设备验收
-- Status: 规划中
+- Status: 进行中（今日页模拟器空态启动通过；Release/Profile 性能和目标设备交互待测）
 - Objective: Verify visual parity, data preservation, offline behavior, selected-folder backup and empty-library restore on the target iPhone.
 - Acceptance: IOS-3-16/17 and relevant real-device checks pass; build, automation, UI runtime and cloud sync evidence remain distinct.
 - Depends on: T6.1–T6.3
@@ -54,7 +55,7 @@ Build the meal-logging product, with the current release direction as the native
 - Status: 进行中
 - Objective: Define the catalog contract, in-app maintenance flow, batch import, and safe mini-program update path.
 - Acceptance: A template and importer produce a validated versioned catalog; users can search/add/edit catalog entries in the app; the app can opt into remote refresh and retain a local fallback and local overrides.
-- Current result: Maintenance defaults to an empty list; search/filter or “展示全部饮品” opens 30-row batches. A global cup-type/capacity setting is shared by drink entry, Today, History, and Intake; record views hide capacity. Existing record sizes and complete nutrition snapshots remain intact. Custom-drink saves no longer add product-level cup mappings. The record form can add a missing drink directly to the selected existing brand and retain that brand association. Deletion requires confirmation and is blocked while any local record references the drink; local tombstones prevent configured remote refresh from restoring it. Brand/drink selectors share aligned label, value, and arrow columns; editing opens a scrollable modal over the unchanged list; the full-list button sits at the right of the catalog count card. Saving edits preserves active filters and the loaded batch size.
+- Current result: Maintenance defaults to an empty list; search/filter or “展示全部饮品” opens 30-row batches. A global cup-type/capacity setting is shared by drink entry, Today, History, and Intake; record views hide capacity. Existing record sizes and complete nutrition snapshots remain intact. Custom-drink saves no longer add product-level cup mappings. The record form can add a missing drink directly to the selected existing brand and retain that brand association. Deletion requires confirmation and is blocked while any local record references the drink; local tombstones prevent configured remote refresh from restoring it. Brand/drink selectors share aligned label, value, and arrow columns; editing opens a scrollable modal over the unchanged list; the full-list button sits at the right of the catalog count card. Saving edits preserves active filters and the loaded batch size. A no-AI brand import wizard collects editable menu candidates and Logo choices from web pages. A phone-export importer maps unique names/aliases to stable brand IDs, merges same-name menus while preserving historical drink IDs, follows user-logo/package-logo precedence, imports Logo assets, and regenerates the iOS catalog; records, photos, and API settings are excluded.
 
 ### T2 — 补全主流品牌菜单并核验城市门店
 - Status: 进行中（候选菜单仍不完整；权威品牌菜单与门店核验待补）
@@ -80,8 +81,8 @@ Build the meal-logging product, with the current release direction as the native
 ### T5 — 饮食记录扩展 / Meal logging
 - Status: 进行中
 - Objective: Add meal records while keeping drink entry separate and sharing one chronological history.
-- Output: A meal entry page, map-confirmed addresses, drag-reorderable multi-dish records, mixed timeline rendering, and drink-only nutrition summaries.
-- Acceptance: Users can save and edit a meal with a map-confirmed address, store name, time, and named dishes with individual photos; record cards show their map location last when available; one drink-style meal card shows every dish name, a fully visible first photo, clearly offset later photos exposed on the right, and a “共 X 张” badge; opening a meal photo shows all photos in that record with swipe navigation and tappable bottom thumbnails; meal and drink records sort together by time; the History page shows each date once for consecutive same-day records and supports multi-select record-type filters discovered from stored records, including unknown future type keys; new types are included by default and legacy records without a type remain drinks; nutrition counts remain drink-only; create-entry buttons appear on Today, not History or Intake; Today links to All Records, catalog and local-storage diagnostics; the native iOS app has four bottom tabs (Today, History, Insights, Menu), with local-storage diagnostics reachable from Menu and no Intake tab.
+- Output: A meal entry page, map-confirmed addresses, drag-reorderable multi-dish records, mixed timeline rendering, and beverage-only summaries outside the native iOS Insights trends.
+- Acceptance: Users can save and edit a meal with a map-confirmed address, store name, time, and named dishes with individual photos; record cards show their map location last when available; one drink-style meal card shows every dish name, a fully visible first photo, clearly offset later photos exposed on the right, and a “共 X 张” badge; opening a meal photo shows all photos in that record with swipe navigation and tappable bottom thumbnails; meal and drink records sort together by time; the History page shows each date once for consecutive same-day records and supports multi-select record-type filters discovered from stored records, including unknown future type keys; new types are included by default and legacy records without a type remain drinks; beverage-specific totals remain drink-only, while native iOS Insights combines shared nutrients under T6.3; create-entry buttons appear on Today, not History or Intake; Today links to All Records, catalog and local-storage diagnostics; the native iOS app has four bottom tabs (Today, History, Insights, Menu), with local-storage diagnostics reachable from Menu and no Intake tab.
 - Depends on: Existing local record storage, native map selection, and local photo persistence.
 - Diagnostics: 17 tests + 18 quota-model checks; device pending. See docs/photo-storage-whitebox.md.
 - Next action: Check date grouping, content scrolling, and navigation through Today links and native back; review the photo stack and viewer in WeChat Developer Tools, then verify map selection and dish ordering on device.
@@ -90,7 +91,7 @@ Build the meal-logging product, with the current release direction as the native
 - Task: T6.3
 - Parent path: T6 → T6.3
 - Objective: Complete and verify the nine iOS page flows against the Mini Program's behavior and data contracts.
-- Next action: 验收内置与自定义 Logo 管理、含饮品目录及营养数据的备份恢复，再继续模拟器检查饮品/用餐表单、地图回退、菜品排序和导航；页面门未完整通过前保持 TODO。
+- Next action: 按新趋势页口径完成摄入洞察的图表交互与视觉验收；九页页面门未完整通过前保持 T6.3 进行中。
 
 ## 5. Decision Log
 | Date | Decision | Rationale | Impact |
@@ -101,7 +102,7 @@ Build the meal-logging product, with the current release direction as the native
 | 2026-10-15 | Use public menu pages to seed brand and drink names while keeping all entries pending. | The user asked to search publicly available menus; public menus are useful for discovery but do not show the current menu of the selected Taobao Flash Sale sample stores. | Each reference keeps its source URL and cannot be promoted to verified until checked against a local platform menu. |
 | 2026-10-15 | Raise the menu acceptance bar from a starter list to every drink in current public menus for the agreed mainstream brands. | The user said missing a purchased drink could make users abandon the product; a starter list is insufficient. | T2 tracks source-page completeness separately from local Taobao Flash Sale store verification; the initial brand boundary is 2026 top-15 tea + 2026 top-15 coffee + Starbucks. |
 | 2026-10-15 | Keep source-reported menu totals and reviewed pages in a separate coverage ledger. | Public aggregators have changing counts and some pages mix food or frozen desserts with drinks. | Current catalog counts remain candidates; none are treated as complete until page-by-page reconciliation. |
-| 2026-10-15 | Keep drink and meal entry separate, but place both record types in one time-sorted history; meal photos belong to individual dishes. | The user wants separate input flows and a shared history. | Meal records are discriminated from drinks, and nutrition summaries continue to include drinks only. |
+| 2026-10-15 | Keep drink and meal entry separate, but place both record types in one time-sorted history; meal photos belong to individual dishes. | The user wants separate input flows and a shared history. | Beverage-only summaries remain drink-only; native iOS Insights follows the later combined-trend scope. |
 | 2026-10-15 | Show each meal as one drink-style history card with every dish photo and name. | The user chose the single-card option for meal history. | Home and history cards show all dishes together; dish order follows the entry form. |
 | 2026-10-15 | Use a right-side exposed photo stack and an enlarged viewer with swipe navigation and tappable bottom thumbnails. | The user selected the right-side stack and requested switching among the photos in one meal. | Home, history, and meal editing open the same ordered photo viewer with a “共 X 张” badge on cards. |
 | 2026-10-15 | Keep meal and drink creation buttons on Today; keep History and Intake focused on review. | The user asked to show drink locations on Today and remove create buttons from the other two tabs. | Drink and meal cards display map locations last when available; History and Intake have no add-entry buttons. |
@@ -115,6 +116,7 @@ Build the meal-logging product, with the current release direction as the native
 | 2026-10-15 | Unified record nutrition input with the catalog's per-100-ml unit, saved per-record nutrition snapshots, required capacity for custom nutrition calculations when unknown, and displayed cup type plus capacity on Today. | The user reported missing cup labels and nutrition values that did not persist or match catalog units. | Historical snapshots remain stable when catalog data changes; custom drink baselines sync locally for later selection. |
 | 2026-10-15 | Hid cup capacities from record and history views, added per-drink capacity configuration, made the catalog list empty until searched/filtered with 30-row view batches, simplified per-100-ml field labels, and added reference-guarded confirmed deletion. | The user approved the plan and specified hidden capacities and safe deletion. | Missing capacity preserves the baseline but skips serving conversion; referenced drinks are retained, and local deletion is retained through configured remote refresh. |
 | 2026-10-15 | Moved cup names and capacities to one shared setting, added a button to expose the full catalog in 30-item batches, and separated card actions into a stable bottom row. | The user wants global cup sizes, explicit full-list access, and a clearer catalog card. | Existing record sizes and snapshots remain intact; all new record and summary calculations read the global mapping. |
+| 2026-11-17 | Native iOS Insights uses 7/30/90-day per-metric trends ordered 热量、咖啡因、糖、脂肪、蛋白质、碳水化合物、水分（饮品）; shared meal/drink nutrients combine, drink volume/caffeine stay separate, estimates count, and missing values remain gaps. | User approved the new Insights design and implementation. | T6.3, IOS-3-13/14; Mini Program behavior unchanged. |
 
 ## 6. Knowledge Context
 - Constraints: Preserve existing Mini Program changes. The iOS app starts empty, stores its working library on-device, and writes backup copies to a user-selected directory that may be in iCloud Drive; no historical migration is needed. Do not claim sample or pending menu items are verified.
@@ -124,8 +126,9 @@ Build the meal-logging product, with the current release direction as the native
 ## 7. Change History
 | Date | Change | Reason | Affected tasks |
 |---|---|---|---|
+| 2026-11-17 | Updated native iOS Insights and IOS-3-13/14 acceptance for the requested metric order, daily meal/drink nutrition trends, separate beverage metrics, estimate handling, and missing-data gaps. | User approved syncing the new page scope into the project documentation. | T6.3 |
 | 2026-10-26 | Added read-only photo/cache diagnostics and exact photo errors. | User approved diagnosis; device check pending. | T5 |
-| 2026-11-13 | Started native iOS app “食光记” as a fresh local-first product with selected-folder iCloud Drive backups; no historical-data migration. | User approved the iOS direction and development plan. | T6 |
+| 2026-11-13 | Started native iOS app “吃吃喝喝” as a fresh local-first product with selected-folder iCloud Drive backups; no historical-data migration. | User approved the iOS direction and development plan. | T6 |
 | 2026-11-13 | Implemented the first local-record UI/core and advanced T6 to backup/restore; 21 Swift core tests pass and iOS/Simulator SDK builds succeed, with device runtime gates still pending. | Continued the approved implementation plan and kept automated evidence separate from device acceptance. | T6 |
 | 2026-11-13 | Implemented versioned file snapshots, original-photo verification, automatic/manual backup triggers, snapshot listing, and transactional restore to an empty SwiftData library; 38 Swift core tests pass and both SDK builds succeed. | Continued T6 through the backup/restore code package while preserving device gates for real iCloud behavior. | T6 |
 | 2026-11-13 | Expanded the approved iOS scope to all nine Mini Program pages and data behaviors, retained single-user v1, and recorded future shared-list constraints without enabling collaboration; added the parity map and IOS-3 acceptance cases. | User requested eventual full page/data reproduction, Logo use and future multi-person extensibility, then approved the iteration plan. | T6, T6.1–T6.4 |
@@ -133,6 +136,8 @@ Build the meal-logging product, with the current release direction as the native
 | 2026-11-13 | Added menu/cup settings to versioned backup restore, MapKit selection and manual address fallback to drink/meal forms, map display in details, and Home title/search/summary-card refinements; 54 core tests pass and the latest iPhone 18 Pro simulator screenshot was reviewed. | Continued the approved page-parity iteration while keeping physical-device, iCloud-delivery, and remaining page gates distinct. | T6.1–T6.3 |
 | 2026-11-15 | Suppressed duplicate snapshots; added retention preview/confirmation, 7-day grace, and cleanup for unreferenced backup images. | User approved reducing redundant snapshot growth while preserving a review step and recovery history. | T6.2, T6.4 |
 | 2026-11-16 | Fixed backup snapshot result typing, SwiftUI snapshot summary type-check complexity, and byte-count formatter usage; Swift package and iOS Simulator builds pass. | User reported compile errors after backup retention implementation. | T6.2, T6.4 |
+| 2026-11-16 | Added a no-AI brand import wizard with editable web-extracted menu candidates and Logo cropping, plus phone catalog export and a preview-first project importer for brands, drinks, and Logo assets. The simulator build, JavaScript syntax checks, and diff whitespace check pass; device interaction and a real phone export/import remain unverified. | The user asked for an add-brand flow and a way to bring phone-maintained catalog data back into the project, then asked whether web research can work without AI. | T1, T6.3 |
+| 2026-11-16 | Added idempotent migration from old local/restored brands to unique packaged name/alias matches; merged duplicate menus, preserved historical drink IDs, applied user-logo/package-logo precedence, and made the phone importer use the same identity rule. Swift core 65/65, targeted Node 10/10, and iOS 27.2 Simulator Debug build pass; full `npm test` still reports six domain/Mini Program failures outside this change, and real phone data/device acceptance remains open. | User approved name-based brand/menu merging with user-custom logos preferred and packaged logos used when local logos are empty. | T1, T6.2, T6.3 |
 | 2026-10-14 | Created initial task tree for the catalog expansion and update work. | User approved the catalog foundation and three-city verification approach. | T1–T3 |
 | 2026-10-15 | Corrected platform source references and recorded the Taobao Flash Sale page-access blocker. | User clarified that current research must use Taobao Flash Sale. | T2 |
 | 2026-10-15 | Added 15 brands and public menu reference products with source links; all stay pending. | User requested public online menu research after direct Taobao access was unavailable. | T2 |
@@ -164,7 +169,7 @@ Build the meal-logging product, with the current release direction as the native
 
 ## 8. Detail Pointers
 - Format: v1 single-file
-- iOS plan: docs/ios-development-plan.md
+- iOS plan: docs/ios-development-plan.md；今日页性能修复与验收（T6.3/T6.4）：`docs/ios-today-performance-plan.md`
 - History: recent changes retained here
 
 ## 9. Current Round

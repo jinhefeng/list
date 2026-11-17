@@ -1,4 +1,5 @@
 import CryptoKit
+import Charts
 import SwiftData
 import SwiftUI
 import UIKit
@@ -11,8 +12,68 @@ private struct TimelineItem: Identifiable {
     var id: UUID { record.id }
 }
 
+@MainActor
+private final class TodayRecordCache {
+    private var libraryGeneration: Int?
+    private var recordIDs: [String] = []
+    private var cachedItems: [TimelineItem] = []
+
+    func items(
+        for storedRecords: [StoredJournalRecord],
+        libraryGeneration: Int,
+        decode: () -> [TimelineItem]
+    ) -> [TimelineItem] {
+        let currentIDs = storedRecords.map(\.recordID)
+        guard self.libraryGeneration != libraryGeneration || recordIDs != currentIDs else {
+            return cachedItems
+        }
+
+        self.libraryGeneration = libraryGeneration
+        recordIDs = currentIDs
+        cachedItems = decode()
+        return cachedItems
+    }
+}
+
+@MainActor
 private enum JournalBrandLogoCatalog {
-    static func loadBrands() -> [String: MenuBrand] {
+    private static var cachedGeneration: Int?
+    private static var cachedBrands: [String: MenuBrand] = [:]
+    private static var loadingGeneration: Int?
+    private static var loadingTask: Task<[String: MenuBrand], Never>?
+
+    static func loadBrands() async -> [String: MenuBrand] {
+        let generation = UserDefaults.standard.integer(forKey: MenuCatalogRepository.changeGenerationKey)
+        if generation == cachedGeneration {
+            return cachedBrands
+        }
+
+        let task: Task<[String: MenuBrand], Never>
+        if loadingGeneration == generation, let loadingTask {
+            task = loadingTask
+        } else {
+            task = Task.detached(priority: .utility) {
+                Self.readBrands()
+            }
+            loadingGeneration = generation
+            loadingTask = task
+        }
+
+        let brands = await task.value
+        guard !Task.isCancelled else { return cachedBrands }
+        guard generation == UserDefaults.standard.integer(forKey: MenuCatalogRepository.changeGenerationKey) else {
+            return await loadBrands()
+        }
+        cachedGeneration = generation
+        cachedBrands = brands
+        if loadingGeneration == generation {
+            loadingGeneration = nil
+            loadingTask = nil
+        }
+        return brands
+    }
+
+    nonisolated private static func readBrands() -> [String: MenuBrand] {
         guard let url = Bundle.main.url(forResource: "catalog", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let bundledCatalog = try? MenuCatalog.decode(data) else {
@@ -33,10 +94,12 @@ struct GanfanMainTabView: View {
     }
 
     @State private var selectedTab: Tab = .today
+    @State private var today = Date.now
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            JournalHomeView()
+            JournalHomeView(today: today)
                 .tabItem { Label("今日", systemImage: "house.fill") }
                 .tag(Tab.today)
 
@@ -61,6 +124,29 @@ struct GanfanMainTabView: View {
         .tint(GanfanPalette.forest)
         .toolbarBackground(GanfanPalette.card, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
+        .task {
+            while !Task.isCancelled {
+                let calendar = Calendar.current
+                let startOfToday = calendar.startOfDay(for: .now)
+                guard let nextDay = calendar.date(byAdding: .day, value: 1, to: startOfToday) else { return }
+                do {
+                    try await Task.sleep(for: .seconds(max(1, nextDay.timeIntervalSinceNow)))
+                } catch {
+                    return
+                }
+                today = .now
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            today = .now
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            today = .now
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in
+            today = .now
+        }
     }
 }
 
@@ -71,54 +157,54 @@ struct JournalHomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(BackupChangeTracker.pendingKey) private var hasPendingLibraryChanges = false
     @AppStorage(BackupChangeTracker.generationKey) private var libraryChangeGeneration = 0
+    @AppStorage(MenuCatalogRepository.changeGenerationKey) private var catalogChangeGeneration = 0
     @Query(sort: \StoredJournalRecord.consumedAt, order: .reverse)
     private var storedRecords: [StoredJournalRecord]
+    @Query private var todayStoredRecords: [StoredJournalRecord]
 
     @StateObject private var backupWorkflow = BackupWorkflowModel.shared
     @State private var isCreatingDrink = false
     @State private var isCreatingMeal = false
     @State private var successfulSaveCount = 0
     @State private var brandCatalog: [String: MenuBrand] = [:]
+    @State private var todayRecordCache = TodayRecordCache()
 
-    private var timelineItems: [TimelineItem] {
-        let items = storedRecords.compactMap { storedRecord -> TimelineItem? in
-            guard let record = try? storedRecord.decodeRecord() else { return nil }
-            return TimelineItem(storedRecord: storedRecord, record: record)
+    private let today: Date
+
+    init(today: Date) {
+        self.today = today
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: today)
+        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
+        let predicate = #Predicate<StoredJournalRecord> { record in
+            record.consumedAt >= start && record.consumedAt < end
         }
-
-        return items.sorted(by: JournalRecordListFormatting.precedes)
+        _todayStoredRecords = Query(
+            filter: predicate,
+            sort: [
+                SortDescriptor(\.consumedAt, order: .forward),
+                SortDescriptor(\.recordID, order: .forward)
+            ]
+        )
     }
 
     private var todayItems: [TimelineItem] {
-        timelineItems.filter { Calendar.current.isDateInToday($0.record.consumedAt) }
+        todayRecordCache.items(
+            for: todayStoredRecords,
+            libraryGeneration: libraryChangeGeneration,
+            decode: decodeTodayItems
+        )
     }
 
-    private func mergeLegacyMicroSweetness() {
-        var replacements: [(StoredJournalRecord, DrinkRecord)] = []
-        for storedRecord in storedRecords {
-            guard let record = try? storedRecord.decodeRecord(),
-                  case .drink(let drink) = record,
-                  drink.sweetness == "微糖",
-                  let migratedDrink = try? drink.replacingSweetness("三分糖") else {
-                continue
-            }
-            replacements.append((storedRecord, migratedDrink))
-        }
-        guard !replacements.isEmpty else { return }
-
-        do {
-            for (storedRecord, drink) in replacements {
-                try storedRecord.replace(with: .drink(drink))
-            }
-            try modelContext.save()
-            BackupChangeTracker().markChanged()
-        } catch {
-            modelContext.rollback()
+    private func decodeTodayItems() -> [TimelineItem] {
+        todayStoredRecords.compactMap { storedRecord -> TimelineItem? in
+            guard let record = try? storedRecord.decodeRecord() else { return nil }
+            return TimelineItem(storedRecord: storedRecord, record: record)
         }
     }
 
     private var unreadableRecordCount: Int {
-        storedRecords.count - timelineItems.count
+        todayStoredRecords.count - todayItems.count
     }
 
     private var pendingBackupCount: Int {
@@ -126,7 +212,14 @@ struct JournalHomeView: View {
     }
 
     private var dailyNutritionSummary: DailyNutritionSummary {
-        .summarize(timelineItems.map(\.record), on: .now)
+        .summarize(todayItems.map(\.record), on: today)
+    }
+
+    private var todayMealNutritionSummary: MealNutritionSummary {
+        MealNutritionSummary(meals: todayItems.compactMap { item in
+            guard case .meal(let meal) = item.record else { return nil }
+            return meal
+        })
     }
 
     var body: some View {
@@ -150,13 +243,13 @@ struct JournalHomeView: View {
             .tint(GanfanPalette.forest)
             .background(GanfanPalette.canvas.ignoresSafeArea())
             .task {
-                brandCatalog = JournalBrandLogoCatalog.loadBrands()
-                mergeLegacyMicroSweetness()
                 backupWorkflow.restoreSavedFolderAccess()
                 backupWorkflow.backupIfNeeded(storedRecords: storedRecords, context: modelContext)
             }
+            .task(id: catalogChangeGeneration) {
+                brandCatalog = await JournalBrandLogoCatalog.loadBrands()
+            }
             .onChange(of: libraryChangeGeneration) { _, _ in
-                brandCatalog = JournalBrandLogoCatalog.loadBrands()
                 backupWorkflow.backupIfNeeded(storedRecords: storedRecords, context: modelContext)
             }
             .onChange(of: scenePhase) { _, phase in
@@ -181,7 +274,10 @@ struct JournalHomeView: View {
     private var todayIntro: some View {
         VStack(alignment: .leading, spacing: GanfanSpacing.mediumSmall) {
             todayHeader
-            TodayDrinkNutritionSummary(summary: dailyNutritionSummary)
+            TodayNutritionSummary(
+                drinkSummary: dailyNutritionSummary,
+                mealSummary: todayMealNutritionSummary
+            )
         }
     }
 
@@ -255,13 +351,13 @@ struct JournalHomeView: View {
     }
 
     private var captureDrinkButton: some View {
-        HomeCaptureButton(title: "记饮品", symbol: "cup.and.saucer.fill", isPrimary: true) {
+        HomeCaptureButton(title: "喝一杯", symbol: "cup.and.saucer.fill", isPrimary: true) {
             isCreatingDrink = true
         }
     }
 
     private var captureMealButton: some View {
-        HomeCaptureButton(title: "记用餐", symbol: "fork.knife", isPrimary: false) {
+        HomeCaptureButton(title: "吃一顿", symbol: "fork.knife", isPrimary: false) {
             isCreatingMeal = true
         }
     }
@@ -282,7 +378,7 @@ struct JournalHomeView: View {
     private var unreadableRecordsNotice: some View {
         if unreadableRecordCount > 0 {
             Label(
-                "有 \(unreadableRecordCount) 条记录无法读取；原始数据仍保留在资料库中。",
+                "今日有 \(unreadableRecordCount) 条记录无法读取；原始数据仍保留在资料库中。",
                 systemImage: "exclamationmark.triangle"
             )
             .font(.footnote)
@@ -291,8 +387,9 @@ struct JournalHomeView: View {
     }
 
     private var todayRecordResults: some View {
-        Group {
-            if todayItems.isEmpty {
+        let items = todayItems
+        return Group {
+            if items.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("今天还没有记录")
                         .font(.headline)
@@ -304,8 +401,8 @@ struct JournalHomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 12)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(todayItems.enumerated()), id: \.element.id) { entry in
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { entry in
                         JournalRecordCardRow(
                             item: entry.element,
                             style: .today,
@@ -317,7 +414,7 @@ struct JournalHomeView: View {
                                 removal: .opacity
                             ))
 
-                        if entry.offset < todayItems.count - 1 {
+                        if entry.offset < items.count - 1 {
                             Rectangle()
                                 .fill(Color(uiColor: .separator).opacity(0.55))
                                 .frame(height: 0.5)
@@ -327,7 +424,7 @@ struct JournalHomeView: View {
                 }
             }
         }
-        .animation(recordListAnimation, value: todayItems.map(\.id))
+        .animation(recordListAnimation, value: items.map(\.id))
     }
 
     private var recordListAnimation: Animation? {
@@ -439,6 +536,56 @@ private struct JournalNutritionMetric: Identifiable {
     let value: String
 
     var id: String { label }
+}
+
+private struct MealNutritionSummary {
+    struct Total {
+        let value: Double?
+        let knownDishCount: Int
+        let totalDishCount: Int
+        let isApproximate: Bool
+    }
+
+    let mealCount: Int
+    let energyKcal: Total
+    let proteinGrams: Total
+    let fatGrams: Total
+
+    init(meals: [MealRecord]) {
+        let dishes = meals.flatMap(\.dishes)
+        let snapshots = dishes.map { dish in
+            dish.nutrition ?? RoughNutritionEstimator.dish(name: dish.name)
+        }
+
+        mealCount = meals.count
+        energyKcal = Self.total(snapshots, keyPath: \.energyKcal, sourceKey: "energyKcal")
+        proteinGrams = Self.total(snapshots, keyPath: \.proteinGrams, sourceKey: "proteinGrams")
+        fatGrams = Self.total(snapshots, keyPath: \.fatGrams, sourceKey: "fatGrams")
+    }
+
+    private static func total(
+        _ snapshots: [NutritionSnapshot],
+        keyPath: KeyPath<NutritionSnapshot, Double?>,
+        sourceKey: String
+    ) -> Total {
+        var values: [Double] = []
+        var isApproximate = false
+        for snapshot in snapshots {
+            guard let value = snapshot[keyPath: keyPath], value.isFinite, value >= 0 else { continue }
+            values.append(value)
+            if snapshot.confidence == .estimated || snapshot.confidence == .rough
+                || snapshot.metricSources[sourceKey] == "rough" {
+                isApproximate = true
+            }
+        }
+
+        return Total(
+            value: values.isEmpty ? nil : values.reduce(0, +),
+            knownDishCount: values.count,
+            totalDishCount: snapshots.count,
+            isApproximate: isApproximate
+        )
+    }
 }
 
 private struct JournalRecordCardRow: View {
@@ -665,6 +812,12 @@ private struct JournalRecordCardRow: View {
                 }
             }
 
+            let nutrition = MealNutritionSummary(meals: [meal])
+            let metrics = Self.mealNutritionMetrics(nutrition)
+            if !metrics.isEmpty {
+                nutritionSummary(metrics)
+            }
+
             let dishNames = meal.dishes.map(\.name).filter { !$0.isEmpty }.joined(separator: "、")
             if !dishNames.isEmpty {
                 Text(dishNames)
@@ -760,6 +913,30 @@ private struct JournalRecordCardRow: View {
             ))
         }
         return metrics
+    }
+
+    private static func mealNutritionMetrics(_ summary: MealNutritionSummary) -> [JournalNutritionMetric] {
+        [
+            mealMetric(summary.energyKcal, symbol: "flame.fill", label: "能量", unit: "kcal", roughStep: 10),
+            mealMetric(summary.proteinGrams, symbol: "p.circle.fill", label: "蛋白质", unit: "g", roughStep: 1),
+            mealMetric(summary.fatGrams, symbol: "drop.fill", label: "脂肪", unit: "g", roughStep: 1)
+        ].compactMap { $0 }
+    }
+
+    private static func mealMetric(
+        _ total: MealNutritionSummary.Total,
+        symbol: String,
+        label: String,
+        unit: String,
+        roughStep: Double
+    ) -> JournalNutritionMetric? {
+        guard let value = total.value else { return nil }
+        let step = total.isApproximate ? roughStep : 0.1
+        return JournalNutritionMetric(
+            symbol: symbol,
+            label: label,
+            value: "\(compactNumber(rounded(value, to: step))) \(unit)"
+        )
     }
 
     private static func rounded(_ value: Double, to step: Double) -> Double {
@@ -999,14 +1176,24 @@ private enum HomeBackupNotice {
 
 private struct DrinkNutritionMetric: Identifiable {
     let title: String
+    let symbol: String
     let value: Double?
     let unit: String
+    var isApproximate = false
+    var roundingStep: Double? = nil
 
     var id: String { title }
 
     var formattedValue: String {
         guard let value, value.isFinite, value >= 0 else { return "—" }
-        return value.formatted(.number.precision(.fractionLength(0...1)))
+        let roundedValue: Double
+        if let roundingStep, roundingStep > 0 {
+            roundedValue = (value / roundingStep).rounded(.toNearestOrAwayFromZero) * roundingStep
+        } else {
+            roundedValue = value
+        }
+        let formatted = roundedValue.formatted(.number.precision(.fractionLength(0...1)))
+        return isApproximate ? "约 \(formatted)" : formatted
     }
 
     var spokenValue: String {
@@ -1015,47 +1202,121 @@ private struct DrinkNutritionMetric: Identifiable {
     }
 }
 
-private struct TodayDrinkNutritionSummary: View {
-    let summary: DailyNutritionSummary
+private struct TodayNutritionSummary: View {
+    let drinkSummary: DailyNutritionSummary
+    let mealSummary: MealNutritionSummary
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    private var shouldRoundCombinedEnergy: Bool {
+        drinkSummary.energyKcal.confidence == .estimated || drinkSummary.energyKcal.confidence == .rough
+            || mealSummary.energyKcal.isApproximate
+    }
+
+    private var combinedEnergy: Double? {
+        let values = [drinkSummary.energyKcal.value, mealSummary.energyKcal.value].compactMap { $0 }
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +)
+    }
+
+    private var combinedEnergyMetric: DrinkNutritionMetric {
+        DrinkNutritionMetric(
+            title: "总能量",
+            symbol: "flame.fill",
+            value: combinedEnergy,
+            unit: "kcal",
+            isApproximate: true,
+            roundingStep: shouldRoundCombinedEnergy ? 10 : nil
+        )
+    }
+
     private var metrics: [DrinkNutritionMetric] {
         [
-            DrinkNutritionMetric(title: "能量", value: summary.energyKcal.value, unit: "kcal"),
-            DrinkNutritionMetric(title: "糖", value: summary.sugarGrams.value, unit: "g"),
-            DrinkNutritionMetric(title: "咖啡因", value: summary.caffeineMilligrams.value, unit: "mg")
+            combinedMetric(
+                title: "蛋白质",
+                symbol: "p.circle.fill",
+                drinkValue: drinkSummary.proteinGrams.value,
+                mealValue: mealSummary.proteinGrams.value,
+                unit: "g"
+            ),
+            combinedMetric(
+                title: "脂肪",
+                symbol: "drop.fill",
+                drinkValue: drinkSummary.fatGrams.value,
+                mealValue: mealSummary.fatGrams.value,
+                unit: "g"
+            ),
+            DrinkNutritionMetric(
+                title: "糖",
+                symbol: "cube.fill",
+                value: drinkSummary.sugarGrams.value,
+                unit: "g"
+            ),
+            DrinkNutritionMetric(
+                title: "咖啡因",
+                symbol: "cup.and.saucer.fill",
+                value: drinkSummary.caffeineMilligrams.value,
+                unit: "mg"
+            )
         ]
+    }
+
+    private func combinedMetric(
+        title: String,
+        symbol: String,
+        drinkValue: Double?,
+        mealValue: Double?,
+        unit: String
+    ) -> DrinkNutritionMetric {
+        let values = [drinkValue, mealValue].compactMap { $0 }
+        return DrinkNutritionMetric(
+            title: title,
+            symbol: symbol,
+            value: values.isEmpty ? nil : values.reduce(0, +),
+            unit: unit
+        )
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: GanfanSpacing.mediumSmall) {
             HStack {
-                Label("今日饮品", systemImage: "cup.and.saucer.fill")
+                Label("今日摄入", systemImage: "fork.knife")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(GanfanPalette.forest)
                 Spacer(minLength: 8)
-                Text("\(summary.drinkCount) 杯")
+                Text("\(drinkSummary.drinkCount) 杯 · \(mealSummary.mealCount) 餐")
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .foregroundStyle(GanfanPalette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
 
-            if summary.drinkCount == 0 {
-                Text("记录饮品后显示摄入汇总")
+            if drinkSummary.drinkCount == 0 && mealSummary.mealCount == 0 {
+                Text("记录饮品或用餐后显示摄入汇总")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: GanfanSpacing.small) {
+                VStack(alignment: .leading, spacing: GanfanSpacing.mediumSmall) {
+                    energySummary(accessibilityLayout: true)
                     ForEach(metrics) { metric in
                         metricRow(metric)
                     }
                 }
             } else {
-                HStack(alignment: .top, spacing: GanfanSpacing.small) {
-                    ForEach(metrics) { metric in
-                        metricColumn(metric)
+                VStack(alignment: .leading, spacing: GanfanSpacing.mediumSmall) {
+                    energySummary(accessibilityLayout: false)
+                    HStack(alignment: .top, spacing: GanfanSpacing.small) {
+                        ForEach(metrics) { metric in
+                            compactMetricColumn(metric)
+                        }
                     }
                 }
+            }
+
+            if hasIncompleteNutritionData {
+                Text("部分营养项暂无数据，合计仅包含已有值")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(12)
@@ -1067,12 +1328,87 @@ private struct TodayDrinkNutritionSummary: View {
         .accessibilityElement(children: .contain)
     }
 
+    private var hasIncompleteNutritionData: Bool {
+        drinkSummary.energyKcal.knownRecordCount < drinkSummary.drinkCount
+            || mealSummary.energyKcal.knownDishCount < mealSummary.energyKcal.totalDishCount
+            || drinkSummary.proteinGrams.knownRecordCount < drinkSummary.drinkCount
+            || mealSummary.proteinGrams.knownDishCount < mealSummary.proteinGrams.totalDishCount
+            || drinkSummary.fatGrams.knownRecordCount < drinkSummary.drinkCount
+            || mealSummary.fatGrams.knownDishCount < mealSummary.fatGrams.totalDishCount
+            || drinkSummary.sugarGrams.knownRecordCount < drinkSummary.drinkCount
+            || drinkSummary.caffeineMilligrams.knownRecordCount < drinkSummary.drinkCount
+    }
+
+    private func energySummary(accessibilityLayout: Bool) -> some View {
+        let drinkValue = componentValue(
+            drinkSummary.energyKcal.value,
+            shouldRound: drinkSummary.energyKcal.confidence == .estimated || drinkSummary.energyKcal.confidence == .rough
+        )
+        let mealValue = componentValue(
+            mealSummary.energyKcal.value,
+            shouldRound: mealSummary.energyKcal.isApproximate
+        )
+
+        return Group {
+            if accessibilityLayout {
+                VStack(alignment: .leading, spacing: 4) {
+                    metricColumn(combinedEnergyMetric)
+                    Text("饮品 \(drinkValue) · 用餐 \(mealValue)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("总能量，\(combinedEnergyMetric.spokenValue)，饮品 \(drinkValue)，用餐 \(mealValue)")
+            } else {
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        metricLabel(
+                            combinedEnergyMetric,
+                            textFont: .caption,
+                            iconFont: .caption2.weight(.semibold)
+                        )
+                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                            Text(combinedEnergyMetric.formattedValue)
+                                .font(.title3.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(GanfanPalette.ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                            Text(combinedEnergyMetric.unit)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(combinedEnergyMetric.title)，\(combinedEnergyMetric.spokenValue)")
+                    Spacer(minLength: 12)
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text("饮品 \(drinkValue)")
+                        Text("用餐 \(mealValue)")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    private func componentValue(_ value: Double?, shouldRound: Bool) -> String {
+        guard let value, value.isFinite, value >= 0 else { return "— kcal" }
+        let roundedValue = shouldRound
+            ? (value / 10).rounded(.toNearestOrAwayFromZero) * 10
+            : value
+        let formatted = roundedValue.formatted(.number.precision(.fractionLength(0...1)))
+        return "\(formatted) kcal"
+    }
+
     private func metricColumn(_ metric: DrinkNutritionMetric) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(metric.title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            metricLabel(metric, textFont: .caption, iconFont: .caption2.weight(.semibold))
 
             metricAmount(metric, font: .title3.weight(.semibold))
         }
@@ -1081,9 +1417,45 @@ private struct TodayDrinkNutritionSummary: View {
         .accessibilityLabel("\(metric.title)，\(metric.spokenValue)")
     }
 
+    private func compactMetricColumn(_ metric: DrinkNutritionMetric) -> some View {
+        HStack(alignment: .top, spacing: 4) {
+            Image(systemName: metric.symbol)
+                .font(.system(size: 9, weight: .semibold))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(metric.title)
+                    .font(.caption2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                metricAmount(metric, font: .footnote.weight(.semibold))
+            }
+        }
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(metric.title)，\(metric.spokenValue)")
+    }
+
+    private func metricLabel(
+        _ metric: DrinkNutritionMetric,
+        textFont: Font,
+        iconFont: Font
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Image(systemName: metric.symbol)
+                .font(iconFont)
+            Text(metric.title)
+                .font(textFont)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .foregroundStyle(.secondary)
+    }
+
     private func metricRow(_ metric: DrinkNutritionMetric) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(metric.title)
+            Label(metric.title, systemImage: metric.symbol)
                 .font(.body)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 12)
@@ -1186,7 +1558,7 @@ private struct NutritionMetricColumn: View {
 }
 
 private struct HistoryView: View {
-    @AppStorage(BackupChangeTracker.generationKey) private var libraryChangeGeneration = 0
+    @AppStorage(MenuCatalogRepository.changeGenerationKey) private var catalogChangeGeneration = 0
     @Query(sort: \StoredJournalRecord.consumedAt, order: .reverse)
     private var storedRecords: [StoredJournalRecord]
     @State private var startDate = Calendar.current.date(byAdding: .day, value: -29, to: .now) ?? .now
@@ -1290,9 +1662,8 @@ private struct HistoryView: View {
         }
         .listSectionSpacing(.compact)
         .scrollContentBackground(.hidden)
-        .task { brandCatalog = JournalBrandLogoCatalog.loadBrands() }
-        .onChange(of: libraryChangeGeneration) { _, _ in
-            brandCatalog = JournalBrandLogoCatalog.loadBrands()
+        .task(id: catalogChangeGeneration) {
+            brandCatalog = await JournalBrandLogoCatalog.loadBrands()
         }
         .background(GanfanPalette.canvas)
         .tint(GanfanPalette.forest)
@@ -1414,100 +1785,540 @@ private struct HistoryFiltersView: View {
     }
 }
 
+private enum IntakeTrendRange: Int, CaseIterable, Identifiable, Hashable {
+    case week = 7
+    case month = 30
+    case quarter = 90
+
+    var id: Int { rawValue }
+    var title: String { "近 \(rawValue) 天" }
+    var axisStride: Int {
+        switch self {
+        case .week: 1
+        case .month: 7
+        case .quarter: 14
+        }
+    }
+}
+
+private enum IntakeTrendMetric: String, CaseIterable, Identifiable, Hashable {
+    case energy
+    case caffeine
+    case sugar
+    case fat
+    case protein
+    case carbohydrate
+    case drinkVolume
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .energy: "热量"
+        case .protein: "蛋白质"
+        case .fat: "脂肪"
+        case .carbohydrate: "碳水化合物"
+        case .sugar: "糖"
+        case .drinkVolume: "水分（饮品）"
+        case .caffeine: "咖啡因"
+        }
+    }
+
+    var unit: String {
+        switch self {
+        case .energy: "kcal / 天"
+        case .protein, .fat, .carbohydrate, .sugar: "g / 天"
+        case .drinkVolume: "ml / 天"
+        case .caffeine: "mg / 天"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .energy: "flame.fill"
+        case .protein: "figure.strengthtraining.traditional"
+        case .fat: "drop.fill"
+        case .carbohydrate: "leaf.fill"
+        case .sugar: "cube.fill"
+        case .drinkVolume: "waterbottle.fill"
+        case .caffeine: "cup.and.saucer.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .energy: Color(uiColor: .systemOrange)
+        case .protein: GanfanPalette.forest
+        case .fat: Color(uiColor: .systemPurple)
+        case .carbohydrate: Color(uiColor: .systemBlue)
+        case .sugar: Color(uiColor: .systemPink)
+        case .drinkVolume: Color(uiColor: .systemTeal)
+        case .caffeine: Color(uiColor: .systemBrown)
+        }
+    }
+
+    var isDrinkOnly: Bool { self == .drinkVolume || self == .caffeine }
+
+    var nutritionSourceKey: String? {
+        switch self {
+        case .energy: "energyKcal"
+        case .protein: "proteinGrams"
+        case .fat: "fatGrams"
+        case .carbohydrate: "carbohydrateGrams"
+        case .sugar: "sugarGrams"
+        case .drinkVolume: nil
+        case .caffeine: "caffeineMilligrams"
+        }
+    }
+
+    func value(in nutrition: NutritionSnapshot) -> Double? {
+        switch self {
+        case .energy: nutrition.energyKcal
+        case .protein: nutrition.proteinGrams
+        case .fat: nutrition.fatGrams
+        case .carbohydrate: nutrition.carbohydrateGrams
+        case .sugar: nutrition.sugarGrams
+        case .drinkVolume: nil
+        case .caffeine: nutrition.caffeineMilligrams
+        }
+    }
+
+    func formatted(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(0)))
+    }
+
+    func axisLabel(_ value: Double) -> String {
+        guard abs(value) >= 1_000 else { return formatted(value) }
+        let compact = (value / 1_000).formatted(.number.precision(.fractionLength(0...1)))
+        return "\(compact)k"
+    }
+}
+
+private struct IntakeMetricValue {
+    let value: Double?
+    let knownCount: Int
+    let totalCount: Int
+    let containsEstimate: Bool
+
+    static let empty = IntakeMetricValue(value: nil, knownCount: 0, totalCount: 0, containsEstimate: false)
+}
+
+private struct IntakeMetricAccumulator {
+    private(set) var sum = 0.0
+    private(set) var knownCount = 0
+    private(set) var totalCount = 0
+    private(set) var containsEstimate = false
+
+    mutating func add(_ value: Double?, isEstimated: Bool) {
+        totalCount += 1
+        guard let value, value.isFinite, value >= 0 else { return }
+        sum += value
+        knownCount += 1
+        containsEstimate = containsEstimate || isEstimated
+    }
+
+    var total: IntakeMetricValue {
+        IntakeMetricValue(
+            value: knownCount == 0 ? nil : sum,
+            knownCount: knownCount,
+            totalCount: totalCount,
+            containsEstimate: containsEstimate
+        )
+    }
+}
+
+private struct IntakeDailySummary: Identifiable {
+    let date: Date
+    let recordCount: Int
+    let drinkCount: Int
+    let metrics: [IntakeTrendMetric: IntakeMetricValue]
+
+    var id: Date { date }
+
+    func value(for metric: IntakeTrendMetric) -> IntakeMetricValue {
+        metrics[metric] ?? .empty
+    }
+}
+
+private struct IntakeDailyAccumulator {
+    private(set) var recordCount = 0
+    private(set) var drinkCount = 0
+    private var metrics = Dictionary(
+        uniqueKeysWithValues: IntakeTrendMetric.allCases.map { ($0, IntakeMetricAccumulator()) }
+    )
+
+    mutating func add(_ drink: DrinkRecord) {
+        recordCount += 1
+        drinkCount += 1
+        let snapshot = drink.nutrition
+        for metric in [IntakeTrendMetric.energy, .protein, .fat, .carbohydrate, .sugar, .caffeine] {
+            let value = snapshot.flatMap { metric.value(in: $0) }
+            metrics[metric, default: IntakeMetricAccumulator()].add(
+                value,
+                isEstimated: Self.isEstimated(snapshot, metric: metric)
+            )
+        }
+        metrics[.drinkVolume, default: IntakeMetricAccumulator()].add(
+            drink.sizeML.map(Double.init),
+            isEstimated: false
+        )
+    }
+
+    mutating func add(_ meal: MealRecord) {
+        recordCount += 1
+        for dish in meal.dishes {
+            let isFallbackEstimate = dish.nutrition == nil
+            let snapshot = dish.nutrition ?? RoughNutritionEstimator.dish(name: dish.name)
+            for metric in [.energy, .protein, .fat, .carbohydrate, .sugar] as [IntakeTrendMetric] {
+                metrics[metric, default: IntakeMetricAccumulator()].add(
+                    metric.value(in: snapshot),
+                    isEstimated: isFallbackEstimate || Self.isEstimated(snapshot, metric: metric)
+                )
+            }
+        }
+    }
+
+    func summary(on date: Date) -> IntakeDailySummary {
+        IntakeDailySummary(
+            date: date,
+            recordCount: recordCount,
+            drinkCount: drinkCount,
+            metrics: metrics.mapValues { $0.total }
+        )
+    }
+
+    private static func isEstimated(_ snapshot: NutritionSnapshot?, metric: IntakeTrendMetric) -> Bool {
+        guard let snapshot else { return false }
+        if snapshot.confidence != .official { return true }
+        guard let sourceKey = metric.nutritionSourceKey else { return false }
+        guard let source = snapshot.metricSources[sourceKey] else { return false }
+        return ["rough", "estimated"].contains(source)
+    }
+}
+
+private struct IntakeTrendPoint: Identifiable {
+    let date: Date
+    let value: Double?
+    let knownCount: Int
+    let totalCount: Int
+    let containsEstimate: Bool
+    let recordCount: Int
+    let drinkCount: Int
+    let segment: Int
+
+    var id: Date { date }
+}
+
+private struct IntakeDailyAverageCard: View {
+    let metric: IntakeTrendMetric
+    let days: [IntakeDailySummary]
+
+    private var title: String {
+        switch metric {
+        case .energy: "日均热量"
+        case .protein: "日均蛋白质"
+        case .caffeine: "日均咖啡因"
+        default: "日均\(metric.title)"
+        }
+    }
+
+    private var unitLabel: String {
+        switch metric {
+        case .energy: "kcal"
+        case .caffeine: "mg"
+        default: "g"
+        }
+    }
+
+    private var dailyValues: [IntakeMetricValue] {
+        days.map { $0.value(for: metric) }.filter { $0.value != nil }
+    }
+
+    private var average: Double? {
+        let values = dailyValues.compactMap(\.value)
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
+
+    private var hasPartialData: Bool {
+        dailyValues.contains { $0.knownCount < $0.totalCount }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: metric.symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(metric.tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(average.map { dailyValues.contains(where: \.containsEstimate) ? "约 \(metric.formatted($0))" : metric.formatted($0) } ?? "—")
+                    .font(.title2.weight(.bold).monospacedDigit())
+                    .foregroundStyle(GanfanPalette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(unitLabel)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(metric.isDrinkOnly ? "饮品" : "用餐 + 饮品") · \(dailyValues.count)/\(days.count) 天有值")
+                if hasPartialData {
+                    Text("部分日期数据不全")
+                }
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: GanfanShape.surface, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct IntakeTrendCard: View {
+    let metric: IntakeTrendMetric
+    let points: [IntakeTrendPoint]
+    let range: IntakeTrendRange
+    @Binding var selectedDate: Date
+    @State private var chartSelection: Date?
+
+    private var selectedPoint: IntakeTrendPoint? {
+        return points.first { Calendar.current.isDate($0.date, inSameDayAs: selectedDate) }
+    }
+
+    private var selectedDateLabel: String {
+        (selectedPoint?.date ?? selectedDate)
+            .formatted(.dateTime.month(.abbreviated).day().weekday(.abbreviated))
+    }
+
+    private var selectedValueLabel: String {
+        guard let selectedPoint else { return "暂无数据" }
+        guard let value = selectedPoint.value else {
+            if selectedPoint.recordCount == 0 { return "暂无记录" }
+            if metric.isDrinkOnly && selectedPoint.drinkCount == 0 { return "暂无饮品记录" }
+            return metric == .drinkVolume ? "容量未记录" : "暂无营养数据"
+        }
+        return "\(selectedPoint.containsEstimate ? "约 " : "")\(metric.formatted(value)) \(unitShortLabel)"
+    }
+
+    private var unitShortLabel: String {
+        switch metric {
+        case .energy: "kcal"
+        case .protein, .fat, .carbohydrate, .sugar: "g"
+        case .drinkVolume: "ml"
+        case .caffeine: "mg"
+        }
+    }
+
+    private var selectedDataNote: String {
+        guard let selectedPoint else { return "选择某一天查看数据" }
+        guard selectedPoint.value != nil else {
+            return selectedPoint.recordCount == 0 ? "这一天没有记录" : "缺失数据不会按 0 计入"
+        }
+        if selectedPoint.knownCount < selectedPoint.totalCount {
+            return "部分数据 · \(selectedPoint.knownCount)/\(selectedPoint.totalCount) 项有值"
+        }
+        return selectedPoint.containsEstimate ? "包含估算值" : "当日合计"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: metric.symbol)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(metric.tint)
+                Text(metric.title)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(GanfanPalette.ink)
+                Spacer(minLength: 4)
+                Text(metric.isDrinkOnly ? "饮品" : "用餐 + 饮品")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(GanfanPalette.canvas, in: Capsule())
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(selectedValueLabel)
+                    .font(.title3.weight(.bold).monospacedDigit())
+                    .foregroundStyle(GanfanPalette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Spacer(minLength: 4)
+                Text(selectedDateLabel)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Chart {
+                ForEach(points.filter { $0.value != nil }) { point in
+                    LineMark(
+                        x: .value("日期", point.date),
+                        y: .value(metric.title, point.value ?? 0),
+                        series: .value("连续数据段", point.segment)
+                    )
+                    .interpolationMethod(.linear)
+                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                    .foregroundStyle(metric.tint)
+
+                    PointMark(
+                        x: .value("日期", point.date),
+                        y: .value(metric.title, point.value ?? 0)
+                    )
+                    .symbolSize(selectedPoint?.date == point.date ? 64 : 30)
+                    .foregroundStyle(metric.tint)
+                }
+
+                RuleMark(x: .value("所选日期", selectedDate))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    .foregroundStyle(Color.secondary.opacity(0.45))
+            }
+            .chartXScale(domain: (points.first?.date ?? .now)...(points.last?.date ?? .now))
+            .chartYScale(domain: .automatic(includesZero: true))
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day, count: range.axisStride)) { value in
+                    AxisTick(length: 3)
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            Text(range == .week
+                                 ? date.formatted(.dateTime.weekday(.abbreviated))
+                                 : date.formatted(.dateTime.month(.abbreviated).day()))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
+                        .foregroundStyle(Color.secondary.opacity(0.22))
+                    AxisTick(length: 3)
+                    AxisValueLabel {
+                        if let amount = value.as(Double.self) {
+                            Text(metric.axisLabel(amount))
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .chartXSelection(value: $chartSelection)
+            .onChange(of: chartSelection) { _, date in
+                guard let date else { return }
+                selectedDate = date
+            }
+            .frame(height: 190)
+            .accessibilityLabel("\(metric.title)每日摄入趋势")
+            .accessibilityHint("拖动图表查看每天的\(metric.title)摄入")
+
+            HStack(spacing: 5) {
+                Circle().fill(metric.tint).frame(width: 6, height: 6)
+                Text(selectedDataNote)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(metric.unit)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(16)
+        .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityElement(children: .contain)
+    }
+}
+
 private struct InsightsView: View {
-    @AppStorage(BackupChangeTracker.generationKey) private var libraryChangeGeneration = 0
     @Query(sort: \StoredJournalRecord.consumedAt, order: .reverse)
     private var storedRecords: [StoredJournalRecord]
-    @State private var selectedDate = Date.now
-    @State private var brandCatalog: [String: MenuBrand] = [:]
+    @State private var range: IntakeTrendRange = .week
+    @State private var selectedDate = Calendar.current.startOfDay(for: .now)
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    private var itemsForDate: [TimelineItem] {
-        let items = storedRecords.compactMap { storedRecord -> TimelineItem? in
-            guard let record = try? storedRecord.decodeRecord(),
-                  Calendar.current.isDate(record.consumedAt, inSameDayAs: selectedDate),
-                  case .drink = record else { return nil }
-            return TimelineItem(storedRecord: storedRecord, record: record)
+    private let calendar = Calendar.current
+
+    private var dateRange: (start: Date, end: Date) {
+        let today = calendar.startOfDay(for: .now)
+        let start = calendar.date(byAdding: .day, value: -(range.rawValue - 1), to: today) ?? today
+        return (start, today)
+    }
+
+    private var dailySummaries: [IntakeDailySummary] {
+        let bounds = dateRange
+        let endExclusive = calendar.date(byAdding: .day, value: 1, to: bounds.end) ?? bounds.end.addingTimeInterval(86_400)
+        var accumulators: [Date: IntakeDailyAccumulator] = [:]
+
+        for storedRecord in storedRecords where storedRecord.consumedAt >= bounds.start && storedRecord.consumedAt < endExclusive {
+            guard let record = try? storedRecord.decodeRecord() else { continue }
+            let day = calendar.startOfDay(for: record.consumedAt)
+            switch record {
+            case .drink(let drink):
+                accumulators[day, default: IntakeDailyAccumulator()].add(drink)
+            case .meal(let meal):
+                accumulators[day, default: IntakeDailyAccumulator()].add(meal)
+            }
         }
-        return items.sorted(by: JournalRecordListFormatting.precedes)
+
+        return (0..<range.rawValue).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: bounds.start) else { return nil }
+            return (accumulators[date] ?? IntakeDailyAccumulator()).summary(on: date)
+        }
     }
 
-    private var summary: DailyNutritionSummary {
-        .summarize(itemsForDate.map(\.record), on: selectedDate)
-    }
-
-    private var nutritionTitle: String {
-        Calendar.current.isDateInToday(selectedDate)
-            ? "今天的饮品"
-            : "\(selectedDate.formatted(date: .abbreviated, time: .omitted)) 的饮品"
+    private var visibleMetrics: [IntakeTrendMetric] {
+        IntakeTrendMetric.allCases.filter { metric in
+            dailySummaries.contains { $0.value(for: metric).value != nil }
+        }
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    Label("日期", systemImage: "calendar")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    DatePicker("日期", selection: $selectedDate, displayedComponents: .date)
-                        .datePickerStyle(.compact)
-                        .labelsHidden()
-                }
-                .padding(.bottom, 12)
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Color(uiColor: .separator).opacity(0.55))
-                        .frame(height: 0.5)
-                }
-
-                DailyNutritionHero(summary: summary, title: nutritionTitle)
-                HStack(alignment: .firstTextBaseline) {
-                    Text("饮品记录")
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("按天查看营养摄入")
                         .font(.title3.weight(.bold))
                         .foregroundStyle(GanfanPalette.ink)
-                    Spacer()
-                    Text("\(itemsForDate.count) 条")
-                        .font(.footnote.monospacedDigit())
+                    Text(rangeCaption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
 
-                if itemsForDate.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("这一天还没有饮品记录", systemImage: "cup.and.saucer")
-                            .font(.headline)
-                            .foregroundStyle(GanfanPalette.ink)
-                        Text("回到“今日”记录饮品后，摄入信息会显示在这里。")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 8)
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(Array(itemsForDate.enumerated()), id: \.element.id) { entry in
-                            NavigationLink {
-                                RecordDetailView(storedRecord: entry.element.storedRecord)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    JournalTimelineRow(record: entry.element.record, brandCatalog: brandCatalog)
-                                    if case .drink(let drink) = entry.element.record {
-                                        Text(nutritionDetail(drink.nutrition))
-                                            .font(.footnote)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-
-                            if entry.offset < itemsForDate.count - 1 {
-                                Rectangle()
-                                    .fill(Color(uiColor: .separator).opacity(0.55))
-                                    .frame(height: 0.5)
-                            }
-                        }
+                Picker("时间范围", selection: $range) {
+                    ForEach(IntakeTrendRange.allCases) { item in
+                        Text(item.title).tag(item)
                     }
                 }
+                .pickerStyle(.segmented)
+
+                summaryCards
+
+                if visibleMetrics.isEmpty {
+                    emptyState
+                } else {
+                    ForEach(visibleMetrics) { metric in
+                        IntakeTrendCard(
+                            metric: metric,
+                            points: trendPoints(for: metric),
+                            range: range,
+                            selectedDate: $selectedDate
+                        )
+                    }
+                }
+
+                Text("热量和营养素合并用餐与饮品；水分（饮品）和咖啡因单独统计。估算值会参与合计，缺失值不会按 0 计入。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 2)
             }
             .padding(.horizontal, GanfanSpacing.pageHorizontal)
             .padding(.vertical, 16)
@@ -1515,25 +2326,84 @@ private struct InsightsView: View {
             .frame(maxWidth: .infinity)
         }
         .background(GanfanPalette.canvas)
-        .task { brandCatalog = JournalBrandLogoCatalog.loadBrands() }
-        .onChange(of: libraryChangeGeneration) { _, _ in
-            brandCatalog = JournalBrandLogoCatalog.loadBrands()
+        .onChange(of: range) { _, _ in
+            selectedDate = dateRange.end
+        }
+        .onChange(of: selectedDate) { _, date in
+            guard let nearestDate = dailySummaries.min(by: {
+                      abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
+                  })?.date,
+                  !calendar.isDate(date, inSameDayAs: nearestDate) else { return }
+            selectedDate = nearestDate
         }
         .navigationTitle("摄入洞察")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
     }
 
-    private func nutritionDetail(_ nutrition: NutritionSnapshot?) -> String {
-        guard let nutrition else { return "暂无营养数据" }
-        let confidence = switch nutrition.confidence {
-        case .official: "官方数据"
-        case .estimated: "估算值"
-        case .rough: "粗略估计"
-        case .unavailable: "暂无数据"
+    @ViewBuilder
+    private var summaryCards: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: 12) {
+                IntakeDailyAverageCard(metric: .energy, days: dailySummaries)
+                IntakeDailyAverageCard(metric: .caffeine, days: dailySummaries)
+            }
+        } else {
+            HStack(alignment: .top, spacing: 12) {
+                IntakeDailyAverageCard(metric: .energy, days: dailySummaries)
+                IntakeDailyAverageCard(metric: .caffeine, days: dailySummaries)
+            }
         }
-        let source = nutrition.source.isEmpty ? "" : " · \(nutrition.source)"
-        return "\(confidence)\(source)"
+    }
+
+    private var rangeCaption: String {
+        guard let first = dailySummaries.first?.date, let last = dailySummaries.last?.date else { return range.title }
+        return "每日总摄入 · \(first.formatted(date: .abbreviated, time: .omitted)) – \(last.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    private var emptyState: some View {
+        let hasRecords = dailySummaries.contains { $0.recordCount > 0 }
+        return VStack(alignment: .leading, spacing: 7) {
+            Label(
+                hasRecords ? "暂时没有可用的营养数据" : "最近 \(range.rawValue) 天还没有记录",
+                systemImage: hasRecords ? "chart.xyaxis.line" : "fork.knife"
+            )
+            .font(.headline)
+            .foregroundStyle(GanfanPalette.ink)
+            Text(hasRecords
+                 ? "已有记录缺少可统计的营养值；补充数据后会显示趋势。"
+                 : "记录用餐或饮品后，这里会显示每日摄入趋势。")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: GanfanShape.surface, style: .continuous))
+    }
+
+    private func trendPoints(for metric: IntakeTrendMetric) -> [IntakeTrendPoint] {
+        var segment = 0
+        var previousPointHadValue = false
+        return dailySummaries.map { day in
+            let total = day.value(for: metric)
+            if total.value != nil {
+                if !previousPointHadValue { segment += 1 }
+                previousPointHadValue = true
+            } else {
+                previousPointHadValue = false
+            }
+            return IntakeTrendPoint(
+                date: day.date,
+                value: total.value,
+                knownCount: total.knownCount,
+                totalCount: total.totalCount,
+                containsEstimate: total.containsEstimate,
+                recordCount: day.recordCount,
+                drinkCount: day.drinkCount,
+                segment: segment
+            )
+        }
     }
 }
 
@@ -1684,7 +2554,7 @@ struct StorageDiagnosticsView: View {
             return
         }
         let report = [
-            "食光记本机存储诊断",
+            "吃吃喝喝本机存储诊断",
             "照片文件：\(usage.photoBytes.map(Self.byteLabel) ?? "无法读取")",
             "照片文件数：\(usage.photoFileCount.map(String.init) ?? "无法读取")",
             "记录数据估算：\(Self.byteLabel(usage.recordPayloadBytes))",
@@ -1744,27 +2614,509 @@ struct StorageDiagnosticsView: View {
 
 private struct RecordDetailSection<Content: View>: View {
     let title: String
-    @ViewBuilder var content: Content
+    let symbol: String
+    let trailing: AnyView?
+    let content: Content
+
+    init(
+        title: String,
+        symbol: String,
+        trailing: AnyView? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.symbol = symbol
+        self.trailing = trailing
+        self.content = content()
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                Image(systemName: symbol)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(GanfanPalette.forest)
+                    .frame(width: 30, height: 30)
+                    .background(GanfanPalette.paleLeaf, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(GanfanPalette.ink)
+
+                if let trailing {
+                    Spacer(minLength: 4)
+                    trailing
+                }
+            }
+
             content
         }
-        .padding(.vertical, 12)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color(uiColor: .separator).opacity(0.55))
-                .frame(height: 0.5)
+    }
+}
+
+private struct RecordDetailFact: Identifiable {
+    let title: String
+    let value: String
+    let symbol: String
+
+    var id: String { title }
+}
+
+private struct RecordDetailMetric: Identifiable {
+    let title: String
+    let value: String
+    let unit: String
+    let symbol: String
+    let note: String?
+    let hasValue: Bool
+
+    var id: String { title }
+}
+
+private struct RecordDetailIconBadge: View {
+    let symbol: String
+    let dimension: CGFloat
+    let symbolSize: CGFloat
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: symbolSize, weight: .semibold))
+            .foregroundStyle(GanfanPalette.forest)
+            .frame(width: dimension, height: dimension)
+            .background(
+                GanfanPalette.paleLeaf,
+                in: RoundedRectangle(cornerRadius: dimension * 0.28, style: .continuous)
+            )
+            .accessibilityHidden(true)
+    }
+}
+
+private struct RecordDetailHero: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    let kind: String
+    let title: String
+    let consumedAt: Date
+    let symbol: String
+    var compact: Bool = false
+    var brandName: String? = nil
+    var brand: MenuBrand? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? 10 : 16) {
+            metadataHeader
+
+            Text(title)
+                .font(compact ? .title2.weight(.semibold) : .largeTitle.weight(.bold))
+                .foregroundStyle(GanfanPalette.ink)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let brandName, !brandName.isEmpty {
+                HStack(spacing: 8) {
+                    GanfanBrandLogoIcon(
+                        assetName: brand?.logoAssetName,
+                        symbol: brand?.logoSymbol,
+                        imageID: brand?.logoImageID,
+                        dimension: 22
+                    )
+
+                    Text(brandName)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
+        .padding(compact ? 14 : 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var metadataHeader: some View {
+        if compact {
+            HStack(alignment: .center, spacing: 10) {
+                kindIcon
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(kind)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(GanfanPalette.leaf)
+
+                    Text(consumedAt.formatted(date: .complete, time: .omitted))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 4)
+
+                Label(consumedAt.formatted(date: .omitted, time: .shortened), systemImage: "clock")
+                    .font(.caption.weight(.medium).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .accessibilityElement(children: .combine)
+            }
+        } else if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(spacing: 12) {
+                    kindIcon
+                    Text(kind)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(GanfanPalette.leaf)
+                }
+
+                Text(consumedAt.formatted(date: .complete, time: .omitted))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Label(consumedAt.formatted(date: .omitted, time: .shortened), systemImage: "clock")
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(GanfanPalette.ink)
+            }
+        } else {
+            HStack(alignment: .center, spacing: 12) {
+                kindIcon
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(kind)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(GanfanPalette.leaf)
+
+                    Text(consumedAt.formatted(date: .complete, time: .omitted))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 4)
+
+                VStack(spacing: 3) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(GanfanPalette.leaf)
+                    Text(consumedAt.formatted(date: .omitted, time: .shortened))
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(GanfanPalette.ink)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
+    private var kindIcon: some View {
+        Image(systemName: symbol)
+            .font(.system(size: compact ? 18 : 22, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: compact ? 38 : 46, height: compact ? 38 : 46)
+            .background(GanfanPalette.forest, in: RoundedRectangle(cornerRadius: compact ? 12 : 15, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
+private struct RecordDetailFactGrid: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    let facts: [RecordDetailFact]
+
+    private var columns: [GridItem] {
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible(), spacing: 8, alignment: .leading)]
+            : [GridItem(.adaptive(minimum: 132), spacing: 8, alignment: .leading)]
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+            ForEach(facts) { fact in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        RecordDetailIconBadge(symbol: fact.symbol, dimension: 22, symbolSize: 12)
+                        Text(fact.title)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text(fact.value)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(GanfanPalette.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+}
+
+private struct RecordDetailMetricGrid: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    let metrics: [RecordDetailMetric]
+    var compact = false
+
+    private var columns: [GridItem] {
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible(), spacing: 8, alignment: .leading)]
+            : [GridItem(.adaptive(minimum: 132), spacing: 8, alignment: .leading)]
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: compact ? 5 : 8) {
+            ForEach(metrics) { metric in
+                HStack(alignment: .center, spacing: compact ? 7 : 9) {
+                    RecordDetailIconBadge(
+                        symbol: metric.symbol,
+                        dimension: compact ? 21 : 26,
+                        symbolSize: compact ? 12 : 14
+                    )
+
+                    VStack(alignment: .leading, spacing: compact ? 0 : 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                            Text(metric.value)
+                                .font(metric.hasValue
+                                      ? (compact ? .subheadline.weight(.bold).monospacedDigit() : .body.weight(.bold).monospacedDigit())
+                                      : .caption.weight(.semibold))
+                                .foregroundStyle(metric.hasValue ? GanfanPalette.ink : Color(uiColor: .secondaryLabel))
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            if !metric.unit.isEmpty {
+                                Text(metric.unit)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        HStack(spacing: 4) {
+                            Text(metric.title)
+                                .font(compact ? .caption2.weight(.medium) : .caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+
+                            if let note = metric.note {
+                                Text(note)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(GanfanPalette.leaf)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity, minHeight: compact ? 42 : 54, alignment: .leading)
+                .padding(.horizontal, compact ? 8 : 10)
+                .padding(.vertical, compact ? 5 : 8)
+                .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: compact ? 11 : 14, style: .continuous))
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+}
+
+private struct RecordDetailConfidenceBadge: View {
+    let confidence: NutritionSnapshot.Confidence
+
+    private var symbol: String {
+        switch confidence {
+        case .official: "checkmark.seal.fill"
+        case .estimated: "chart.bar.fill"
+        case .rough: "sparkles"
+        case .unavailable: "questionmark.circle.fill"
+        }
+    }
+
+    private var tint: Color {
+        switch confidence {
+        case .official, .estimated: GanfanPalette.forest
+        case .rough: GanfanPalette.leaf
+        case .unavailable: Color(uiColor: .secondaryLabel)
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .accessibilityHidden(true)
+            Text(confidence.displayName)
+                .font(.footnote.weight(.semibold))
+        }
+            .foregroundStyle(tint)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .background(tint.opacity(0.1), in: Capsule())
+    }
+}
+
+private struct RecordDetailNutritionHeaderAccessory: View {
+    let confidence: NutritionSnapshot.Confidence
+    let assumptions: String
+    let source: String
+    let sourceURL: String?
+
+    init(nutrition: NutritionSnapshot) {
+        confidence = nutrition.confidence
+        assumptions = nutrition.assumptions
+        source = nutrition.source
+        sourceURL = nutrition.sourceURL
+    }
+
+    init(snapshots: [NutritionSnapshot]) {
+        let confidences = snapshots.map(\.confidence)
+        if confidences.isEmpty || confidences.allSatisfy({ $0 == .unavailable }) {
+            confidence = .unavailable
+        } else if confidences.contains(.rough) {
+            confidence = .rough
+        } else if confidences.contains(.estimated) || confidences.contains(.unavailable) {
+            confidence = .estimated
+        } else {
+            confidence = .official
+        }
+
+        assumptions = Self.joinUnique(snapshots.map(\.assumptions))
+        source = Self.joinUnique(snapshots.map(\.source))
+        let links = Self.joinUnique(snapshots.compactMap(\.sourceURL))
+        sourceURL = links.isEmpty ? nil : links
+    }
+
+    private var hasDetails: Bool {
+        !assumptions.isEmpty || !source.isEmpty || !(sourceURL?.isEmpty ?? true)
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            RecordDetailConfidenceBadge(confidence: confidence)
+
+            if hasDetails {
+                RecordDetailNutritionInfoButton(
+                    assumptions: assumptions,
+                    source: source,
+                    sourceURL: sourceURL
+                )
+            }
+        }
+    }
+
+    private static func joinUnique(_ values: [String]) -> String {
+        values.reduce(into: [String]()) { result, value in
+            let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !normalized.isEmpty && !result.contains(normalized) {
+                result.append(normalized)
+            }
+        }
+        .joined(separator: "；")
+    }
+}
+
+private struct RecordDetailNutritionInfoButton: View {
+    let assumptions: String
+    let source: String
+    let sourceURL: String?
+
+    @State private var isPresented = false
+
+    var body: some View {
+        Button {
+            isPresented = true
+        } label: {
+            Image(systemName: "info.circle")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(GanfanPalette.forest)
+                .frame(width: 30, height: 30)
+                .background(GanfanPalette.paleLeaf, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("查看营养估算说明")
+        .popover(isPresented: $isPresented, arrowEdge: .top) {
+            VStack(alignment: .leading, spacing: 13) {
+                Text("营养说明")
+                    .font(.headline)
+                    .foregroundStyle(GanfanPalette.ink)
+
+                if !assumptions.isEmpty {
+                    detailBlock("估算假设", value: assumptions, symbol: "lightbulb")
+                }
+
+                if !source.isEmpty {
+                    detailBlock("营养来源", value: source, symbol: "doc.text.magnifyingglass")
+                }
+
+                if let sourceURL, !sourceURL.isEmpty {
+                    Divider()
+                    if let url = URL(string: sourceURL), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                        Link(destination: url) {
+                            Label("打开来源链接", systemImage: "arrow.up.right")
+                                .font(.footnote.weight(.medium))
+                        }
+                    } else {
+                        detailBlock("来源链接", value: sourceURL, symbol: "link")
+                    }
+                }
+            }
+            .padding(16)
+            .frame(width: 290, alignment: .leading)
+            .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private func detailBlock(_ title: String, value: String, symbol: String) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(GanfanPalette.leaf)
+                .frame(width: 18)
+                .padding(.top, 2)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.footnote)
+                    .foregroundStyle(GanfanPalette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct RecordDetailInfoRow: View {
+    let title: String
+    let value: String
+    let symbol: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(GanfanPalette.leaf)
+                .frame(width: 20)
+                .padding(.top, 2)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(value)
+                    .font(.body)
+                    .foregroundStyle(GanfanPalette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
 private struct RecordDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(MenuCatalogRepository.changeGenerationKey) private var catalogChangeGeneration = 0
 
     let storedRecord: StoredJournalRecord
 
@@ -1793,7 +3145,9 @@ private struct RecordDetailView: View {
         .navigationTitle("记录详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
-        .task { brandCatalog = JournalBrandLogoCatalog.loadBrands() }
+        .task(id: catalogChangeGeneration) {
+            brandCatalog = await JournalBrandLogoCatalog.loadBrands()
+        }
         .toolbar {
             if decodedRecord != nil {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -1835,167 +3189,10 @@ private struct RecordDetailView: View {
     @ViewBuilder
     private func detailContent(for record: JournalRecord) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Label(record.consumedAt.formatted(date: .complete, time: .shortened), systemImage: "clock")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
+            VStack(alignment: .leading, spacing: 24) {
                 switch record {
-                case .drink(let drink):
-                    let serving = DrinkServingSelection(
-                        temperature: drink.temperature,
-                        ice: drink.ice,
-                        legacyServingOption: drink.temperature == nil && drink.ice == nil ? drink.servingOption : nil
-                    )
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(drink.drinkName)
-                            .font(.largeTitle.weight(.bold))
-                            .foregroundStyle(GanfanPalette.ink)
-                        if !drink.brandName.isEmpty {
-                            HStack(spacing: 8) {
-                                GanfanBrandLogoIcon(
-                                    assetName: brandCatalog[drink.brandID]?.logoAssetName,
-                                    symbol: brandCatalog[drink.brandID]?.logoSymbol,
-                                    imageID: brandCatalog[drink.brandID]?.logoImageID,
-                                    dimension: 20
-                                )
-                                Text(drink.brandName)
-                                    .font(.title3)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-
-                    if let photo = drink.photo {
-                        Button {
-                            activePhotoOverlay = .photoViewer(assets: [photo], labels: [drink.drinkName])
-                        } label: {
-                            RecordDetailPhoto(asset: photo)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("查看\(drink.drinkName)照片")
-                    }
-
-                    RecordDetailSection(title: "点单信息") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            detailLine("杯型", drink.cupType)
-                            detailLine("温度", serving.temperature)
-                            detailLine("甜度", drink.sweetness)
-                            detailLine("容量", drink.sizeML.map { "\($0) ml" } ?? "")
-                            detailLine("冰量", serving.ice)
-                        }
-                    }
-
-                    RecordDetailSection(title: "营养资料") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            if let nutrition = drink.nutrition {
-                                LabeledContent("营养状态", value: nutrition.confidence.displayName)
-                                detailLine("能量", nutrition.energyKcal.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) kcal" } ?? "")
-                                detailLine("糖", nutrition.sugarGrams.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) g" } ?? "")
-                                detailLine("咖啡因", nutrition.caffeineMilligrams.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) mg" } ?? "")
-                                detailLine("蛋白质" + (nutrition.metricSources["proteinGrams"] == "rough" ? "（粗估）" : ""), nutrition.proteinGrams.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) g" } ?? "")
-                                detailLine("脂肪" + (nutrition.metricSources["fatGrams"] == "rough" ? "（粗估）" : ""), nutrition.fatGrams.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) g" } ?? "")
-                                detailLine("碳水化合物" + (nutrition.metricSources["carbohydrateGrams"] == "rough" ? "（粗估）" : ""), nutrition.carbohydrateGrams.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) g" } ?? "")
-                                detailLine("估算假设", nutrition.assumptions)
-                                detailLine("营养来源", nutrition.source)
-                                detailLine("来源链接", nutrition.sourceURL ?? "")
-                            } else {
-                                LabeledContent("营养状态", value: "暂无数据")
-                            }
-                        }
-                    }
-
-                    if !drink.locationName.isEmpty || !drink.locationAddress.isEmpty || drink.latitude != nil {
-                        RecordDetailSection(title: "地点") {
-                            VStack(alignment: .leading, spacing: 10) {
-                                detailLine("地点", [drink.locationName, drink.locationAddress].filter { !$0.isEmpty }.joined(separator: " · "))
-                                if let latitude = drink.latitude, let longitude = drink.longitude {
-                                    StaticRecordLocationMap(
-                                        name: drink.locationName,
-                                        address: drink.locationAddress,
-                                        latitude: latitude,
-                                        longitude: longitude
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if !drink.notes.isEmpty {
-                        RecordDetailSection(title: "备注") {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(drink.notes)
-                                    .font(.body)
-                                    .foregroundStyle(GanfanPalette.ink)
-                            }
-                        }
-                    }
-                case .meal(let meal):
-                    let photoEntries = meal.dishes.compactMap { dish in
-                        dish.photo.map { (asset: $0, label: dish.name) }
-                    }
-                    Text(meal.storeName.isEmpty ? "用餐记录" : meal.storeName)
-                        .font(.largeTitle.weight(.bold))
-                        .foregroundStyle(GanfanPalette.ink)
-
-                    if !meal.locationAddress.isEmpty || meal.latitude != nil {
-                        RecordDetailSection(title: "地点") {
-                            VStack(alignment: .leading, spacing: 10) {
-                                detailLine("地址", meal.locationAddress)
-                                if let latitude = meal.latitude, let longitude = meal.longitude {
-                                    StaticRecordLocationMap(
-                                        name: meal.storeName,
-                                        address: meal.locationAddress,
-                                        latitude: latitude,
-                                        longitude: longitude
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if !meal.notes.isEmpty {
-                        RecordDetailSection(title: "备注") {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(meal.notes)
-                                    .font(.body)
-                            }
-                        }
-                    }
-
-                    let mealNutrition = meal.dishes.map {
-                        $0.nutrition ?? RoughNutritionEstimator.dish(name: $0.name)
-                    }
-                    RecordDetailSection(title: "本餐营养参考") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            LabeledContent("能量", value: "约 \(Int(mealNutrition.compactMap(\.energyKcal).reduce(0, +))) kcal")
-                            LabeledContent("蛋白质", value: "约 \(Int(mealNutrition.compactMap(\.proteinGrams).reduce(0, +))) g")
-                            LabeledContent("脂肪", value: "约 \(Int(mealNutrition.compactMap(\.fatGrams).reduce(0, +))) g")
-                            LabeledContent("碳水化合物", value: "约 \(Int(mealNutrition.compactMap(\.carbohydrateGrams).reduce(0, +))) g")
-                            Text("包含离线粗估或 AI 辅助估算，实际份量与烹调用油可能造成较大误差。")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("菜品")
-                            .font(.title2.weight(.bold))
-                            .foregroundStyle(GanfanPalette.ink)
-                        Spacer()
-                        Text("\(meal.dishes.count) 道")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.top, 4)
-
-                    ForEach(Array(meal.dishes.enumerated()), id: \.element.id) { item in
-                        mealDishCard(
-                            dish: item.element,
-                            index: item.offset,
-                            photoEntries: photoEntries
-                        )
-                    }
+                case .drink(let drink): drinkContent(drink)
+                case .meal(let meal): mealContent(meal)
                 }
             }
             .frame(maxWidth: 680, alignment: .leading)
@@ -2010,6 +3207,249 @@ private struct RecordDetailView: View {
     }
 
     @ViewBuilder
+    private func drinkContent(_ drink: DrinkRecord) -> some View {
+        let serving = DrinkServingSelection(
+            temperature: drink.temperature,
+            ice: drink.ice,
+            legacyServingOption: drink.temperature == nil && drink.ice == nil ? drink.servingOption : nil
+        )
+        let facts = [
+            RecordDetailFact(title: "杯型", value: drink.cupType, symbol: "cup.and.saucer.fill"),
+            RecordDetailFact(title: "温度", value: serving.displayLabel, symbol: "thermometer.medium"),
+            RecordDetailFact(title: "甜度", value: drink.sweetness, symbol: "cube.fill"),
+            RecordDetailFact(title: "容量", value: drink.sizeML.map { "\($0) ml" } ?? "", symbol: "ruler")
+        ].filter { !$0.value.isEmpty }
+
+        RecordDetailHero(
+            kind: "饮品记录",
+            title: drink.drinkName,
+            consumedAt: drink.consumedAt,
+            symbol: "cup.and.saucer.fill",
+            compact: true,
+            brandName: drink.brandName,
+            brand: brandCatalog[drink.brandID]
+        )
+
+        if let photo = drink.photo {
+            Button {
+                activePhotoOverlay = .photoViewer(assets: [photo], labels: [drink.drinkName])
+            } label: {
+                RecordDetailPhoto(asset: photo)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("查看\(drink.drinkName)照片")
+        }
+
+        RecordDetailSection(title: "点单信息", symbol: "slider.horizontal.3") {
+            if facts.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 14, weight: .medium))
+                        .padding(.top, 2)
+                        .accessibilityHidden(true)
+                    Text("本次没有记录杯型、温度或甜度")
+                        .font(.footnote)
+                }
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 2)
+            } else {
+                RecordDetailFactGrid(facts: facts)
+            }
+        }
+
+        drinkNutritionSection(drink.nutrition)
+
+        if !drink.locationName.isEmpty || !drink.locationAddress.isEmpty || drink.latitude != nil {
+            RecordDetailSection(title: "地点", symbol: "mappin.and.ellipse") {
+                VStack(alignment: .leading, spacing: 14) {
+                    if let latitude = drink.latitude, let longitude = drink.longitude {
+                        StaticRecordLocationMap(
+                            name: drink.locationName,
+                            address: drink.locationAddress,
+                            latitude: latitude,
+                            longitude: longitude
+                        )
+                    }
+                    let addressDetails = [drink.locationName, drink.locationAddress]
+                        .filter { !$0.isEmpty }
+                        .joined(separator: " · ")
+                    if !addressDetails.isEmpty {
+                        RecordDetailInfoRow(title: "地址", value: addressDetails, symbol: "mappin.and.ellipse")
+                    }
+                }
+            }
+        }
+
+        if !drink.notes.isEmpty {
+            RecordDetailSection(title: "备注", symbol: "text.quote") {
+                Text(drink.notes)
+                    .font(.body)
+                    .foregroundStyle(GanfanPalette.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func drinkNutritionSection(_ nutrition: NutritionSnapshot?) -> some View {
+        RecordDetailSection(
+            title: "营养信息",
+            symbol: "chart.bar.xaxis",
+            trailing: nutrition.map { AnyView(RecordDetailNutritionHeaderAccessory(nutrition: $0)) }
+        ) {
+            if let nutrition {
+                let metrics = nutritionMetrics(for: nutrition)
+                VStack(alignment: .leading, spacing: 8) {
+                    if metrics.contains(where: \.hasValue) {
+                        RecordDetailMetricGrid(metrics: metrics, compact: true)
+                    } else {
+                        Label("暂无营养数据", systemImage: "leaf")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 2)
+                    }
+                }
+            } else {
+                Label("这条记录没有保存营养资料", systemImage: "leaf")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 2)
+            }
+        }
+    }
+
+    private func nutritionMetrics(for nutrition: NutritionSnapshot) -> [RecordDetailMetric] {
+        [
+            nutritionMetric("能量", symbol: "flame.fill", value: nutrition.energyKcal, unit: "kcal"),
+            nutritionMetric("糖", symbol: "cube.fill", value: nutrition.sugarGrams, unit: "g"),
+            nutritionMetric("咖啡因", symbol: "cup.and.saucer.fill", value: nutrition.caffeineMilligrams, unit: "mg"),
+            nutritionMetric("蛋白质", symbol: "figure.strengthtraining.traditional", value: nutrition.proteinGrams, unit: "g", sourceKey: "proteinGrams", sources: nutrition.metricSources),
+            nutritionMetric("脂肪", symbol: "drop.fill", value: nutrition.fatGrams, unit: "g", sourceKey: "fatGrams", sources: nutrition.metricSources),
+            nutritionMetric("碳水化合物", symbol: "leaf.fill", value: nutrition.carbohydrateGrams, unit: "g", sourceKey: "carbohydrateGrams", sources: nutrition.metricSources)
+        ]
+    }
+
+    private func nutritionMetric(
+        _ title: String,
+        symbol: String,
+        value: Double?,
+        unit: String,
+        sourceKey: String? = nil,
+        sources: [String: String] = [:]
+    ) -> RecordDetailMetric {
+        guard let value, value.isFinite, value >= 0 else {
+            return RecordDetailMetric(title: title, value: "暂无数据", unit: "", symbol: symbol, note: nil, hasValue: false)
+        }
+
+        let isRough = sourceKey.flatMap { sources[$0] } == "rough"
+        return RecordDetailMetric(
+            title: title,
+            value: value.formatted(.number.precision(.fractionLength(0...1))),
+            unit: unit,
+            symbol: symbol,
+            note: isRough ? "粗估" : nil,
+            hasValue: true
+        )
+    }
+
+    @ViewBuilder
+    private func mealContent(_ meal: MealRecord) -> some View {
+        let photoEntries = meal.dishes.compactMap { dish in
+            dish.photo.map { (asset: $0, label: dish.name) }
+        }
+        let mealNutrition = meal.dishes.map {
+            $0.nutrition ?? RoughNutritionEstimator.dish(name: $0.name)
+        }
+
+        RecordDetailHero(
+            kind: "用餐记录",
+            title: meal.storeName.isEmpty ? "用餐记录" : meal.storeName,
+            consumedAt: meal.consumedAt,
+            symbol: "fork.knife",
+            compact: true
+        )
+
+        RecordDetailSection(
+            title: "营养信息",
+            symbol: "chart.bar.xaxis",
+            trailing: AnyView(RecordDetailNutritionHeaderAccessory(snapshots: mealNutrition))
+        ) {
+            VStack(alignment: .leading, spacing: 7) {
+                RecordDetailMetricGrid(metrics: [
+                    mealMetric("能量", symbol: "flame.fill", value: mealNutrition.compactMap(\.energyKcal).reduce(0, +), unit: "kcal"),
+                    mealMetric("蛋白质", symbol: "figure.strengthtraining.traditional", value: mealNutrition.compactMap(\.proteinGrams).reduce(0, +), unit: "g"),
+                    mealMetric("脂肪", symbol: "drop.fill", value: mealNutrition.compactMap(\.fatGrams).reduce(0, +), unit: "g"),
+                    mealMetric("碳水化合物", symbol: "leaf.fill", value: mealNutrition.compactMap(\.carbohydrateGrams).reduce(0, +), unit: "g")
+                ], compact: true)
+
+                HStack(alignment: .top, spacing: 7) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 13, weight: .medium))
+                        .padding(.top, 2)
+                        .accessibilityHidden(true)
+                    Text("参考估算，实际份量与烹调用油会带来差异")
+                        .font(.caption2)
+                }
+                    .foregroundStyle(.secondary)
+            }
+        }
+
+        RecordDetailSection(title: "菜品", symbol: "fork.knife") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("\(meal.dishes.count) 道菜")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                ForEach(Array(meal.dishes.enumerated()), id: \.element.id) { item in
+                    mealDishCard(dish: item.element, index: item.offset, photoEntries: photoEntries)
+                }
+            }
+        }
+
+        if !meal.locationAddress.isEmpty || meal.latitude != nil {
+            RecordDetailSection(title: "地点", symbol: "mappin.and.ellipse") {
+                VStack(alignment: .leading, spacing: 14) {
+                    if let latitude = meal.latitude, let longitude = meal.longitude {
+                        StaticRecordLocationMap(
+                            name: meal.storeName,
+                            address: meal.locationAddress,
+                            latitude: latitude,
+                            longitude: longitude
+                        )
+                    }
+                    if !meal.locationAddress.isEmpty {
+                        RecordDetailInfoRow(title: "地址", value: meal.locationAddress, symbol: "map")
+                    }
+                }
+            }
+        }
+
+        if !meal.notes.isEmpty {
+            RecordDetailSection(title: "备注", symbol: "text.quote") {
+                Text(meal.notes)
+                    .font(.body)
+                    .foregroundStyle(GanfanPalette.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+        }
+    }
+
+    private func mealMetric(_ title: String, symbol: String, value: Double, unit: String) -> RecordDetailMetric {
+        RecordDetailMetric(
+            title: title,
+            value: "约 \(Int(value))",
+            unit: unit,
+            symbol: symbol,
+            note: nil,
+            hasValue: true
+        )
+    }
+
+    @ViewBuilder
     private func mealDishCard(
         dish: MealDish,
         index: Int,
@@ -2017,33 +3457,52 @@ private struct RecordDetailView: View {
     ) -> some View {
         let row = HStack(spacing: 12) {
             if let photo = dish.photo {
-                JournalPhotoThumbnail(asset: photo, dimension: 82)
+                JournalPhotoThumbnail(asset: photo, dimension: 76)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(alignment: .bottomTrailing) {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .padding(6)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .padding(4)
+                    }
             } else {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(GanfanPalette.paleLeaf)
-                    .frame(width: 82, height: 82)
+                    .frame(width: 76, height: 76)
                     .overlay {
                         Image(systemName: "fork.knife")
+                            .font(.title3.weight(.medium))
                             .foregroundStyle(GanfanPalette.leaf)
                     }
             }
-            VStack(alignment: .leading, spacing: 4) {
+
+            VStack(alignment: .leading, spacing: 5) {
                 Text("\(index + 1). \(dish.name)")
                     .font(.headline)
                     .foregroundStyle(GanfanPalette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 let nutrition = dish.nutrition ?? RoughNutritionEstimator.dish(name: dish.name)
-                Text("\(nutrition.confidence.displayName) · 约 \(Int(nutrition.energyKcal ?? 0)) kcal")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if dish.photo != nil {
-                    Text("查看菜品照片")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .accessibilityHidden(true)
+                    Text(nutrition.energyKcal.map { "约 \(Int($0)) kcal" } ?? "暂无能量数据")
+                        .font(.footnote)
                 }
+                    .foregroundStyle(.secondary)
+
+                Text(nutrition.confidence.displayName)
+                    .font(.caption)
+                    .foregroundStyle(GanfanPalette.leaf)
             }
             Spacer(minLength: 0)
         }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .contentShape(Rectangle())
 
         if let photo = dish.photo {
@@ -2061,13 +3520,6 @@ private struct RecordDetailView: View {
             .accessibilityLabel("查看第 \(index + 1) 道菜：\(dish.name) 的照片")
         } else {
             row
-        }
-    }
-
-    @ViewBuilder
-    private func detailLine(_ title: String, _ value: String) -> some View {
-        if !value.isEmpty {
-            LabeledContent(title, value: value)
         }
     }
 
@@ -2100,6 +3552,8 @@ private struct RecordDetailView: View {
 }
 
 private struct RecordDetailPhoto: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let asset: PhotoAsset
 
     @State private var image: UIImage?
@@ -2121,10 +3575,22 @@ private struct RecordDetailPhoto: View {
             }
         }
         .background(GanfanPalette.card)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color(uiColor: .separator).opacity(0.16), lineWidth: 1)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(alignment: .bottomTrailing) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .accessibilityHidden(true)
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Text("查看照片")
+                        .font(.caption.weight(.semibold))
+                }
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.ultraThinMaterial, in: Capsule())
+            .padding(10)
         }
         .task(id: asset.id) {
             let currentAsset = asset

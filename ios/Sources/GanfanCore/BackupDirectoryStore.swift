@@ -229,14 +229,15 @@ public struct BackupDirectoryStore: Sendable {
     }
 
     public var backupDirectoryURL: URL {
-        let currentDirectory = userSelectedFolderURL.appendingPathComponent("食光记", isDirectory: true)
-        let legacyDirectory = userSelectedFolderURL.appendingPathComponent("干饭手册", isDirectory: true)
+        let currentDirectory = userSelectedFolderURL.appendingPathComponent("吃吃喝喝", isDirectory: true)
+        let legacyDirectories = ["食光记", "干饭手册"].map {
+            userSelectedFolderURL.appendingPathComponent($0, isDirectory: true)
+        }
         let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: currentDirectory.path)
-            || !fileManager.fileExists(atPath: legacyDirectory.path) {
+        if fileManager.fileExists(atPath: currentDirectory.path) {
             return currentDirectory
         }
-        return legacyDirectory
+        return legacyDirectories.first { fileManager.fileExists(atPath: $0.path) } ?? currentDirectory
     }
 
     public func write(

@@ -283,6 +283,7 @@ public struct MenuEntry: Codable, Equatable, Sendable {
 
 public struct MenuDrink: Codable, Equatable, Identifiable, Sendable {
     public let id: String
+    public let legacyIDs: [String]
     public let brandID: String
     public let brandName: String
     public let name: String
@@ -308,6 +309,7 @@ public struct MenuDrink: Codable, Equatable, Identifiable, Sendable {
 
     public init(
         id: String,
+        legacyIDs: [String] = [],
         brandID: String,
         brandName: String,
         name: String,
@@ -332,6 +334,7 @@ public struct MenuDrink: Codable, Equatable, Identifiable, Sendable {
         custom: Bool = false
     ) {
         self.id = id
+        self.legacyIDs = legacyIDs
         self.brandID = brandID
         self.brandName = brandName
         self.name = name
@@ -358,6 +361,7 @@ public struct MenuDrink: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, aliases, category, source, sourceType, sourceName, updatedAt, status, active
+        case legacyIDs = "legacyIds"
         case sourceURL = "sourceUrl"
         case brandID = "brandId"
         case brandName, cupTypes, cupSizes, sweetnessOptions, servingOptions
@@ -368,6 +372,7 @@ public struct MenuDrink: Codable, Equatable, Identifiable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
+        legacyIDs = try container.decodeIfPresent([String].self, forKey: .legacyIDs) ?? []
         brandID = try container.decode(String.self, forKey: .brandID)
         brandName = try container.decodeIfPresent(String.self, forKey: .brandName) ?? ""
         name = try container.decode(String.self, forKey: .name)
@@ -475,19 +480,27 @@ public struct MenuCatalog: Codable, Equatable, Sendable {
             localDrinks.filter { $0.localOverride || $0.custom }.map { ($0.id, $0) },
             uniquingKeysWith: { _, latest in latest }
         )
+        let inheritedDrinkIDs = Set(localDrinks.flatMap(\.legacyIDs))
+        func isDeleted(_ drink: MenuDrink) -> Bool {
+            deletedDrinkIDs.contains(drink.id) || drink.legacyIDs.contains(where: deletedDrinkIDs.contains)
+        }
         var mergedDrinks = drinks
-            .filter { !deletedDrinkIDs.contains($0.id) }
+            .filter { !deletedDrinkIDs.contains($0.id) && !inheritedDrinkIDs.contains($0.id) }
             .map { drinkOverrides[$0.id] ?? $0 }
         let bundledIDs = Set(drinks.map(\.id))
         let existingDrinkIDs = Set(mergedDrinks.map(\.id))
         mergedDrinks.append(contentsOf: localDrinks.filter {
             ($0.localOverride || $0.custom)
-                && !deletedDrinkIDs.contains($0.id)
+                && !isDeleted($0)
                 && !bundledIDs.contains($0.id)
                 && !existingDrinkIDs.contains($0.id)
         })
 
         return MenuCatalog(version: version, updatedAt: updatedAt, brands: mergedBrands, drinks: mergedDrinks)
+    }
+
+    public func drink(for id: String) -> MenuDrink? {
+        drinks.first { $0.id == id } ?? drinks.first { $0.legacyIDs.contains(id) }
     }
 
     public func searchBrands(_ query: String) -> [MenuBrand] {

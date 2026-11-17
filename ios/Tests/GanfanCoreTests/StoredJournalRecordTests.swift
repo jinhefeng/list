@@ -64,6 +64,49 @@ final class StoredJournalRecordTests: XCTestCase {
         }
     }
 
+    func testLegacyMicroSweetnessIsCanonicalizedWhenReading() throws {
+        let record = try DrinkRecord(drinkName: "拿铁", sweetness: "三分糖")
+        let stored = try StoredJournalRecord(record: .drink(record))
+        let encoded = try JournalRecordCodec.encode(.drink(record))
+        let legacyPayload = String(decoding: encoded, as: UTF8.self)
+            .replacingOccurrences(of: "三分糖", with: "微糖")
+        stored.payload = Data(legacyPayload.utf8)
+
+        guard case .drink(let decoded) = try stored.decodeRecord() else {
+            return XCTFail("Expected the legacy drink record")
+        }
+        XCTAssertEqual(decoded.sweetness, "三分糖")
+    }
+
+    func testDateRangeFetchIncludesDayStartAndExcludesNextDay() throws {
+        let container = try makeInMemoryContainer()
+        let context = ModelContext(container)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 17)))
+        let end = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: start))
+        let records = [
+            try DrinkRecord(consumedAt: start.addingTimeInterval(-1), drinkName: "昨天"),
+            try DrinkRecord(consumedAt: start, drinkName: "当天开始"),
+            try DrinkRecord(consumedAt: end.addingTimeInterval(-1), drinkName: "当天结束前"),
+            try DrinkRecord(consumedAt: end, drinkName: "次日开始")
+        ]
+        for record in records {
+            context.insert(try StoredJournalRecord(record: .drink(record)))
+        }
+        try context.save()
+
+        let predicate = #Predicate<StoredJournalRecord> { storedRecord in
+            storedRecord.consumedAt >= start && storedRecord.consumedAt < end
+        }
+        let fetched = try context.fetch(FetchDescriptor<StoredJournalRecord>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.consumedAt), SortDescriptor(\.recordID)]
+        ))
+
+        XCTAssertEqual(fetched.map(\.recordID), [records[1].id.uuidString, records[2].id.uuidString])
+    }
+
     func testDeletingOneRecordLeavesOtherRecordsUntouched() throws {
         let container = try makeInMemoryContainer()
         let context = ModelContext(container)

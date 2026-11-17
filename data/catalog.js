@@ -2,7 +2,9 @@ const updatedAt = '2026-11-16';
 const checkedAt = '2026-11-16';
 // Increment this when bundled brand, drink, or logo data changes. The store uses
 // it to refresh cached catalogs on existing installations without clearing records.
-const version = '2026-11-16.2';
+const baseVersion = '2026-11-16.5';
+const phoneOverrides = require('./catalog-phone-overrides');
+const version = phoneOverrides.version || baseVersion;
 
 const publicMenuCandidates = require('./catalog-public-menus');
 
@@ -387,6 +389,7 @@ const brands = catalogSources.map((item) => ({
   active: true,
   status: 'pending'
 }));
+const bundledBrandIDs = brands.map((brand) => brand.id);
 
 const drinks = catalogSources.flatMap((brand) => Array.from(new Map(brand.products.map((product) => {
   const item = typeof product === 'string' ? { name: product } : product;
@@ -427,5 +430,90 @@ const drinks = catalogSources.flatMap((brand) => Array.from(new Map(brand.produc
     }]
   };
 }));
+function mergeByID(baseRows, overrideRows) {
+  const rowsByID = new Map(baseRows.map((row) => [row.id, row]));
+  (overrideRows || []).forEach((row) => rowsByID.set(row.id, row));
+  return Array.from(rowsByID.values());
+}
 
-module.exports = { brands, drinks, updatedAt, version };
+function normalizeIdentity(value) {
+  return String(value || '').normalize('NFC').replace(/\s+/g, '').toLocaleLowerCase();
+}
+
+function mergeDrinkIdentityGroups(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    const key = `${row.brandId}|${normalizeIdentity(row.name)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  const uniqueStrings = (...values) => {
+    const seen = new Set();
+    return values.flat().filter((value) => {
+      const key = normalizeIdentity(value);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+  const unionRows = (preferred, fallback, key) => {
+    const result = [...(preferred || [])];
+    for (const item of fallback || []) {
+      if (key && result.some((existing) => normalizeIdentity(existing[key]) === normalizeIdentity(item[key]))) {
+        const index = result.findIndex((existing) => normalizeIdentity(existing[key]) === normalizeIdentity(item[key]));
+        if (key === 'cupType' && result[index].sizeMl == null && item.sizeMl != null) {
+          result[index] = { ...result[index], sizeMl: item.sizeMl };
+        }
+      } else if (!result.some((existing) => JSON.stringify(existing) === JSON.stringify(item))) {
+        result.push(item);
+      }
+    }
+    return result;
+  };
+  const mergeNutrition = (preferred, fallback) => {
+    if (!preferred) return fallback || null;
+    if (!fallback || preferred.amount !== fallback.amount || normalizeIdentity(preferred.unit) !== normalizeIdentity(fallback.unit)) {
+      return preferred;
+    }
+    const result = { ...fallback, ...preferred };
+    for (const field of ['energyKcal', 'sugarG', 'caffeineMg', 'proteinG', 'fatG', 'carbohydrateG', 'sourceType', 'source', 'updatedAt']) {
+      if (preferred[field] == null || preferred[field] === '') result[field] = fallback[field] ?? null;
+    }
+    return result;
+  };
+  return Array.from(groups.values()).map((group) => {
+    if (group.length === 1) return group[0];
+    const preferred = group.find((row) => group.some((other) => (row.legacyIds || []).includes(other.id))) || group[group.length - 1];
+    const fallback = group.filter((row) => row !== preferred);
+    let merged = { ...preferred };
+    for (const row of fallback) {
+      merged = {
+        ...row,
+        ...merged,
+        id: preferred.id,
+        legacyIds: uniqueStrings(merged.legacyIds || [], row.legacyIds || [], row.id).filter((id) => id !== preferred.id),
+        aliases: uniqueStrings(merged.aliases || [], row.aliases || [], merged.name === row.name ? [] : [row.name]),
+        cupTypes: uniqueStrings(merged.cupTypes || [], row.cupTypes || []),
+        cupSizes: unionRows(merged.cupSizes, row.cupSizes, 'cupType'),
+        sizesMl: [...new Set([...(merged.sizesMl || []), ...(row.sizesMl || [])])],
+        sweetnessOptions: uniqueStrings(merged.sweetnessOptions || [], row.sweetnessOptions || []),
+        servingOptions: uniqueStrings(merged.servingOptions || [], row.servingOptions || []),
+        nutritionPerUnit: mergeNutrition(merged.nutritionPerUnit, row.nutritionPerUnit),
+        nutritionVariants: unionRows(merged.nutritionVariants, row.nutritionVariants),
+        menuEntries: unionRows(merged.menuEntries, row.menuEntries)
+      };
+      for (const field of ['category', 'source', 'sourceType', 'sourceName', 'sourceUrl', 'updatedAt']) {
+        if (!merged[field]) merged[field] = row[field] || '';
+      }
+    }
+    return merged;
+  });
+}
+
+module.exports = {
+  brands: mergeByID(brands, phoneOverrides.brands),
+  drinks: mergeDrinkIdentityGroups(mergeByID(drinks, phoneOverrides.drinks)),
+  updatedAt: phoneOverrides.updatedAt || updatedAt,
+  version,
+  _bundledBrandIDs: bundledBrandIDs
+};

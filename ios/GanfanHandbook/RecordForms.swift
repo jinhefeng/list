@@ -74,7 +74,7 @@ struct DrinkRecordForm: View {
         let menuCatalog = Self.loadBundledCatalog()
         let selectedMenuDrink: MenuDrink?
         if let drinkID = originalRecord?.drinkID, !drinkID.isEmpty {
-            selectedMenuDrink = menuCatalog?.drinks.first(where: { $0.id == drinkID })
+            selectedMenuDrink = menuCatalog?.drink(for: drinkID)
         } else {
             selectedMenuDrink = nil
         }
@@ -930,6 +930,7 @@ struct DrinkRecordForm: View {
         )
         let updatedDrink = MenuDrink(
             id: id,
+            legacyIDs: previousDrink?.legacyIDs ?? [],
             brandID: brandID,
             brandName: brandName,
             name: name,
@@ -958,7 +959,7 @@ struct DrinkRecordForm: View {
         let updatedState = MenuCatalogUserState(
             brands: brands,
             drinks: drinks,
-            deletedDrinkIDs: previousState.deletedDrinkIDs.subtracting([id]),
+            deletedDrinkIDs: previousState.deletedDrinkIDs.subtracting([id] + (previousDrink?.legacyIDs ?? [])),
             globalCupSizes: previousState.globalCupSizes
         )
         try repository.saveUserState(updatedState)

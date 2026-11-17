@@ -1185,5 +1185,41 @@
     "logoAssetName": "BrandIconKFC",
     "sourceName": "用户提供品牌 Logo；菜单待补",
     "products": []
+  },
+  {
+    "id": "brand-quchashan",
+    "name": "去茶山",
+    "aliases": [
+      "去茶山茶饮"
+    ],
+    "category": "新茶饮",
+    "logoAssetName": "BrandIconQuchashan",
+    "sourceName": "用户提供品牌 Logo；菜单待补",
+    "products": []
+  },
+  {
+    "id": "brand-red-tea-company",
+    "name": "红茶公司",
+    "aliases": [
+      "Charlie Town Tea Company",
+      "Charlie Town"
+    ],
+    "category": "茶饮",
+    "logoAssetName": "BrandIconCharlieTown",
+    "sourceName": "用户提供品牌 Logo；菜单待补",
+    "products": []
+  },
+  {
+    "id": "brand-tai-ben-niu",
+    "name": "太犇牛",
+    "aliases": [
+      "TAI BEN NIU",
+      "太犇牛茶铺",
+      "太奔牛"
+    ],
+    "category": "新茶饮",
+    "logoAssetName": "BrandIconTaiBenNiu",
+    "sourceName": "用户提供品牌 Logo；菜单待补",
+    "products": []
   }
 ]

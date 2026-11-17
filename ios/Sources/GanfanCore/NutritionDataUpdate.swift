@@ -138,7 +138,12 @@ public struct NutritionDataPack: Codable, Equatable, Sendable {
         try validate()
         var drinks = bundled.drinks
         var lookup: [String: Int] = [:]
-        for (index, drink) in drinks.enumerated() { lookup[drink.id] = index }
+        for (index, drink) in drinks.enumerated() {
+            lookup[drink.id] = index
+            for legacyID in drink.legacyIDs where lookup[legacyID] == nil {
+                lookup[legacyID] = index
+            }
+        }
         for entry in entries {
             if let index = lookup[entry.id] {
                 drinks[index] = Self.update(drinks[index], with: entry)
@@ -175,7 +180,7 @@ public struct NutritionDataPack: Codable, Equatable, Sendable {
             variants = merged
         } else { variants = old.nutritionVariants }
         return MenuDrink(
-            id: old.id, brandID: old.brandID, brandName: old.brandName, name: old.name,
+            id: old.id, legacyIDs: old.legacyIDs, brandID: old.brandID, brandName: old.brandName, name: old.name,
             aliases: old.aliases, category: old.category, source: old.source,
             sourceType: old.sourceType, sourceName: old.sourceName, sourceURL: old.sourceURL,
             updatedAt: old.updatedAt, status: old.status, active: old.active,
@@ -233,9 +238,13 @@ public final class NutritionUpdateRepository {
     }
 
     public func catalog(from bundled: MenuCatalog, userState: MenuCatalogUserState) throws -> MenuCatalog {
-        let resolved = try load()?.merging(into: bundled) ?? bundled
+        let resolved = try baseCatalog(from: bundled)
         return resolved.merging(localBrands: userState.brands, localDrinks: userState.drinks,
                                 deletedDrinkIDs: userState.deletedDrinkIDs)
+    }
+
+    public func baseCatalog(from bundled: MenuCatalog) throws -> MenuCatalog {
+        try load()?.merging(into: bundled) ?? bundled
     }
 }
 

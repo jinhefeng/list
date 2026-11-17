@@ -61,7 +61,7 @@ struct BackupSettingsView: View {
                     model.isImportingFolder = true
                 }
 
-                Text("新备份保存在所选目录下的「食光记」文件夹中；已有的「干饭手册」备份仍可读取。")
+                Text("新备份保存在所选目录下的「吃吃喝喝」文件夹中；已有的「食光记」或「干饭手册」备份仍可读取。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -239,7 +239,7 @@ final class BackupWorkflowModel: ObservableObject {
             folderName = folderURL.lastPathComponent
             snapshots = try BackupDirectoryStore(userSelectedFolderURL: folderURL).listSnapshots()
             homeFailure = nil
-            status = "目录授权已保存。App 会把记录快照和原图写入此目录下的「食光记」文件夹；已有的「干饭手册」备份仍可读取。"
+            status = "目录授权已保存。App 会把记录快照和原图写入此目录下的「吃吃喝喝」文件夹；已有的「食光记」或「干饭手册」备份仍可读取。"
 
             if !records.isEmpty || BackupChangeTracker().hasPendingChanges {
                 backupNow(storedRecords: records, context: context)
@@ -253,6 +253,7 @@ final class BackupWorkflowModel: ObservableObject {
     func restoreSavedFolderAccess() {
         guard !folderBookmark.isEmpty else { return }
         homeFailure = nil
+        var activeFolderURL: URL?
 
         do {
             let (folderURL, isStale) = try resolveSavedFolder()
@@ -261,15 +262,32 @@ final class BackupWorkflowModel: ObservableObject {
                 homeFailure = .directoryUnavailable
                 return
             }
-            defer { folderURL.stopAccessingSecurityScopedResource() }
+            activeFolderURL = folderURL
 
             if isStale {
                 saveBookmark(try makeBookmark(for: folderURL))
             }
             folderName = folderURL.lastPathComponent
-            snapshots = try BackupDirectoryStore(userSelectedFolderURL: folderURL).listSnapshots()
-            status = snapshots.isEmpty ? "目录授权已恢复，当前没有可读取的备份快照。" : "目录授权已恢复，找到 \(snapshots.count) 份快照。"
+            let store = BackupDirectoryStore(userSelectedFolderURL: folderURL)
+            status = "目录授权已恢复，正在读取备份快照。"
+            Task { @MainActor in
+                defer { folderURL.stopAccessingSecurityScopedResource() }
+                do {
+                    let loadedSnapshots = try await Task.detached(priority: .utility) {
+                        try store.listSnapshots()
+                    }.value
+                    snapshots = loadedSnapshots
+                    status = loadedSnapshots.isEmpty
+                        ? "目录授权已恢复，当前没有可读取的备份快照。"
+                        : "目录授权已恢复，找到 \(loadedSnapshots.count) 份快照。"
+                } catch {
+                    status = "无法读取备份快照，请重新选择备份目录。\n\(error.localizedDescription)"
+                    homeFailure = .directoryUnavailable
+                }
+            }
+            activeFolderURL = nil
         } catch {
+            activeFolderURL?.stopAccessingSecurityScopedResource()
             status = "无法恢复目录授权或读取快照，请重新选择备份目录。\n\(error.localizedDescription)"
             homeFailure = .directoryUnavailable
         }
@@ -287,21 +305,15 @@ final class BackupWorkflowModel: ObservableObject {
 
     func backupNow(storedRecords: [StoredJournalRecord], context: ModelContext) {
         guard !isWorking else { return }
-
-        let records: [JournalRecord]
-        do {
-            records = try storedRecords.map { try $0.decodeRecord() }
-        } catch {
-            status = "本机有无法读取的记录，已停止备份以免生成不完整快照。\n\(error.localizedDescription)"
-            homeFailure = .backupFailed
-            return
-        }
+        let recordSnapshots = storedRecords.map { $0.decodingSnapshot() }
+        var activeFolderURL: URL?
 
         do {
             let (folderURL, isStale) = try resolveSavedFolder()
             guard folderURL.startAccessingSecurityScopedResource() else {
                 throw BackupWorkflowError.authorizationUnavailable
             }
+            activeFolderURL = folderURL
             if isStale {
                 saveBookmark(try makeBookmark(for: folderURL))
             }
@@ -324,14 +336,17 @@ final class BackupWorkflowModel: ObservableObject {
                 }
 
                 do {
+                    let records = try await Task.detached(priority: .utility) {
+                        try recordSnapshots.map { try $0.decodeRecord() }
+                    }.value
                     let result = try await Task.detached(priority: .utility) {
                         let catalogRepository = MenuCatalogRepository()
-                        let catalogState = try catalogRepository.loadUserState()
                         guard let catalogURL = Bundle.main.url(forResource: "catalog", withExtension: "json") else {
                             throw BackupSnapshotError.invalidCatalogManifest
                         }
                         let bundledCatalog = try MenuCatalog.decode(Data(contentsOf: catalogURL))
                         let catalog = try catalogRepository.catalog(from: bundledCatalog)
+                        let catalogState = try catalogRepository.loadUserState()
                         let nutritionDataPack = NutritionUpdateRepository().load()
                         let brandLogoAssets = try AppStoragePaths.brandLogoAssets()
                         let snapshot = try BackupSnapshot(
@@ -357,7 +372,9 @@ final class BackupWorkflowModel: ObservableObject {
                         )
                     }.value
 
-                    snapshots = try backupStore.listSnapshots()
+                    snapshots = try await Task.detached(priority: .utility) {
+                        try backupStore.listSnapshots()
+                    }.value
                     homeFailure = nil
                     if changeTracker.generation == backupGeneration {
                         for storedRecord in storedRecords {
@@ -382,7 +399,9 @@ final class BackupWorkflowModel: ObservableObject {
                     homeFailure = .backupFailed
                 }
             }
+            activeFolderURL = nil
         } catch {
+            activeFolderURL?.stopAccessingSecurityScopedResource()
             status = "无法访问备份目录，记录仍保留在本机。\n\(error.localizedDescription)"
             homeFailure = .directoryUnavailable
         }
