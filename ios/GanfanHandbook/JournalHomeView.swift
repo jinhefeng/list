@@ -1801,6 +1801,12 @@ private enum IntakeTrendRange: Int, CaseIterable, Identifiable, Hashable {
     }
 }
 
+private enum IntakeTrendGraphStyle: Equatable {
+    case line
+    case area
+    case bars
+}
+
 private enum IntakeTrendMetric: String, CaseIterable, Identifiable, Hashable {
     case energy
     case caffeine
@@ -1859,6 +1865,14 @@ private enum IntakeTrendMetric: String, CaseIterable, Identifiable, Hashable {
 
     var isDrinkOnly: Bool { self == .drinkVolume || self == .caffeine }
 
+    var graphStyle: IntakeTrendGraphStyle {
+        switch self {
+        case .energy: .area
+        case .caffeine, .drinkVolume: .bars
+        case .sugar, .fat, .protein, .carbohydrate: .line
+        }
+    }
+
     var nutritionSourceKey: String? {
         switch self {
         case .energy: "energyKcal"
@@ -1899,8 +1913,15 @@ private struct IntakeMetricValue {
     let knownCount: Int
     let totalCount: Int
     let containsEstimate: Bool
+    let latestRecordAt: Date?
 
-    static let empty = IntakeMetricValue(value: nil, knownCount: 0, totalCount: 0, containsEstimate: false)
+    static let empty = IntakeMetricValue(
+        value: nil,
+        knownCount: 0,
+        totalCount: 0,
+        containsEstimate: false,
+        latestRecordAt: nil
+    )
 }
 
 private struct IntakeMetricAccumulator {
@@ -1908,13 +1929,15 @@ private struct IntakeMetricAccumulator {
     private(set) var knownCount = 0
     private(set) var totalCount = 0
     private(set) var containsEstimate = false
+    private(set) var latestRecordAt: Date?
 
-    mutating func add(_ value: Double?, isEstimated: Bool) {
+    mutating func add(_ value: Double?, isEstimated: Bool, recordedAt: Date) {
         totalCount += 1
         guard let value, value.isFinite, value >= 0 else { return }
         sum += value
         knownCount += 1
         containsEstimate = containsEstimate || isEstimated
+        latestRecordAt = max(latestRecordAt ?? recordedAt, recordedAt)
     }
 
     var total: IntakeMetricValue {
@@ -1922,7 +1945,8 @@ private struct IntakeMetricAccumulator {
             value: knownCount == 0 ? nil : sum,
             knownCount: knownCount,
             totalCount: totalCount,
-            containsEstimate: containsEstimate
+            containsEstimate: containsEstimate,
+            latestRecordAt: latestRecordAt
         )
     }
 }
@@ -1955,12 +1979,14 @@ private struct IntakeDailyAccumulator {
             let value = snapshot.flatMap { metric.value(in: $0) }
             metrics[metric, default: IntakeMetricAccumulator()].add(
                 value,
-                isEstimated: Self.isEstimated(snapshot, metric: metric)
+                isEstimated: Self.isEstimated(snapshot, metric: metric),
+                recordedAt: drink.consumedAt
             )
         }
         metrics[.drinkVolume, default: IntakeMetricAccumulator()].add(
             drink.sizeML.map(Double.init),
-            isEstimated: false
+            isEstimated: false,
+            recordedAt: drink.consumedAt
         )
     }
 
@@ -1972,7 +1998,8 @@ private struct IntakeDailyAccumulator {
             for metric in [.energy, .protein, .fat, .carbohydrate, .sugar] as [IntakeTrendMetric] {
                 metrics[metric, default: IntakeMetricAccumulator()].add(
                     metric.value(in: snapshot),
-                    isEstimated: isFallbackEstimate || Self.isEstimated(snapshot, metric: metric)
+                    isEstimated: isFallbackEstimate || Self.isEstimated(snapshot, metric: metric),
+                    recordedAt: meal.consumedAt
                 )
             }
         }
@@ -2002,6 +2029,7 @@ private struct IntakeTrendPoint: Identifiable {
     let knownCount: Int
     let totalCount: Int
     let containsEstimate: Bool
+    let latestRecordAt: Date?
     let recordCount: Int
     let drinkCount: Int
     let segment: Int
@@ -2009,92 +2037,70 @@ private struct IntakeTrendPoint: Identifiable {
     var id: Date { date }
 }
 
-private struct IntakeDailyAverageCard: View {
-    let metric: IntakeTrendMetric
-    let days: [IntakeDailySummary]
-
-    private var title: String {
-        switch metric {
-        case .energy: "日均热量"
-        case .protein: "日均蛋白质"
-        case .caffeine: "日均咖啡因"
-        default: "日均\(metric.title)"
-        }
-    }
-
-    private var unitLabel: String {
-        switch metric {
-        case .energy: "kcal"
-        case .caffeine: "mg"
-        default: "g"
-        }
-    }
-
-    private var dailyValues: [IntakeMetricValue] {
-        days.map { $0.value(for: metric) }.filter { $0.value != nil }
-    }
-
-    private var average: Double? {
-        let values = dailyValues.compactMap(\.value)
-        guard !values.isEmpty else { return nil }
-        return values.reduce(0, +) / Double(values.count)
-    }
-
-    private var hasPartialData: Bool {
-        dailyValues.contains { $0.knownCount < $0.totalCount }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(title, systemImage: metric.symbol)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(metric.tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(average.map { dailyValues.contains(where: \.containsEstimate) ? "约 \(metric.formatted($0))" : metric.formatted($0) } ?? "—")
-                    .font(.title2.weight(.bold).monospacedDigit())
-                    .foregroundStyle(GanfanPalette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Text(unitLabel)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(metric.isDrinkOnly ? "饮品" : "用餐 + 饮品") · \(dailyValues.count)/\(days.count) 天有值")
-                if hasPartialData {
-                    Text("部分日期数据不全")
-                }
-            }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: GanfanShape.surface, style: .continuous))
-        .accessibilityElement(children: .combine)
-    }
-}
-
 private struct IntakeTrendCard: View {
     let metric: IntakeTrendMetric
     let points: [IntakeTrendPoint]
     let range: IntakeTrendRange
     @Binding var selectedDate: Date
-    @State private var chartSelection: Date?
+    @Binding var expandedMetric: IntakeTrendMetric?
+    @Binding var hasSelectedChartDate: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var selectedPoint: IntakeTrendPoint? {
-        return points.first { Calendar.current.isDate($0.date, inSameDayAs: selectedDate) }
+    private var isExpanded: Bool { expandedMetric == metric }
+
+    private var validPoints: [IntakeTrendPoint] {
+        points.filter { $0.value != nil }
     }
 
-    private var selectedDateLabel: String {
-        (selectedPoint?.date ?? selectedDate)
-            .formatted(.dateTime.month(.abbreviated).day().weekday(.abbreviated))
+    private var averageValue: Double? {
+        let values = validPoints.compactMap(\.value)
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
+
+    private var averageLabel: String {
+        guard let averageValue else { return "—" }
+        let prefix = validPoints.contains(where: \.containsEstimate) ? "约 " : ""
+        return "\(prefix)\(metric.formatted(averageValue)) \(unitShortLabel)"
+    }
+
+    private var graphStyle: IntakeTrendGraphStyle {
+        metric.graphStyle
+    }
+
+    private func adaptiveBarWidth(plotWidth: CGFloat, includesYAxis: Bool) -> CGFloat {
+        let yAxisAllowance: CGFloat = includesYAxis ? 44 : 0
+        let usableWidth = max(plotWidth - yAxisAllowance, 1)
+        let slotWidth = usableWidth / CGFloat(max(points.count, 1))
+        let minimumWidth: CGFloat = includesYAxis ? 2.5 : 2
+        let maximumWidth: CGFloat = includesYAxis ? 28 : 16
+        return min(max(slotWidth * 0.72, minimumWidth), maximumWidth)
+    }
+
+    private var chartDomain: ClosedRange<Date> {
+        (points.first?.date ?? .now)...(points.last?.date ?? .now)
+    }
+
+    private var latestPoint: IntakeTrendPoint? {
+        points.last { $0.value != nil }
+    }
+
+    private var selectedPoint: IntakeTrendPoint? {
+        points.first { Calendar.current.isDate($0.date, inSameDayAs: selectedDate) }
+    }
+
+    private var latestRecordLabel: String {
+        guard let date = latestPoint?.latestRecordAt else { return "暂无数据" }
+        if Calendar.current.isDateInToday(date) {
+            return date.formatted(date: .omitted, time: .shortened)
+        }
+        return date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+    }
+
+    private var latestValueLabel: String {
+        guard let latestPoint, let value = latestPoint.value else { return "—" }
+        return "\(latestPoint.containsEstimate ? "约 " : "")\(metric.formatted(value))"
     }
 
     private var selectedValueLabel: String {
@@ -2104,7 +2110,7 @@ private struct IntakeTrendCard: View {
             if metric.isDrinkOnly && selectedPoint.drinkCount == 0 { return "暂无饮品记录" }
             return metric == .drinkVolume ? "容量未记录" : "暂无营养数据"
         }
-        return "\(selectedPoint.containsEstimate ? "约 " : "")\(metric.formatted(value)) \(unitShortLabel)"
+        return "\(selectedPoint.containsEstimate ? "约 " : "")\(metric.formatted(value))"
     }
 
     private var unitShortLabel: String {
@@ -2114,6 +2120,11 @@ private struct IntakeTrendCard: View {
         case .drinkVolume: "ml"
         case .caffeine: "mg"
         }
+    }
+
+    private var selectedDateLabel: String {
+        (selectedPoint?.date ?? selectedDate)
+            .formatted(.dateTime.month(.abbreviated).day().weekday(.abbreviated))
     }
 
     private var selectedDataNote: String {
@@ -2128,6 +2139,172 @@ private struct IntakeTrendCard: View {
     }
 
     var body: some View {
+        ZStack(alignment: .top) {
+            frontFace
+                .opacity(isExpanded ? 0 : 1)
+                .rotation3DEffect(.degrees(isExpanded ? -180 : 0), axis: (x: 0, y: 1, z: 0), perspective: 0.72)
+                .frame(height: isExpanded ? 0 : nil, alignment: .top)
+                .allowsHitTesting(!isExpanded)
+                .accessibilityHidden(isExpanded)
+
+            expandedFace
+                .opacity(isExpanded ? 1 : 0)
+                .rotation3DEffect(.degrees(isExpanded ? 0 : 180), axis: (x: 0, y: 1, z: 0), perspective: 0.72)
+                .frame(height: isExpanded ? nil : 0, alignment: .top)
+                .allowsHitTesting(isExpanded)
+                .accessibilityHidden(!isExpanded)
+        }
+        .frame(maxWidth: .infinity)
+        .animation(reduceMotion ? nil : .spring(response: 0.52, dampingFraction: 0.88), value: isExpanded)
+    }
+
+    private var frontFace: some View {
+        Button(action: expand) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: metric.symbol)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(metric.tint)
+                    Text(metric.title)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(metric.tint)
+                    Spacer(minLength: 4)
+                    Text(latestRecordLabel)
+                        .font(.caption.weight(.medium).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 10) {
+                        previewValue
+                        miniTrendChart
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 84)
+                    }
+                } else {
+                    HStack(alignment: .bottom, spacing: 10) {
+                        previewValue
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        miniTrendChart
+                            .frame(width: 142, height: 82)
+                    }
+                }
+
+                averageSummary
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(metric.title)，\(latestValueLabel) \(unitShortLabel)，最新记录 \(latestRecordLabel)")
+        .accessibilityHint("轻点翻转查看大图并选择日期")
+    }
+
+    private var previewValue: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(latestValueLabel)
+                    .font(.system(.largeTitle, design: .rounded).weight(.semibold).monospacedDigit())
+                    .foregroundStyle(GanfanPalette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                Text(unitShortLabel)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            Text(latestPoint?.date.formatted(.dateTime.month(.abbreviated).day().weekday(.abbreviated)) ?? "当前范围暂无数据")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+    }
+
+    private var averageSummary: some View {
+        HStack(spacing: 7) {
+            Text("日均摄入")
+                .foregroundStyle(.secondary)
+            Text(averageLabel)
+                .fontWeight(.semibold)
+                .foregroundStyle(GanfanPalette.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+            Spacer(minLength: 2)
+            Text("按 \(validPoints.count) 天计算")
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(GanfanPalette.canvas, in: Capsule())
+        }
+        .font(.caption)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("日均摄入，\(averageLabel)，按 \(validPoints.count) 天计算")
+    }
+
+    private var miniTrendChart: some View {
+        GeometryReader { geometry in
+            let columnWidth = adaptiveBarWidth(plotWidth: geometry.size.width, includesYAxis: false)
+            Chart {
+                if graphStyle == .bars {
+                    ForEach(validPoints) { point in
+                        BarMark(
+                            x: .value("日期", point.date),
+                            y: .value(metric.title, point.value ?? 0),
+                            width: .fixed(columnWidth)
+                        )
+                        .foregroundStyle(metric.tint.opacity(point.date == latestPoint?.date ? 1 : 0.58))
+                    }
+                } else {
+                    ForEach(validPoints) { point in
+                        if graphStyle == .area {
+                            AreaMark(
+                                x: .value("日期", point.date),
+                                yStart: .value("基线", 0.0),
+                                yEnd: .value(metric.title, point.value ?? 0),
+                                series: .value("连续数据段", point.segment)
+                            )
+                            .interpolationMethod(.linear)
+                            .foregroundStyle(metric.tint.opacity(0.12))
+                        }
+
+                        LineMark(
+                            x: .value("日期", point.date),
+                            y: .value(metric.title, point.value ?? 0),
+                            series: .value("连续数据段", point.segment)
+                        )
+                        .interpolationMethod(.linear)
+                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                        .foregroundStyle(metric.tint.opacity(point.date == latestPoint?.date ? 0.95 : 0.46))
+
+                        if point.date == latestPoint?.date {
+                            PointMark(
+                                x: .value("日期", point.date),
+                                y: .value(metric.title, point.value ?? 0)
+                            )
+                            .symbolSize(42)
+                            .foregroundStyle(metric.tint)
+                        }
+                    }
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .chartXScale(domain: chartDomain)
+            .chartYScale(domain: .automatic(includesZero: true))
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .chartLegend(.hidden)
+            .accessibilityHidden(true)
+        }
+    }
+
+    private var expandedFace: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: metric.symbol)
@@ -2135,22 +2312,31 @@ private struct IntakeTrendCard: View {
                     .foregroundStyle(metric.tint)
                 Text(metric.title)
                     .font(.headline.weight(.semibold))
-                    .foregroundStyle(GanfanPalette.ink)
+                    .foregroundStyle(metric.tint)
                 Spacer(minLength: 4)
-                Text(metric.isDrinkOnly ? "饮品" : "用餐 + 饮品")
-                    .font(.caption2.weight(.medium))
+                Text(latestRecordLabel)
+                    .font(.caption.weight(.medium).monospacedDigit())
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(GanfanPalette.canvas, in: Capsule())
+                Button(action: collapse) {
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                        .background(GanfanPalette.canvas, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("收起\(metric.title)趋势")
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(selectedValueLabel)
-                    .font(.title3.weight(.bold).monospacedDigit())
+                    .font(.title2.weight(.bold).monospacedDigit())
                     .foregroundStyle(GanfanPalette.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
+                Text(unitShortLabel)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
                 Spacer(minLength: 4)
                 Text(selectedDateLabel)
                     .font(.caption.weight(.medium))
@@ -2158,30 +2344,82 @@ private struct IntakeTrendCard: View {
                     .lineLimit(1)
             }
 
-            Chart {
-                ForEach(points.filter { $0.value != nil }) { point in
-                    LineMark(
-                        x: .value("日期", point.date),
-                        y: .value(metric.title, point.value ?? 0),
-                        series: .value("连续数据段", point.segment)
-                    )
-                    .interpolationMethod(.linear)
-                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(metric.tint)
+            averageSummary
 
-                    PointMark(
-                        x: .value("日期", point.date),
-                        y: .value(metric.title, point.value ?? 0)
-                    )
-                    .symbolSize(selectedPoint?.date == point.date ? 64 : 30)
-                    .foregroundStyle(metric.tint)
+            largeTrendChart
+                .frame(height: 190)
+                .accessibilityLabel("\(metric.title)每日摄入趋势")
+                .accessibilityHint("轻点选择日期；松开后保留所选日期")
+
+            HStack(spacing: 5) {
+                Circle().fill(metric.tint).frame(width: 6, height: 6)
+                Text(selectedDataNote)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(metric.isDrinkOnly ? "饮品 · \(metric.unit)" : "用餐 + 饮品 · \(metric.unit)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityElement(children: .contain)
+    }
+
+    private var largeTrendChart: some View {
+        GeometryReader { chartGeometry in
+            let columnWidth = adaptiveBarWidth(plotWidth: chartGeometry.size.width, includesYAxis: true)
+            Chart {
+                if graphStyle == .bars {
+                    ForEach(validPoints) { point in
+                        BarMark(
+                            x: .value("日期", point.date),
+                            y: .value(metric.title, point.value ?? 0),
+                            width: .fixed(columnWidth)
+                        )
+                        .foregroundStyle(metric.tint.opacity(selectedPoint?.date == point.date ? 1 : 0.58))
+                    }
+                } else {
+                    ForEach(validPoints) { point in
+                        if graphStyle == .area {
+                            AreaMark(
+                                x: .value("日期", point.date),
+                                yStart: .value("基线", 0.0),
+                                yEnd: .value(metric.title, point.value ?? 0),
+                                series: .value("连续数据段", point.segment)
+                            )
+                            .interpolationMethod(.linear)
+                            .foregroundStyle(metric.tint.opacity(0.1))
+                        }
+
+                        LineMark(
+                            x: .value("日期", point.date),
+                            y: .value(metric.title, point.value ?? 0),
+                            series: .value("连续数据段", point.segment)
+                        )
+                        .interpolationMethod(.linear)
+                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                        .foregroundStyle(metric.tint)
+
+                        if range == .week || selectedPoint?.date == point.date {
+                            PointMark(
+                                x: .value("日期", point.date),
+                                y: .value(metric.title, point.value ?? 0)
+                            )
+                            .symbolSize(selectedPoint?.date == point.date ? 64 : 30)
+                            .foregroundStyle(metric.tint)
+                        }
+                    }
                 }
 
                 RuleMark(x: .value("所选日期", selectedDate))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     .foregroundStyle(Color.secondary.opacity(0.45))
             }
-            .chartXScale(domain: (points.first?.date ?? .now)...(points.last?.date ?? .now))
+            .frame(width: chartGeometry.size.width, height: chartGeometry.size.height)
+            .chartXScale(domain: chartDomain)
             .chartYScale(domain: .automatic(includesZero: true))
             .chartXAxis {
                 AxisMarks(values: .stride(by: .day, count: range.axisStride)) { value in
@@ -2211,29 +2449,62 @@ private struct IntakeTrendCard: View {
                     }
                 }
             }
-            .chartXSelection(value: $chartSelection)
-            .onChange(of: chartSelection) { _, date in
-                guard let date else { return }
-                selectedDate = date
-            }
-            .frame(height: 190)
-            .accessibilityLabel("\(metric.title)每日摄入趋势")
-            .accessibilityHint("拖动图表查看每天的\(metric.title)摄入")
-
-            HStack(spacing: 5) {
-                Circle().fill(metric.tint).frame(width: 6, height: 6)
-                Text(selectedDataNote)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(metric.unit)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            .chartOverlay { proxy in
+                GeometryReader { overlayGeometry in
+                    if let plotFrameAnchor = proxy.plotFrame {
+                        let plotFrame = overlayGeometry[plotFrameAnchor]
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .frame(width: plotFrame.width, height: plotFrame.height)
+                            .position(x: plotFrame.midX, y: plotFrame.midY)
+                            // Tap-only selection lets the parent scroll view own vertical drags.
+                            .simultaneousGesture(
+                                SpatialTapGesture()
+                                    .onEnded { value in
+                                        guard let date = proxy.value(atX: value.location.x, as: Date.self) else { return }
+                                        selectNearestPoint(to: date)
+                                    }
+                            )
+                    }
+                }
             }
         }
-        .padding(16)
-        .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .accessibilityElement(children: .contain)
+    }
+
+    private func selectNearestPoint(to date: Date) {
+        guard let nearestPoint = points.min(by: {
+            abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
+        }) else { return }
+        selectedDate = nearestPoint.date
+        hasSelectedChartDate = true
+    }
+
+    private func expand() {
+        let updates = {
+            expandedMetric = metric
+            if !hasSelectedChartDate, let latestPoint {
+                selectedDate = latestPoint.date
+                hasSelectedChartDate = true
+            }
+        }
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(.spring(response: 0.52, dampingFraction: 0.88)) {
+                updates()
+            }
+        }
+    }
+
+    private func collapse() {
+        if reduceMotion {
+            expandedMetric = nil
+        } else {
+            withAnimation(.spring(response: 0.52, dampingFraction: 0.88)) {
+                expandedMetric = nil
+            }
+        }
     }
 }
 
@@ -2242,7 +2513,8 @@ private struct InsightsView: View {
     private var storedRecords: [StoredJournalRecord]
     @State private var range: IntakeTrendRange = .week
     @State private var selectedDate = Calendar.current.startOfDay(for: .now)
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var expandedMetric: IntakeTrendMetric?
+    @State private var hasSelectedChartDate = false
 
     private let calendar = Calendar.current
 
@@ -2299,8 +2571,6 @@ private struct InsightsView: View {
                 }
                 .pickerStyle(.segmented)
 
-                summaryCards
-
                 if visibleMetrics.isEmpty {
                     emptyState
                 } else {
@@ -2309,7 +2579,9 @@ private struct InsightsView: View {
                             metric: metric,
                             points: trendPoints(for: metric),
                             range: range,
-                            selectedDate: $selectedDate
+                            selectedDate: $selectedDate,
+                            expandedMetric: $expandedMetric,
+                            hasSelectedChartDate: $hasSelectedChartDate
                         )
                     }
                 }
@@ -2327,7 +2599,11 @@ private struct InsightsView: View {
         }
         .background(GanfanPalette.canvas)
         .onChange(of: range) { _, _ in
-            selectedDate = dateRange.end
+            let latestDataDay = dailySummaries.last { day in
+                IntakeTrendMetric.allCases.contains { day.value(for: $0).value != nil }
+            }?.date
+            selectedDate = latestDataDay ?? dateRange.end
+            hasSelectedChartDate = false
         }
         .onChange(of: selectedDate) { _, date in
             guard let nearestDate = dailySummaries.min(by: {
@@ -2339,21 +2615,6 @@ private struct InsightsView: View {
         .navigationTitle("摄入洞察")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
-    }
-
-    @ViewBuilder
-    private var summaryCards: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(spacing: 12) {
-                IntakeDailyAverageCard(metric: .energy, days: dailySummaries)
-                IntakeDailyAverageCard(metric: .caffeine, days: dailySummaries)
-            }
-        } else {
-            HStack(alignment: .top, spacing: 12) {
-                IntakeDailyAverageCard(metric: .energy, days: dailySummaries)
-                IntakeDailyAverageCard(metric: .caffeine, days: dailySummaries)
-            }
-        }
     }
 
     private var rangeCaption: String {
@@ -2399,6 +2660,7 @@ private struct InsightsView: View {
                 knownCount: total.knownCount,
                 totalCount: total.totalCount,
                 containsEstimate: total.containsEstimate,
+                latestRecordAt: total.latestRecordAt,
                 recordCount: day.recordCount,
                 drinkCount: day.drinkCount,
                 segment: segment
