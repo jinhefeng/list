@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-11-16",
+  "asOf": "2026-11-18",
   "scope": {
     "targetBrandCount": 31,
     "teaRanking": "2026 中国新式茶饮连锁品牌 15 强",
@@ -412,6 +412,15 @@
       "pagesReviewed": 13,
       "status": "partial",
       "notes": "逐页读取第1–13页并筛选出154个饮品候选；来源同时包含餐食、甜品和周边，需后续按品牌饮品菜单复核。第三方菜单不证明具体城市或淘宝闪购门店在售。"
+    },
+    {
+      "brandId": "brand-chun-tian",
+      "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1",
+      "sourceReportedInSaleItems": 71,
+      "sourceReportedPages": 4,
+      "pagesReviewed": 4,
+      "status": "partial",
+      "notes": "本轮直接读取第1–4页，导入71个菜单名称并保留分页来源，包括菜单列出的薯丸产品。直接抓取时页面自报71款；搜索索引的较早页面快照自报66款，来源数据有变动，因此保持部分覆盖。品牌官方菜单与具体门店供应待核验。"
     }
   ]
 }

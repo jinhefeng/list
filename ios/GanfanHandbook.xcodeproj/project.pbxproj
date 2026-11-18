@@ -34,6 +34,7 @@
 		A10000000000000000000025 /* Sources/GanfanCore/NutritionDataUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* Sources/GanfanCore/NutritionDataUpdate.swift */; };
 		A10000000000000000000026 /* Sources/GanfanCore/IngredientNutritionEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* Sources/GanfanCore/IngredientNutritionEstimator.swift */; };
 		A10000000000000000000027 /* GanfanHandbook/AINutritionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* GanfanHandbook/AINutritionSettings.swift */; };
+		A10000000000000000000028 /* Sources/GanfanCore/JournalSQLiteStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* Sources/GanfanCore/JournalSQLiteStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -66,6 +67,7 @@
 		A20000000000000000000028 /* Sources/GanfanCore/NutritionDataUpdate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/NutritionDataUpdate.swift; sourceTree = "<group>"; };
 		A20000000000000000000029 /* Sources/GanfanCore/IngredientNutritionEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/IngredientNutritionEstimator.swift; sourceTree = "<group>"; };
 		A20000000000000000000030 /* GanfanHandbook/AINutritionSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanfanHandbook/AINutritionSettings.swift; sourceTree = "<group>"; };
+		A20000000000000000000031 /* Sources/GanfanCore/JournalSQLiteStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GanfanCore/JournalSQLiteStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -109,6 +111,7 @@
 				A20000000000000000000028 /* Sources/GanfanCore/NutritionDataUpdate.swift */,
 				A20000000000000000000029 /* Sources/GanfanCore/IngredientNutritionEstimator.swift */,
 				A20000000000000000000030 /* GanfanHandbook/AINutritionSettings.swift */,
+				A20000000000000000000031 /* Sources/GanfanCore/JournalSQLiteStore.swift */,
 				A20000000000000000000004 /* GanfanHandbook/Info.plist */,
 				A40000000000000000000002 /* Products */,
 			);
@@ -216,6 +219,7 @@
 				A10000000000000000000025 /* Sources/GanfanCore/NutritionDataUpdate.swift in Sources */,
 				A10000000000000000000026 /* Sources/GanfanCore/IngredientNutritionEstimator.swift in Sources */,
 				A10000000000000000000027 /* GanfanHandbook/AINutritionSettings.swift in Sources */,
+				A10000000000000000000028 /* Sources/GanfanCore/JournalSQLiteStore.swift in Sources */,
 				A10000000000000000000023 /* GanfanHandbook/LocationPickerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -1,38 +1,15 @@
 import CryptoKit
 import Charts
+import Observation
 import SwiftData
 import SwiftUI
 import UIKit
-import ImageIO
 
 private struct TimelineItem: Identifiable {
-    let storedRecord: StoredJournalRecord
-    let record: JournalRecord
+    let entry: JournalLibraryEntry
 
-    var id: UUID { record.id }
-}
-
-@MainActor
-private final class TodayRecordCache {
-    private var libraryGeneration: Int?
-    private var recordIDs: [String] = []
-    private var cachedItems: [TimelineItem] = []
-
-    func items(
-        for storedRecords: [StoredJournalRecord],
-        libraryGeneration: Int,
-        decode: () -> [TimelineItem]
-    ) -> [TimelineItem] {
-        let currentIDs = storedRecords.map(\.recordID)
-        guard self.libraryGeneration != libraryGeneration || recordIDs != currentIDs else {
-            return cachedItems
-        }
-
-        self.libraryGeneration = libraryGeneration
-        recordIDs = currentIDs
-        cachedItems = decode()
-        return cachedItems
-    }
+    var id: UUID { entry.id }
+    var record: JournalRecord { entry.record }
 }
 
 @MainActor
@@ -85,6 +62,22 @@ private enum JournalBrandLogoCatalog {
     }
 }
 
+private struct JournalRecordsRevision: Equatable {
+    let databaseGeneration: Int
+    let restorationGeneration: Int
+}
+
+private struct JournalTodayRequest: Equatable {
+    let day: DateInterval
+    let revision: JournalRecordsRevision
+}
+
+private struct JournalTodayContent {
+    let day: DateInterval
+    let items: [TimelineItem]
+    let unreadableRecordCount: Int
+}
+
 struct GanfanMainTabView: View {
     private enum Tab: Hashable {
         case today
@@ -95,22 +88,52 @@ struct GanfanMainTabView: View {
 
     @State private var selectedTab: Tab = .today
     @State private var today = Date.now
+    @State private var timeZone = TimeZone.current
+    @State private var history = JournalHistoryState()
+    @State private var todayContent: JournalTodayContent?
+    @State private var todayLoadError: String?
+    @State private var brandCatalog: [String: MenuBrand] = [:]
+    @State private var recordsRevision: JournalRecordsRevision?
+    @State private var restorationGeneration = 0
+    @State private var backupStatusGeneration = 0
+    @State private var pendingBackupCount = 0
+    @Environment(\.journalSQLiteStore) private var library
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(BackupChangeTracker.generationKey) private var libraryChangeGeneration = 0
+    @AppStorage(MenuCatalogRepository.changeGenerationKey) private var catalogChangeGeneration = 0
+
+    private var todayInterval: DateInterval {
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
+        let start = calendar.startOfDay(for: today)
+        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
+        return DateInterval(start: start, end: end)
+    }
+
+    private var todayRequest: JournalTodayRequest? {
+        recordsRevision.map { JournalTodayRequest(day: todayInterval, revision: $0) }
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            JournalHomeView(today: today)
-                .tabItem { Label("今日", systemImage: "house.fill") }
-                .tag(Tab.today)
+            JournalHomeView(
+                today: today,
+                content: todayContent?.day == todayInterval ? todayContent : nil,
+                loadError: todayLoadError,
+                brandCatalog: brandCatalog,
+                pendingBackupCount: pendingBackupCount
+            )
+            .tabItem { Label("今日", systemImage: "house.fill") }
+            .tag(Tab.today)
 
             NavigationStack {
-                HistoryView()
+                HistoryView(state: history, revision: recordsRevision, timeZone: timeZone, brandCatalog: brandCatalog)
             }
             .tabItem { Label("历史", systemImage: "clock.fill") }
             .tag(Tab.history)
 
             NavigationStack {
-                InsightsView()
+                InsightsView(today: today, revision: recordsRevision)
             }
             .tabItem { Label("摄入", systemImage: "chart.bar.fill") }
             .tag(Tab.insights)
@@ -124,7 +147,23 @@ struct GanfanMainTabView: View {
         .tint(GanfanPalette.forest)
         .toolbarBackground(GanfanPalette.card, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
-        .task {
+        .task { BackupWorkflowModel.shared.restoreSavedFolderAccess() }
+        .task(id: libraryChangeGeneration) {
+            if let library { BackupWorkflowModel.shared.backupIfNeeded(library: library) }
+        }
+        .task(id: [libraryChangeGeneration, restorationGeneration, backupStatusGeneration]) {
+            await refreshLibraryStatus()
+        }
+        .task(id: catalogChangeGeneration) {
+            let loaded = await JournalBrandLogoCatalog.loadBrands()
+            guard !Task.isCancelled else { return }
+            brandCatalog = loaded
+        }
+        .task(id: todayRequest) {
+            guard let request = todayRequest else { return }
+            await refreshToday(for: request)
+        }
+        .task(id: timeZone) {
             while !Task.isCancelled {
                 let calendar = Calendar.current
                 let startOfToday = calendar.startOfDay(for: .now)
@@ -139,77 +178,80 @@ struct GanfanMainTabView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            today = .now
+            refreshClock()
+            backupStatusGeneration &+= 1
+            BackupWorkflowModel.shared.restoreSavedFolderAccess()
+            if let library { BackupWorkflowModel.shared.backupIfNeeded(library: library) }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
-            today = .now
+            refreshClock()
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in
-            today = .now
+            refreshClock()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .ganfanLibraryBackupStateChanged)) { _ in
+            backupStatusGeneration &+= 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .ganfanJournalRecordsRestored)) { _ in
+            restorationGeneration &+= 1
+        }
+    }
+
+    private func refreshClock() {
+        timeZone = .current
+        today = .now
+    }
+
+    private func refreshLibraryStatus() async {
+        guard let library else { return }
+        let restored = restorationGeneration
+        let (generation, pendingCount) = await Task.detached(priority: .utility) {
+            (library.dataGeneration, try? library.pendingBackupCount())
+        }.value
+        guard !Task.isCancelled, restored == restorationGeneration else { return }
+        if let pendingCount, pendingCount != pendingBackupCount { pendingBackupCount = pendingCount }
+        let revision = JournalRecordsRevision(databaseGeneration: generation, restorationGeneration: restored)
+        if revision != recordsRevision { recordsRevision = revision }
+    }
+
+    private func refreshToday(for request: JournalTodayRequest) async {
+        guard let library else { return }
+        todayLoadError = nil
+        let day = request.day
+        do {
+            let (entries, issueCount) = try await Task.detached(priority: .userInitiated) {
+                let entries = try library.entries(from: day.start, to: day.end)
+                let issues = try library.legacyIssues(from: day.start, to: day.start)
+                return (entries, issues.count)
+            }.value
+            guard !Task.isCancelled, request == todayRequest else { return }
+            todayContent = JournalTodayContent(
+                day: day,
+                items: entries.map(TimelineItem.init(entry:)),
+                unreadableRecordCount: issueCount
+            )
+        } catch {
+            guard !Task.isCancelled, request == todayRequest else { return }
+            todayLoadError = "无法读取今日记录。"
         }
     }
 }
 
-struct JournalHomeView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.scenePhase) private var scenePhase
+private struct JournalHomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(BackupChangeTracker.pendingKey) private var hasPendingLibraryChanges = false
-    @AppStorage(BackupChangeTracker.generationKey) private var libraryChangeGeneration = 0
-    @AppStorage(MenuCatalogRepository.changeGenerationKey) private var catalogChangeGeneration = 0
-    @Query(sort: \StoredJournalRecord.consumedAt, order: .reverse)
-    private var storedRecords: [StoredJournalRecord]
-    @Query private var todayStoredRecords: [StoredJournalRecord]
-
     @StateObject private var backupWorkflow = BackupWorkflowModel.shared
     @State private var isCreatingDrink = false
     @State private var isCreatingMeal = false
     @State private var successfulSaveCount = 0
-    @State private var brandCatalog: [String: MenuBrand] = [:]
-    @State private var todayRecordCache = TodayRecordCache()
+    let today: Date
+    let content: JournalTodayContent?
+    let loadError: String?
+    let brandCatalog: [String: MenuBrand]
+    let pendingBackupCount: Int
 
-    private let today: Date
-
-    init(today: Date) {
-        self.today = today
-        let calendar = Calendar.current
-        let start = calendar.startOfDay(for: today)
-        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
-        let predicate = #Predicate<StoredJournalRecord> { record in
-            record.consumedAt >= start && record.consumedAt < end
-        }
-        _todayStoredRecords = Query(
-            filter: predicate,
-            sort: [
-                SortDescriptor(\.consumedAt, order: .forward),
-                SortDescriptor(\.recordID, order: .forward)
-            ]
-        )
-    }
-
-    private var todayItems: [TimelineItem] {
-        todayRecordCache.items(
-            for: todayStoredRecords,
-            libraryGeneration: libraryChangeGeneration,
-            decode: decodeTodayItems
-        )
-    }
-
-    private func decodeTodayItems() -> [TimelineItem] {
-        todayStoredRecords.compactMap { storedRecord -> TimelineItem? in
-            guard let record = try? storedRecord.decodeRecord() else { return nil }
-            return TimelineItem(storedRecord: storedRecord, record: record)
-        }
-    }
-
-    private var unreadableRecordCount: Int {
-        todayStoredRecords.count - todayItems.count
-    }
-
-    private var pendingBackupCount: Int {
-        storedRecords.filter(\.needsBackup).count
-    }
+    private var todayItems: [TimelineItem] { content?.items ?? [] }
 
     private var dailyNutritionSummary: DailyNutritionSummary {
         .summarize(todayItems.map(\.record), on: today)
@@ -242,21 +284,6 @@ struct JournalHomeView: View {
             .toolbar(.hidden, for: .navigationBar)
             .tint(GanfanPalette.forest)
             .background(GanfanPalette.canvas.ignoresSafeArea())
-            .task {
-                backupWorkflow.restoreSavedFolderAccess()
-                backupWorkflow.backupIfNeeded(storedRecords: storedRecords, context: modelContext)
-            }
-            .task(id: catalogChangeGeneration) {
-                brandCatalog = await JournalBrandLogoCatalog.loadBrands()
-            }
-            .onChange(of: libraryChangeGeneration) { _, _ in
-                backupWorkflow.backupIfNeeded(storedRecords: storedRecords, context: modelContext)
-            }
-            .onChange(of: scenePhase) { _, phase in
-                guard phase == .active else { return }
-                backupWorkflow.restoreSavedFolderAccess()
-                backupWorkflow.backupIfNeeded(storedRecords: storedRecords, context: modelContext)
-            }
             .sheet(isPresented: $isCreatingDrink) {
                 NavigationStack {
                     DrinkRecordForm(onSave: { successfulSaveCount += 1 })
@@ -274,10 +301,12 @@ struct JournalHomeView: View {
     private var todayIntro: some View {
         VStack(alignment: .leading, spacing: GanfanSpacing.mediumSmall) {
             todayHeader
-            TodayNutritionSummary(
-                drinkSummary: dailyNutritionSummary,
-                mealSummary: todayMealNutritionSummary
-            )
+            if content != nil {
+                TodayNutritionSummary(
+                    drinkSummary: dailyNutritionSummary,
+                    mealSummary: todayMealNutritionSummary
+                )
+            }
         }
     }
 
@@ -376,7 +405,12 @@ struct JournalHomeView: View {
 
     @ViewBuilder
     private var unreadableRecordsNotice: some View {
-        if unreadableRecordCount > 0 {
+        if let loadError {
+            Text(loadError)
+                .font(.footnote)
+                .foregroundStyle(.orange)
+        }
+        if let unreadableRecordCount = content?.unreadableRecordCount, unreadableRecordCount > 0 {
             Label(
                 "今日有 \(unreadableRecordCount) 条记录无法读取；原始数据仍保留在资料库中。",
                 systemImage: "exclamationmark.triangle"
@@ -389,7 +423,12 @@ struct JournalHomeView: View {
     private var todayRecordResults: some View {
         let items = todayItems
         return Group {
-            if items.isEmpty {
+            if content == nil {
+                if loadError == nil {
+                    ProgressView("正在读取今日记录")
+                        .frame(maxWidth: .infinity)
+                }
+            } else if items.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("今天还没有记录")
                         .font(.headline)
@@ -512,7 +551,7 @@ private struct JournalPhotoEntry: Identifiable {
 }
 
 private enum JournalRecordOverlayRoute: Identifiable {
-    case detail(id: UUID, storedRecord: StoredJournalRecord)
+    case detail(id: UUID, entry: JournalLibraryEntry)
     case photos(id: UUID, assets: [PhotoAsset], labels: [String], initialIndex: Int)
 
     var id: UUID {
@@ -521,8 +560,8 @@ private enum JournalRecordOverlayRoute: Identifiable {
         }
     }
 
-    static func record(_ storedRecord: StoredJournalRecord) -> Self {
-        .detail(id: UUID(), storedRecord: storedRecord)
+    static func record(_ entry: JournalLibraryEntry) -> Self {
+        .detail(id: UUID(), entry: entry)
     }
 
     static func photoViewer(assets: [PhotoAsset], labels: [String], initialIndex: Int = 0) -> Self {
@@ -620,7 +659,7 @@ private struct JournalRecordCardRow: View {
     @ViewBuilder
     private var detailAction: some View {
         Button {
-            activeOverlay = .record(item.storedRecord)
+            activeOverlay = .record(item.entry)
         } label: {
             recordDetails
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -956,11 +995,18 @@ private struct JournalPhotoThumbnail: View {
     let asset: PhotoAsset
     let dimension: CGFloat
 
-    @State private var thumbnailData: Data?
+    @Environment(\.displayScale) private var displayScale
+    @State private var loadedImage: (key: GanfanThumbnailLoader.Key, image: UIImage)?
+
+    private var imageKey: GanfanThumbnailLoader.Key {
+        .init(resource: "photo:\(asset.id.uuidString):\(asset.sha256)", dimension: dimension, scale: displayScale)
+    }
 
     var body: some View {
+        let key = imageKey
+        let image = (loadedImage?.key == key ? loadedImage?.image : nil) ?? GanfanThumbnailLoader.cachedImage(for: key)
         Group {
-            if let thumbnailData, let image = UIImage(data: thumbnailData) {
+            if let image {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -976,47 +1022,31 @@ private struct JournalPhotoThumbnail: View {
         }
         .frame(width: dimension, height: dimension)
         .clipped()
-        .task(id: asset.id) {
+        .task(id: key) {
+            guard loadedImage?.key != key, !Task.isCancelled else { return }
             let currentAsset = asset
             let photoStore = AppStoragePaths.photoStore
-            let maxPixelSize = Int(dimension * 3)
-            let data = await Task.detached(priority: .utility) { () -> Data? in
-                guard let sourceData = try? photoStore.load(currentAsset) else { return nil }
-                return JournalPhotoThumbnailLoader.thumbnailData(from: sourceData, maxPixelSize: maxPixelSize)
-            }.value
-            guard !Task.isCancelled else { return }
-            thumbnailData = data
+            let image = await GanfanThumbnailLoader.load(key) { try? photoStore.load(currentAsset) }
+            guard let image, !Task.isCancelled else { return }
+            loadedImage = (key, image)
         }
-    }
-}
-
-private enum JournalPhotoThumbnailLoader {
-    static func thumbnailData(from data: Data, maxPixelSize: Int) -> Data? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
-            kCGImageSourceShouldCacheImmediately: true
-        ]
-        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-
-        let output = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(output, "public.jpeg" as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.82] as CFDictionary)
-        guard CGImageDestinationFinalize(destination) else { return nil }
-        return output as Data
     }
 }
 
 private struct JournalHistoryTimelineEntry: View {
     let item: TimelineItem
     let dateLabel: String?
+    let isFirst: Bool
     let isLast: Bool
     let brandCatalog: [String: MenuBrand]
 
+    private let dateColumnWidth: CGFloat = 58
+    private let railWidth: CGFloat = 18
+    private let rowPadding: CGFloat = 6
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            VStack(alignment: .trailing, spacing: 4) {
+            VStack(alignment: .trailing, spacing: 2) {
                 if let dateLabel {
                     Text(dateLabel)
                         .font(.caption.weight(.semibold))
@@ -1026,10 +1056,10 @@ private struct JournalHistoryTimelineEntry: View {
                     .font(.footnote.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            .frame(width: 58, alignment: .trailing)
+            .frame(width: dateColumnWidth, alignment: .trailing)
 
             Color.clear
-                .frame(width: 24)
+                .frame(width: railWidth)
 
             JournalRecordCardRow(
                 item: item,
@@ -1037,20 +1067,23 @@ private struct JournalHistoryTimelineEntry: View {
                 brandCatalog: brandCatalog
             )
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, rowPadding)
         .overlay(alignment: .topLeading) {
             GeometryReader { geometry in
-                let railX: CGFloat = 70
-                if !isLast {
+                let railX = dateColumnWidth + railWidth / 2
+                let dotY = rowPadding + 5
+                let lineTop = isFirst ? dotY : 0
+                let lineBottom = isLast ? dotY : geometry.size.height
+                if lineBottom > lineTop {
                     Rectangle()
                         .fill(Color(uiColor: .separator).opacity(0.8))
-                        .frame(width: 1, height: max(0, geometry.size.height - 17))
-                        .position(x: railX, y: 17 + max(0, geometry.size.height - 17) / 2)
+                        .frame(width: 1, height: lineBottom - lineTop)
+                        .position(x: railX, y: (lineTop + lineBottom) / 2)
                 }
                 Circle()
                     .fill(GanfanPalette.forest)
                     .frame(width: 8, height: 8)
-                    .position(x: railX, y: 17)
+                    .position(x: railX, y: dotY)
             }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
@@ -1557,78 +1590,169 @@ private struct NutritionMetricColumn: View {
     }
 }
 
+private struct JournalHistoryRequest: Equatable {
+    let startDate: Date?
+    let endDate: Date?
+    let selectedTypes: Set<String>
+    let searchText: String
+    let revision: JournalRecordsRevision
+    let timeZone: TimeZone
+
+    var query: JournalHistoryQuery {
+        JournalHistoryQuery(startDate: startDate, endDate: endDate, recordTypes: selectedTypes, searchText: searchText)
+    }
+}
+
+@MainActor
+@Observable
+private final class JournalHistoryState {
+    var startDate: Date?
+    var endDate: Date?
+    var selectedTypes: Set<String> = ["drink", "meal"]
+    var searchText = ""
+
+    private(set) var visibleItems: [TimelineItem] = []
+    private(set) var unreadableRecords: [JournalLegacyRecordIssue] = []
+    private(set) var isLoadingMore = false
+    private(set) var loadError: String?
+    private var loadedRequest: JournalHistoryRequest?
+    @ObservationIgnored private var nextCursor: JournalHistoryCursor?
+    @ObservationIgnored private var loading: (request: JournalHistoryRequest, task: Task<Void, Never>)?
+
+    var hasLoaded: Bool { loadedRequest != nil }
+
+    func refresh(_ request: JournalHistoryRequest, in library: JournalSQLiteStore, force: Bool = false) async {
+        guard !Task.isCancelled else { return }
+        if !force {
+            if let loading, loading.request == request {
+                await loading.task.value
+                return
+            }
+            if loadedRequest == request {
+                loading?.task.cancel()
+                loading = nil
+                isLoadingMore = false
+                return
+            }
+        }
+
+        let debounceSearch = !force && request.searchText != (loadedRequest?.searchText ?? "")
+        await loadPage(request, after: nil, in: library, debounceSearch: debounceSearch)
+    }
+
+    func loadNextPage(_ request: JournalHistoryRequest, in library: JournalSQLiteStore) async {
+        guard !Task.isCancelled, loading == nil, loadedRequest == request, let nextCursor else { return }
+        await loadPage(request, after: nextCursor, in: library)
+    }
+
+    private func loadPage(
+        _ request: JournalHistoryRequest,
+        after cursor: JournalHistoryCursor?,
+        in library: JournalSQLiteStore,
+        debounceSearch: Bool = false
+    ) async {
+        loading?.task.cancel()
+        isLoadingMore = cursor != nil
+        loadError = nil
+        let query = request.query
+
+        // A query can finish while its tab is hidden. Only a newer request replaces it.
+        let task = Task {
+            defer {
+                if !Task.isCancelled {
+                    loading = nil
+                    isLoadingMore = false
+                }
+            }
+            do {
+                if debounceSearch { try await Task.sleep(for: .milliseconds(180)) }
+                try Task.checkCancellation()
+                let (page, issues) = try await Task.detached(priority: .userInitiated) {
+                    let page = try library.historyPage(query: query, after: cursor, limit: 50)
+                    let issues = cursor == nil ? try library.legacyIssues(from: query.startDate, to: query.endDate) : []
+                    return (page, issues)
+                }.value
+                try Task.checkCancellation()
+                let items = page.items.map(TimelineItem.init(entry:))
+                if cursor == nil {
+                    visibleItems = items
+                    unreadableRecords = issues
+                    loadedRequest = request
+                } else {
+                    visibleItems.append(contentsOf: items)
+                }
+                nextCursor = page.hasMore ? page.nextCursor : nil
+            } catch {
+                guard !Task.isCancelled else { return }
+                loadError = "读取历史记录失败：\(error.localizedDescription)"
+            }
+        }
+        loading = (request, task)
+        await task.value
+    }
+}
+
 private struct HistoryView: View {
-    @AppStorage(MenuCatalogRepository.changeGenerationKey) private var catalogChangeGeneration = 0
-    @Query(sort: \StoredJournalRecord.consumedAt, order: .reverse)
-    private var storedRecords: [StoredJournalRecord]
-    @State private var startDate = Calendar.current.date(byAdding: .day, value: -29, to: .now) ?? .now
-    @State private var endDate = Date.now
-    @State private var selectedTypes: Set<String> = ["drink", "meal"]
-    @State private var searchText = ""
+    @Environment(\.journalSQLiteStore) private var library
+    @Bindable var state: JournalHistoryState
+    let revision: JournalRecordsRevision?
+    let timeZone: TimeZone
+    let brandCatalog: [String: MenuBrand]
     @State private var isShowingFilters = false
-    @State private var brandCatalog: [String: MenuBrand] = [:]
+
+    private let rowInsets = EdgeInsets(
+        top: 0, leading: GanfanSpacing.pageHorizontal,
+        bottom: 0, trailing: GanfanSpacing.pageHorizontal
+    )
+
+    private var request: JournalHistoryRequest? {
+        guard let revision else { return nil }
+        return JournalHistoryRequest(
+            startDate: state.startDate,
+            endDate: state.endDate,
+            selectedTypes: state.selectedTypes,
+            searchText: state.searchText.trimmingCharacters(in: .whitespacesAndNewlines),
+            revision: revision,
+            timeZone: timeZone
+        )
+    }
 
     private var filterSummary: String {
-        let formatter = DateIntervalFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        let range = formatter.string(from: startDate, to: endDate)
+        let dateText: String
+        switch (state.startDate, state.endDate) {
+        case (nil, nil): dateText = "全部时间"
+        case (let start?, let end?):
+            let formatter = DateIntervalFormatter()
+            formatter.locale = Locale(identifier: "zh_CN")
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .none
+            dateText = formatter.string(from: start, to: end)
+        case (let start?, nil): dateText = "从 \(start.formatted(date: .abbreviated, time: .omitted)) 起"
+        case (nil, let end?): dateText = "截至 \(end.formatted(date: .abbreviated, time: .omitted))"
+        }
         let types = [
-            selectedTypes.contains("drink") ? "饮品" : nil,
-            selectedTypes.contains("meal") ? "用餐" : nil
+            state.selectedTypes.contains("drink") ? "饮品" : nil,
+            state.selectedTypes.contains("meal") ? "用餐" : nil
         ].compactMap { $0 }.joined(separator: "、")
-        return types.isEmpty ? "\(range) · 未选择记录类型" : "\(range) · \(types)"
-    }
-
-    private var visibleItems: [TimelineItem] {
-        let start = Calendar.current.startOfDay(for: startDate)
-        let end = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: endDate)) ?? endDate
-        let items = storedRecords.compactMap { storedRecord -> TimelineItem? in
-            guard let record = try? storedRecord.decodeRecord(),
-                  record.consumedAt >= start,
-                  record.consumedAt < end else { return nil }
-            let type = Self.typeKey(record)
-            guard selectedTypes.contains(type) else { return nil }
-            guard Self.matchesSearch(record, query: searchText) else { return nil }
-            return TimelineItem(storedRecord: storedRecord, record: record)
-        }
-        return items.sorted(by: JournalRecordListFormatting.precedes)
-    }
-
-    private var unreadableRecords: [StoredJournalRecord] {
-        storedRecords.filter { storedRecord in
-            storedRecord.consumedAt >= Calendar.current.startOfDay(for: startDate)
-                && storedRecord.consumedAt < (Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: endDate)) ?? endDate)
-                && (try? storedRecord.decodeRecord()) == nil
-        }.sorted {
-            JournalRecordListFormatting.precedes(
-                $0.consumedAt,
-                id: $0.recordID,
-                $1.consumedAt,
-                id: $1.recordID
-            )
-        }
+        return types.isEmpty ? "\(dateText) · 未选择记录类型" : "\(dateText) · \(types)"
     }
 
     var body: some View {
+        let visibleItems = state.visibleItems
         List {
-            Section {
-                HStack {
-                    Text(filterSummary)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
+            Text(filterSummary)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, GanfanSpacing.xSmall)
+                .listRowInsets(rowInsets)
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
-            }
 
-            if !unreadableRecords.isEmpty {
+            if !state.unreadableRecords.isEmpty {
                 Section("无法读取的记录") {
-                    ForEach(unreadableRecords) { item in
+                    ForEach(state.unreadableRecords) { item in
                         Label("\(item.recordType) · \(item.consumedAt.formatted(date: .abbreviated, time: .shortened))", systemImage: "exclamationmark.triangle")
                             .font(.footnote)
                             .foregroundStyle(.orange)
@@ -1637,8 +1761,14 @@ private struct HistoryView: View {
             }
 
             if visibleItems.isEmpty {
-                ContentUnavailableView("没有匹配的记录", systemImage: "calendar", description: Text("调整日期范围或记录类型后再试。"))
-                    .listRowBackground(Color.clear)
+                if state.hasLoaded {
+                    ContentUnavailableView("没有匹配的记录", systemImage: "calendar", description: Text("调整日期范围或记录类型后再试。"))
+                        .listRowBackground(Color.clear)
+                } else if state.loadError == nil {
+                    ProgressView("正在查找记录")
+                        .frame(maxWidth: .infinity)
+                        .listRowBackground(Color.clear)
+                }
             } else {
                 ForEach(Array(visibleItems.enumerated()), id: \.element.id) { entry in
                     let index = entry.offset
@@ -1651,26 +1781,54 @@ private struct HistoryView: View {
                     JournalHistoryTimelineEntry(
                         item: item,
                         dateLabel: startsNewDay ? JournalRecordListFormatting.date(item.record.consumedAt) : nil,
+                        isFirst: index == 0,
                         isLast: index == visibleItems.count - 1,
                         brandCatalog: brandCatalog
                     )
-                    .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
+                    .listRowInsets(rowInsets)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
+                    .onAppear {
+                        guard index >= visibleItems.count - 8, let library, let request else { return }
+                        Task { await state.loadNextPage(request, in: library) }
+                    }
                 }
             }
+            if let loadError = state.loadError {
+                Text(loadError)
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .listRowBackground(Color.clear)
+            }
+            if state.isLoadingMore {
+                ProgressView("正在加载更早记录")
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+            }
         }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 28)
+        .contentMargins(.top, 0, for: .scrollContent)
         .listSectionSpacing(.compact)
         .scrollContentBackground(.hidden)
-        .task(id: catalogChangeGeneration) {
-            brandCatalog = await JournalBrandLogoCatalog.loadBrands()
+        .task(id: request) {
+            guard let request, let library else { return }
+            await state.refresh(request, in: library)
+        }
+        .refreshable {
+            guard let request, let library else { return }
+            await state.refresh(request, in: library, force: true)
         }
         .background(GanfanPalette.canvas)
         .tint(GanfanPalette.forest)
         .navigationTitle("全部记录")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
-        .searchable(text: $searchText, prompt: "搜索饮品、餐厅或菜品")
+        .searchable(
+            text: $state.searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "搜索饮品、餐厅或菜品"
+        )
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -1684,62 +1842,41 @@ private struct HistoryView: View {
         .sheet(isPresented: $isShowingFilters) {
             NavigationStack {
                 HistoryFiltersView(
-                    startDate: $startDate,
-                    endDate: $endDate,
-                    selectedTypes: $selectedTypes
+                    startDate: $state.startDate,
+                    endDate: $state.endDate,
+                    selectedTypes: $state.selectedTypes
                 )
             }
         }
     }
 
-    private func typeBinding(_ key: String) -> Binding<Bool> {
-        Binding(
-            get: { selectedTypes.contains(key) },
-            set: { selected in
-                if selected { selectedTypes.insert(key) } else { selectedTypes.remove(key) }
-            }
-        )
-    }
-
-    private static func typeKey(_ record: JournalRecord) -> String {
-        switch record {
-        case .drink: "drink"
-        case .meal: "meal"
-        }
-    }
-
-    private static func matchesSearch(_ record: JournalRecord, query: String) -> Bool {
-        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !needle.isEmpty else { return true }
-        switch record {
-        case .drink(let drink):
-            return [drink.brandName, drink.drinkName, drink.locationName, drink.locationAddress, drink.notes]
-                .contains { $0.localizedCaseInsensitiveContains(needle) }
-        case .meal(let meal):
-            return [meal.storeName, meal.locationAddress, meal.notes].contains { $0.localizedCaseInsensitiveContains(needle) }
-                || meal.dishes.contains { $0.name.localizedCaseInsensitiveContains(needle) }
-        }
-    }
 }
 
 private struct HistoryFiltersView: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding var startDate: Date
-    @Binding var endDate: Date
+    @Binding var startDate: Date?
+    @Binding var endDate: Date?
     @Binding var selectedTypes: Set<String>
 
     var body: some View {
         Form {
             Section("快捷范围") {
                 HStack(spacing: 8) {
+                    Button("全部时间") { startDate = nil; endDate = nil }
                     rangeButton("近 7 天", days: 7)
                     rangeButton("近 30 天", days: 30)
                 }
             }
 
             Section("自定义日期") {
-                DatePicker("开始", selection: $startDate, in: ...endDate, displayedComponents: .date)
-                DatePicker("结束", selection: $endDate, in: startDate..., displayedComponents: .date)
+                Toggle("设置开始日期", isOn: startEnabled)
+                if startDate != nil {
+                    DatePicker("开始日期", selection: startPicker, displayedComponents: .date)
+                }
+                Toggle("设置结束日期", isOn: endEnabled)
+                if endDate != nil {
+                    DatePicker("结束日期", selection: endPicker, displayedComponents: .date)
+                }
             }
 
             Section("记录类型") {
@@ -1755,8 +1892,8 @@ private struct HistoryFiltersView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("重置") {
-                    startDate = Calendar.current.date(byAdding: .day, value: -29, to: .now) ?? .now
-                    endDate = .now
+                    startDate = nil
+                    endDate = nil
                     selectedTypes = ["drink", "meal"]
                 }
             }
@@ -1768,11 +1905,34 @@ private struct HistoryFiltersView: View {
 
     private func rangeButton(_ title: String, days: Int) -> some View {
         Button(title) {
-            endDate = .now
-            startDate = Calendar.current.date(byAdding: .day, value: -(days - 1), to: .now) ?? .now
+            let calendar = Calendar.current
+            endDate = calendar.startOfDay(for: .now)
+            startDate = calendar.date(byAdding: .day, value: -(days - 1), to: calendar.startOfDay(for: .now)) ?? .now
         }
         .buttonStyle(.bordered)
         .tint(GanfanPalette.forest)
+    }
+
+    private var startEnabled: Binding<Bool> {
+        Binding(get: { startDate != nil }, set: { startDate = $0 ? Calendar.current.startOfDay(for: .now) : nil })
+    }
+
+    private var endEnabled: Binding<Bool> {
+        Binding(get: { endDate != nil }, set: { endDate = $0 ? Calendar.current.startOfDay(for: .now) : nil })
+    }
+
+    private var startPicker: Binding<Date> {
+        Binding(
+            get: { startDate ?? Calendar.current.startOfDay(for: .now) },
+            set: { startDate = Calendar.current.startOfDay(for: $0) }
+        )
+    }
+
+    private var endPicker: Binding<Date> {
+        Binding(
+            get: { endDate ?? Calendar.current.startOfDay(for: .now) },
+            set: { endDate = Calendar.current.startOfDay(for: $0) }
+        )
     }
 
     private func typeBinding(_ key: String) -> Binding<Bool> {
@@ -2508,42 +2668,31 @@ private struct IntakeTrendCard: View {
     }
 }
 
+private struct IntakeSummaryRequest: Equatable {
+    let start: Date
+    let end: Date
+    let range: IntakeTrendRange
+    let revision: JournalRecordsRevision
+}
+
 private struct InsightsView: View {
-    @Query(sort: \StoredJournalRecord.consumedAt, order: .reverse)
-    private var storedRecords: [StoredJournalRecord]
+    @Environment(\.journalSQLiteStore) private var library
+    let today: Date
+    let revision: JournalRecordsRevision?
     @State private var range: IntakeTrendRange = .week
     @State private var selectedDate = Calendar.current.startOfDay(for: .now)
     @State private var expandedMetric: IntakeTrendMetric?
     @State private var hasSelectedChartDate = false
+    @State private var dailySummaries: [IntakeDailySummary] = []
+    @State private var loadedRequest: IntakeSummaryRequest?
 
     private let calendar = Calendar.current
 
-    private var dateRange: (start: Date, end: Date) {
-        let today = calendar.startOfDay(for: .now)
-        let start = calendar.date(byAdding: .day, value: -(range.rawValue - 1), to: today) ?? today
-        return (start, today)
-    }
-
-    private var dailySummaries: [IntakeDailySummary] {
-        let bounds = dateRange
-        let endExclusive = calendar.date(byAdding: .day, value: 1, to: bounds.end) ?? bounds.end.addingTimeInterval(86_400)
-        var accumulators: [Date: IntakeDailyAccumulator] = [:]
-
-        for storedRecord in storedRecords where storedRecord.consumedAt >= bounds.start && storedRecord.consumedAt < endExclusive {
-            guard let record = try? storedRecord.decodeRecord() else { continue }
-            let day = calendar.startOfDay(for: record.consumedAt)
-            switch record {
-            case .drink(let drink):
-                accumulators[day, default: IntakeDailyAccumulator()].add(drink)
-            case .meal(let meal):
-                accumulators[day, default: IntakeDailyAccumulator()].add(meal)
-            }
-        }
-
-        return (0..<range.rawValue).compactMap { offset in
-            guard let date = calendar.date(byAdding: .day, value: offset, to: bounds.start) else { return nil }
-            return (accumulators[date] ?? IntakeDailyAccumulator()).summary(on: date)
-        }
+    private var request: IntakeSummaryRequest? {
+        guard let revision else { return nil }
+        let end = calendar.startOfDay(for: today)
+        let start = calendar.date(byAdding: .day, value: -(range.rawValue - 1), to: end) ?? end
+        return IntakeSummaryRequest(start: start, end: end, range: range, revision: revision)
     }
 
     private var visibleMetrics: [IntakeTrendMetric] {
@@ -2598,11 +2747,11 @@ private struct InsightsView: View {
             .frame(maxWidth: .infinity)
         }
         .background(GanfanPalette.canvas)
+        .task(id: request) {
+            guard let request, loadedRequest != request else { return }
+            await refreshSummaries(for: request)
+        }
         .onChange(of: range) { _, _ in
-            let latestDataDay = dailySummaries.last { day in
-                IntakeTrendMetric.allCases.contains { day.value(for: $0).value != nil }
-            }?.date
-            selectedDate = latestDataDay ?? dateRange.end
             hasSelectedChartDate = false
         }
         .onChange(of: selectedDate) { _, date in
@@ -2615,6 +2764,37 @@ private struct InsightsView: View {
         .navigationTitle("摄入洞察")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+    }
+
+    private func refreshSummaries(for request: IntakeSummaryRequest) async {
+        guard let library else { return }
+        let start = request.start
+        let endExclusive = calendar.date(byAdding: .day, value: 1, to: request.end) ?? request.end.addingTimeInterval(86_400)
+        do {
+            let records = try await Task.detached(priority: .userInitiated) {
+                try library.records(from: start, to: endExclusive)
+            }.value
+            guard !Task.isCancelled, request == self.request else { return }
+            var accumulators: [Date: IntakeDailyAccumulator] = [:]
+            for record in records {
+                let day = calendar.startOfDay(for: record.consumedAt)
+                switch record {
+                case .drink(let drink): accumulators[day, default: IntakeDailyAccumulator()].add(drink)
+                case .meal(let meal): accumulators[day, default: IntakeDailyAccumulator()].add(meal)
+                }
+            }
+            dailySummaries = (0..<request.range.rawValue).compactMap { offset in
+                guard let date = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
+                return (accumulators[date] ?? IntakeDailyAccumulator()).summary(on: date)
+            }
+            let latestDataDay = dailySummaries.last { day in
+                IntakeTrendMetric.allCases.contains { day.value(for: $0).value != nil }
+            }?.date
+            selectedDate = latestDataDay ?? request.end
+            loadedRequest = request
+        } catch {
+            // Keep the last successful summaries if the refresh fails.
+        }
     }
 
     private var rangeCaption: String {
@@ -2669,14 +2849,15 @@ private struct InsightsView: View {
     }
 }
 
-private struct StorageUsageSnapshot {
+private struct StorageUsageSnapshot: Sendable {
     let photoFileCount: Int?
     let photoBytes: Int?
-    let recordPayloadBytes: Int
+    let databaseBytes: Int?
+    let recordCount: Int
     let settingsBytes: Int?
 }
 
-private struct RecentPhotoCard: Identifiable {
+private struct RecentPhotoCard: Identifiable, Sendable {
     let recordID: UUID
     let asset: PhotoAsset
     let label: String
@@ -2686,31 +2867,15 @@ private struct RecentPhotoCard: Identifiable {
 }
 
 struct StorageDiagnosticsView: View {
-    @Query(sort: \StoredJournalRecord.consumedAt, order: .reverse)
-    private var storedRecords: [StoredJournalRecord]
+    @Environment(\.journalSQLiteStore) private var library
     @State private var usage: StorageUsageSnapshot?
+    @State private var recentPhotos: [RecentPhotoCard] = []
     @State private var failures: [PhotoStorageFailureEvent] = []
     @State private var copyMessage: String?
     @State private var activePhotoOverlay: JournalRecordOverlayRoute?
 
     private let failureStore = PhotoStorageDiagnosticsStore()
     private let catalogRepository = MenuCatalogRepository()
-
-    private var recentPhotos: [RecentPhotoCard] {
-        let photos = storedRecords.compactMap { storedRecord -> [RecentPhotoCard]? in
-            guard let record = try? storedRecord.decodeRecord() else { return nil }
-            switch record {
-            case .drink(let drink):
-                guard let photo = drink.photo else { return [] }
-                return [RecentPhotoCard(recordID: drink.id, asset: photo, label: drink.drinkName, occurredAt: drink.consumedAt)]
-            case .meal(let meal):
-                return meal.dishes.compactMap { dish in
-                    dish.photo.map { RecentPhotoCard(recordID: meal.id, asset: $0, label: dish.name, occurredAt: meal.consumedAt) }
-                }
-            }
-        }.flatMap { $0 }
-        return photos.sorted { $0.occurredAt > $1.occurredAt }.prefix(8).map { $0 }
-    }
 
     var body: some View {
         List {
@@ -2720,16 +2885,17 @@ struct StorageDiagnosticsView: View {
                 } label: {
                     Label("iCloud Drive 备份与恢复", systemImage: "icloud.and.arrow.up")
                 }
-                Button("刷新统计", systemImage: "arrow.clockwise", action: refresh)
+                Button("刷新统计", systemImage: "arrow.clockwise") { Task { await refresh() } }
                 Button("复制诊断摘要", systemImage: "doc.on.doc", action: copySummary)
             }
 
             Section("本机占用") {
                 LabeledContent("照片文件", value: usage?.photoBytes.map(Self.byteLabel) ?? "无法读取")
                 LabeledContent("照片文件数", value: usage?.photoFileCount.map(String.init) ?? "无法读取")
-                LabeledContent("记录数据估算", value: usage.map { Self.byteLabel($0.recordPayloadBytes) } ?? "读取中")
+                LabeledContent("SQLite 资料库", value: usage?.databaseBytes.map(Self.byteLabel) ?? "读取中")
+                LabeledContent("记录数量", value: usage.map { String($0.recordCount) } ?? "读取中")
                 LabeledContent("菜单与偏好", value: usage?.settingsBytes.map(Self.byteLabel) ?? "暂无")
-                Text("记录占用按编码字段估算；照片占用来自本机照片目录文件，不包含 iCloud 下载状态。")
+                Text("SQLite 占用包含主库及事务日志；照片占用来自本机原图目录，不包含 iCloud 下载状态。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -2788,7 +2954,7 @@ struct StorageDiagnosticsView: View {
         .sheet(item: $activePhotoOverlay) { route in
             JournalRecordOverlaySheet(route: route)
         }
-        .task { refresh() }
+        .task { await refresh() }
         .alert("诊断摘要", isPresented: Binding(
             get: { copyMessage != nil },
             set: { if !$0 { copyMessage = nil } }
@@ -2799,15 +2965,43 @@ struct StorageDiagnosticsView: View {
         }
     }
 
-    private func refresh() {
-        let photoUsage = Self.photoUsage(at: AppStoragePaths.photoStore.directoryURL)
-        usage = StorageUsageSnapshot(
-            photoFileCount: photoUsage?.count,
-            photoBytes: photoUsage?.bytes,
-            recordPayloadBytes: storedRecords.reduce(0) { $0 + $1.payload.count },
-            settingsBytes: catalogRepository.savedStateByteCount
-        )
-        failures = failureStore.recentEvents
+    private func refresh() async {
+        guard let library else { return }
+        let photoDirectory = AppStoragePaths.photoStore.directoryURL
+        let settingsBytes = catalogRepository.savedStateByteCount
+        do {
+            let result = try await Task.detached(priority: .utility) {
+                let entries = try library.recentPhotoEntries(limit: 16)
+                let photoUsage = Self.photoUsage(at: photoDirectory)
+                let photos = entries.flatMap { entry -> [RecentPhotoCard] in
+                    switch entry.record {
+                    case .drink(let drink):
+                        guard let photo = drink.photo else { return [] }
+                        return [RecentPhotoCard(recordID: drink.id, asset: photo, label: drink.drinkName, occurredAt: drink.consumedAt)]
+                    case .meal(let meal):
+                        return meal.dishes.compactMap { dish in
+                            dish.photo.map { RecentPhotoCard(recordID: meal.id, asset: $0, label: dish.name, occurredAt: meal.consumedAt) }
+                        }
+                    }
+                }.sorted { $0.occurredAt > $1.occurredAt }.prefix(8).map { $0 }
+                return (
+                    photos,
+                    StorageUsageSnapshot(
+                        photoFileCount: photoUsage?.count,
+                        photoBytes: photoUsage?.bytes,
+                        databaseBytes: library.databaseByteCount(),
+                        recordCount: try library.count(),
+                        settingsBytes: settingsBytes
+                    )
+                )
+            }.value
+            recentPhotos = result.0
+            usage = result.1
+            failures = failureStore.recentEvents
+        } catch {
+            usage = nil
+            recentPhotos = []
+        }
     }
 
     private func copySummary() {
@@ -2819,7 +3013,8 @@ struct StorageDiagnosticsView: View {
             "吃吃喝喝本机存储诊断",
             "照片文件：\(usage.photoBytes.map(Self.byteLabel) ?? "无法读取")",
             "照片文件数：\(usage.photoFileCount.map(String.init) ?? "无法读取")",
-            "记录数据估算：\(Self.byteLabel(usage.recordPayloadBytes))",
+            "SQLite 资料库：\(usage.databaseBytes.map(Self.byteLabel) ?? "无法读取")",
+            "记录数量：\(usage.recordCount)",
             "菜单与偏好：\(usage.settingsBytes.map(Self.byteLabel) ?? "暂无")",
             "近期照片失败：\(failures.count)"
         ].joined(separator: "\n")
@@ -2827,7 +3022,7 @@ struct StorageDiagnosticsView: View {
         copyMessage = "已复制摘要。内容不包含记录正文、照片、文件路径或原始错误。"
     }
 
-    private static func photoUsage(at directory: URL) -> (count: Int, bytes: Int)? {
+    private nonisolated static func photoUsage(at directory: URL) -> (count: Int, bytes: Int)? {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: directory.path) else { return (0, 0) }
         guard let enumerator = fileManager.enumerator(
@@ -3376,20 +3571,26 @@ private struct RecordDetailInfoRow: View {
 }
 
 private struct RecordDetailView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.journalSQLiteStore) private var library
     @Environment(\.dismiss) private var dismiss
     @AppStorage(MenuCatalogRepository.changeGenerationKey) private var catalogChangeGeneration = 0
 
-    let storedRecord: StoredJournalRecord
+    let entry: JournalLibraryEntry
 
     @State private var isEditing = false
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
     @State private var brandCatalog: [String: MenuBrand] = [:]
     @State private var activePhotoOverlay: JournalRecordOverlayRoute?
+    @State private var currentRecord: JournalRecord
+
+    init(entry: JournalLibraryEntry) {
+        self.entry = entry
+        _currentRecord = State(initialValue: entry.record)
+    }
 
     private var decodedRecord: JournalRecord? {
-        try? storedRecord.decodeRecord()
+        currentRecord
     }
 
     var body: some View {
@@ -3426,14 +3627,14 @@ private struct RecordDetailView: View {
             Button("删除", role: .destructive, action: deleteRecord)
             Button("取消", role: .cancel) {}
         }
-        .sheet(isPresented: $isEditing) {
+        .sheet(isPresented: $isEditing, onDismiss: refreshRecord) {
             NavigationStack {
                 if let record = decodedRecord {
                     switch record {
-                    case .drink:
-                        DrinkRecordForm(storedRecord: storedRecord)
-                    case .meal:
-                        MealRecordForm(storedRecord: storedRecord)
+                    case .drink(let drink):
+                        DrinkRecordForm(record: drink)
+                    case .meal(let meal):
+                        MealRecordForm(record: meal)
                     }
                 }
             }
@@ -3786,21 +3987,26 @@ private struct RecordDetailView: View {
     }
 
     private func deleteRecord() {
-        let previousRecord = decodedRecord
-        BackupChangeTracker().markChanged()
-        modelContext.delete(storedRecord)
+        guard let library, let previousRecord = decodedRecord else {
+            errorMessage = "资料库尚未就绪。"
+            return
+        }
         do {
-            try modelContext.save()
-            if let previousRecord {
-                for asset in Self.photoAssets(in: previousRecord) {
-                    try? AppStoragePaths.photoStore.remove(asset)
-                }
+            try library.delete(previousRecord.id)
+            BackupChangeTracker().markChanged()
+            for asset in Self.photoAssets(in: previousRecord) {
+                try? AppStoragePaths.photoStore.remove(asset)
             }
             dismiss()
         } catch {
-            modelContext.rollback()
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func refreshRecord() {
+        guard let library, let id = decodedRecord?.id,
+              let updated = try? library.record(id: id) else { return }
+        currentRecord = updated.record
     }
 
     private static func photoAssets(in record: JournalRecord) -> [PhotoAsset] {
@@ -3857,12 +4063,12 @@ private struct RecordDetailPhoto: View {
         .task(id: asset.id) {
             let currentAsset = asset
             let photoStore = AppStoragePaths.photoStore
-            let data = await Task.detached(priority: .utility) { () -> Data? in
+            let loaded = await Task.detached(priority: .utility) { () -> UIImage? in
                 guard let sourceData = try? photoStore.load(currentAsset) else { return nil }
-                return JournalPhotoThumbnailLoader.thumbnailData(from: sourceData, maxPixelSize: 2_000)
+                return GanfanThumbnailLoader.downsample(sourceData, maxPixelSize: 2_000)
             }.value
             guard !Task.isCancelled else { return }
-            image = data.flatMap(UIImage.init(data:))
+            image = loaded
             failed = image == nil
         }
     }
@@ -3876,8 +4082,8 @@ private struct JournalRecordOverlaySheet: View {
     var body: some View {
         NavigationStack {
             switch route {
-            case .detail(_, let storedRecord):
-                RecordDetailView(storedRecord: storedRecord)
+            case .detail(_, let entry):
+                RecordDetailView(entry: entry)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button("关闭") { dismiss() }
@@ -4010,7 +4216,7 @@ private struct PhotoViewer: View {
         let asset = assets[currentIndex]
         do {
             let data = try AppStoragePaths.photoStore.load(asset)
-            currentImage = Self.downsample(data, maxPixelSize: 2_400)
+            currentImage = GanfanThumbnailLoader.downsample(data, maxPixelSize: 2_400)
             if currentImage == nil {
                 errorMessage = "照片文件格式无法解码。"
             }
@@ -4029,7 +4235,7 @@ private struct PhotoViewer: View {
         for asset in assets where thumbnailImages[asset.id] == nil {
             do {
                 let data = try AppStoragePaths.photoStore.load(asset)
-                if let thumbnail = Self.downsample(data, maxPixelSize: 140) {
+                if let thumbnail = GanfanThumbnailLoader.downsample(data, maxPixelSize: 140) {
                     thumbnailImages[asset.id] = thumbnail
                 }
             } catch {
@@ -4043,16 +4249,6 @@ private struct PhotoViewer: View {
         }
     }
 
-    private static func downsample(_ data: Data, maxPixelSize: Int) -> UIImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
-            kCGImageSourceShouldCacheImmediately: true
-        ]
-        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        return UIImage(cgImage: image)
-    }
 }
 
 enum AppStoragePaths {

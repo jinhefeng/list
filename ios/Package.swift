@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "GanfanCore", targets: ["GanfanCore"])
     ],
     targets: [
-        .target(name: "GanfanCore"),
+        .target(name: "GanfanCore", linkerSettings: [.linkedLibrary("sqlite3")]),
         .testTarget(name: "GanfanCoreTests", dependencies: ["GanfanCore"])
     ]
 )

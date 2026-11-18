@@ -1,3 +1,4 @@
+import ImageIO
 import SwiftUI
 import UIKit
 
@@ -35,6 +36,63 @@ enum GanfanPalette {
     })
 }
 
+@MainActor
+enum GanfanThumbnailLoader {
+    struct Key: Hashable {
+        let resource: String
+        let maxPixelSize: Int
+
+        init(resource: String, dimension: CGFloat, scale: CGFloat) {
+            self.resource = resource
+            maxPixelSize = max(1, Int((dimension * scale).rounded(.up)))
+        }
+
+        var cacheKey: NSString { "\(resource)@\(maxPixelSize)" as NSString }
+    }
+
+    private static let cache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 256
+        cache.totalCostLimit = 32 * 1024 * 1024
+        return cache
+    }()
+    private static var inFlight: [Key: Task<UIImage?, Never>] = [:]
+
+    static func cachedImage(for key: Key) -> UIImage? {
+        cache.object(forKey: key.cacheKey)
+    }
+
+    static func load(_ key: Key, readData: @escaping @Sendable () -> Data?) async -> UIImage? {
+        if let image = cachedImage(for: key) { return image }
+        if let task = inFlight[key] { return await task.value }
+
+        let maxPixelSize = key.maxPixelSize
+        let task = Task.detached(priority: .utility) {
+            readData().flatMap { downsample($0, maxPixelSize: maxPixelSize) }
+        }
+        inFlight[key] = task
+        let image = await task.value
+        if let image, let pixels = image.cgImage {
+            cache.setObject(image, forKey: key.cacheKey, cost: pixels.bytesPerRow * pixels.height)
+        }
+        inFlight[key] = nil
+        return image
+    }
+
+    nonisolated static func downsample(_ data: Data, maxPixelSize: Int) -> UIImage? {
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: image)
+    }
+}
+
 struct GanfanBrandLogoIcon: View {
     private static let assetsWithOwnBackground: Set<String> = [
         "BrandIconAmasha",
@@ -55,14 +113,14 @@ struct GanfanBrandLogoIcon: View {
     let symbol: String?
     let imageID: UUID?
     var dimension: CGFloat = 20
-    @State private var customImage: UIImage?
+    @Environment(\.displayScale) private var displayScale
+    @State private var loadedImage: (key: GanfanThumbnailLoader.Key, image: UIImage)?
 
     init(assetName: String? = nil, symbol: String?, imageID: UUID? = nil, dimension: CGFloat = 20) {
         self.assetName = assetName
         self.symbol = symbol
         self.imageID = imageID
         self.dimension = dimension
-        _customImage = State(initialValue: nil)
     }
 
     private var resolvedAssetName: String? {
@@ -74,16 +132,16 @@ struct GanfanBrandLogoIcon: View {
         return assetName
     }
 
-    private var needsWhiteBacking: Bool {
-        guard let resolvedAssetName else { return false }
-        return !Self.assetsWithOwnBackground.contains(resolvedAssetName)
-    }
-
-    private var logoContentInset: CGFloat {
-        resolvedAssetName == "BrandIconCharlieTown" ? dimension * 0.06 : 0
+    private var imageKey: GanfanThumbnailLoader.Key? {
+        imageID.map { .init(resource: "logo:\($0.uuidString)", dimension: dimension, scale: displayScale) }
     }
 
     var body: some View {
+        let key = imageKey
+        let customImage = key.flatMap { key in
+            if let loadedImage, loadedImage.key == key { return loadedImage.image }
+            return GanfanThumbnailLoader.cachedImage(for: key)
+        }
         Group {
             if let customImage {
                 Image(uiImage: customImage)
@@ -94,24 +152,24 @@ struct GanfanBrandLogoIcon: View {
                 Image(resolvedAssetName)
                     .resizable()
                     .scaledToFit()
-                    .padding(logoContentInset)
+                    .padding(resolvedAssetName == "BrandIconCharlieTown" ? dimension * 0.06 : 0)
                     .frame(width: dimension, height: dimension)
-                    .background(needsWhiteBacking ? Color.white : Color.clear)
+                    .background(Self.assetsWithOwnBackground.contains(resolvedAssetName) ? Color.clear : Color.white)
             } else {
                 fallbackIcon
             }
         }
         .frame(width: dimension, height: dimension)
         .clipShape(RoundedRectangle(cornerRadius: dimension * 0.24, style: .continuous))
-        .task(id: imageID) {
-            guard let imageID else {
-                customImage = nil
+        .task(id: key) {
+            guard let key, let imageID else {
+                loadedImage = nil
                 return
             }
-            let data = await Task.detached(priority: .utility) {
-                AppStoragePaths.brandLogoImageData(for: imageID)
-            }.value
-            customImage = data.flatMap(UIImage.init(data:))
+            guard loadedImage?.key != key, !Task.isCancelled else { return }
+            let image = await GanfanThumbnailLoader.load(key) { AppStoragePaths.brandLogoImageData(for: imageID) }
+            guard let image, !Task.isCancelled else { return }
+            loadedImage = (key, image)
         }
         .accessibilityHidden(true)
     }

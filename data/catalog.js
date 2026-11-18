@@ -1,8 +1,8 @@
-const updatedAt = '2026-11-16';
-const checkedAt = '2026-11-16';
+const updatedAt = '2026-11-18';
+const checkedAt = '2026-11-18';
 // Increment this when bundled brand, drink, or logo data changes. The store uses
 // it to refresh cached catalogs on existing installations without clearing records.
-const baseVersion = '2026-11-16.5';
+const baseVersion = '2026-11-18.2';
 const phoneOverrides = require('./catalog-phone-overrides');
 const version = phoneOverrides.version || baseVersion;
 

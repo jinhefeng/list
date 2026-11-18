@@ -1,17 +1,20 @@
-import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
+extension Notification.Name {
+    static let ganfanLibraryBackupStateChanged = Notification.Name("ganfanLibraryBackupStateChanged")
+    static let ganfanJournalRecordsRestored = Notification.Name("ganfanJournalRecordsRestored")
+}
+
 struct BackupSettingsView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \StoredJournalRecord.consumedAt, order: .reverse)
-    private var storedRecords: [StoredJournalRecord]
+    @Environment(\.journalSQLiteStore) private var library
+    @AppStorage(BackupChangeTracker.generationKey) private var libraryChangeGeneration = 0
     @AppStorage(BackupChangeTracker.pendingKey) private var hasPendingLibraryChanges = false
     @StateObject private var model = BackupWorkflowModel.shared
-
-    private var pendingCount: Int {
-        storedRecords.filter(\.needsBackup).count
-    }
+    @State private var recordCount = 0
+    @State private var pendingCount = 0
+    @State private var legacyIssueCount = 0
+    private var libraryIsEmpty: Bool { recordCount == 0 && legacyIssueCount == 0 }
 
     private var backupStatus: String {
         if model.isWorking { return "正在处理备份" }
@@ -20,10 +23,13 @@ struct BackupSettingsView: View {
     }
 
     private func snapshotDescription(_ snapshot: BackupSnapshotSummary) -> String {
+        let recordText = snapshot.legacyIssueCount == 0
+            ? "\(snapshot.recordCount) 条记录"
+            : "\(snapshot.recordCount) 条可读取记录 · \(snapshot.legacyIssueCount) 条旧记录原样保留"
         if snapshot.includesCatalog {
-            return "\(snapshot.recordCount) 条记录 · \(snapshot.photoCount) 张原图 · \(snapshot.brandCount) 个品牌 · \(snapshot.drinkCount) 款饮品 · 营养数据已备份（更新包 \(snapshot.nutritionEntryCount) 条）"
+            return "\(recordText) · \(snapshot.photoCount) 张原图 · \(snapshot.brandCount) 个品牌 · \(snapshot.drinkCount) 款饮品 · 营养数据已备份（更新包 \(snapshot.nutritionEntryCount) 条）"
         }
-        return "\(snapshot.recordCount) 条记录 · \(snapshot.photoCount) 张原图 · 此旧快照未包含饮品目录和营养数据"
+        return "\(recordText) · \(snapshot.photoCount) 张原图 · 此旧快照未包含饮品目录和营养数据"
     }
 
     var body: some View {
@@ -34,7 +40,7 @@ struct BackupSettingsView: View {
                         Label(backupStatus, systemImage: model.isWorking ? "arrow.triangle.2.circlepath.icloud" : "externaldrive")
                             .font(.headline)
                             .foregroundStyle(model.folderBookmark.isEmpty || pendingCount > 0 || hasPendingLibraryChanges ? GanfanPalette.leaf : GanfanPalette.forest)
-                        Text("\(storedRecords.count) 条记录 · \(pendingCount) 条待备份")
+                        Text("\(recordCount + legacyIssueCount) 条记录 · \(pendingCount) 条待备份")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         if !model.folderName.isEmpty {
@@ -67,12 +73,12 @@ struct BackupSettingsView: View {
             }
 
             Section("本机资料库") {
-                LabeledContent("记录数", value: "\(storedRecords.count)")
+                LabeledContent("记录数", value: "\(recordCount + legacyIssueCount)")
                 LabeledContent("待备份记录", value: "\(pendingCount)")
                 LabeledContent("资料库变更", value: hasPendingLibraryChanges ? "待备份" : "已备份")
 
                 Button {
-                    model.backupNow(storedRecords: storedRecords, context: modelContext)
+                    if let library { model.backupNow(library: library) }
                 } label: {
                     if model.isWorking {
                         ProgressView("正在校验并写入")
@@ -115,13 +121,13 @@ struct BackupSettingsView: View {
                             Button("恢复此快照") {
                                 model.requestRestore(snapshot)
                             }
-                            .disabled(model.isWorking || !storedRecords.isEmpty)
+                            .disabled(model.isWorking || !libraryIsEmpty)
                         }
                         .padding(.vertical, 4)
                     }
                 }
 
-                if !storedRecords.isEmpty {
+                if !libraryIsEmpty {
                     Text("为保护本机数据，恢复只对空资料库开放。当前资料库已有记录。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -148,12 +154,12 @@ struct BackupSettingsView: View {
             allowedContentTypes: [.folder],
             allowsMultipleSelection: false,
             onCompletion: { result in
-                model.saveSelectedFolder(result, records: storedRecords, context: modelContext)
+                if let library { model.saveSelectedFolder(result, library: library) }
             }
         )
         .confirmationDialog("恢复这份备份？", isPresented: $model.isConfirmingRestore, titleVisibility: .visible) {
             Button("恢复到空资料库", role: .destructive) {
-                model.restoreSelectedSnapshot(storedRecords: storedRecords, context: modelContext)
+                if let library { model.restoreSelectedSnapshot(library: library) }
             }
             Button("取消", role: .cancel) {}
         } message: {
@@ -173,6 +179,25 @@ struct BackupSettingsView: View {
         }
         .task {
             model.restoreSavedFolderAccess()
+            await refreshCounts()
+        }
+        .task(id: libraryChangeGeneration) { await refreshCounts() }
+        .onReceive(NotificationCenter.default.publisher(for: .ganfanLibraryBackupStateChanged)) { _ in
+            Task { await refreshCounts() }
+        }
+    }
+
+    private func refreshCounts() async {
+        guard let library else { return }
+        do {
+            let result = try await Task.detached(priority: .utility) {
+                (try library.count(), try library.pendingBackupCount(), try library.legacyIssueCount())
+            }.value
+            recordCount = result.0
+            pendingCount = result.1
+            legacyIssueCount = result.2
+        } catch {
+            model.status = "无法读取资料库摘要：\(error.localizedDescription)"
         }
     }
 }
@@ -207,8 +232,7 @@ final class BackupWorkflowModel: ObservableObject {
 
     func saveSelectedFolder(
         _ result: Result<[URL], Error>,
-        records: [StoredJournalRecord],
-        context: ModelContext
+        library: JournalSQLiteStore
     ) {
         let folderURL: URL
         do {
@@ -241,8 +265,10 @@ final class BackupWorkflowModel: ObservableObject {
             homeFailure = nil
             status = "目录授权已保存。App 会把记录快照和原图写入此目录下的「吃吃喝喝」文件夹；已有的「食光记」或「干饭手册」备份仍可读取。"
 
-            if !records.isEmpty || BackupChangeTracker().hasPendingChanges {
-                backupNow(storedRecords: records, context: context)
+            let recordCount = try library.count()
+            let legacyIssueCount = try library.legacyIssueCount()
+            if recordCount > 0 || legacyIssueCount > 0 || BackupChangeTracker().hasPendingChanges {
+                backupNow(library: library)
             }
         } catch {
             status = "保存目录授权或读取现有备份失败：\(error.localizedDescription)"
@@ -293,19 +319,19 @@ final class BackupWorkflowModel: ObservableObject {
         }
     }
 
-    func backupIfNeeded(storedRecords: [StoredJournalRecord], context: ModelContext) {
-        guard (storedRecords.contains(where: \.needsBackup) || BackupChangeTracker().hasPendingChanges),
-              !folderBookmark.isEmpty else { return }
+    func backupIfNeeded(library: JournalSQLiteStore) {
+        guard !folderBookmark.isEmpty else { return }
+        let pendingCount = (try? library.pendingBackupCount()) ?? 0
+        guard pendingCount > 0 || BackupChangeTracker().hasPendingChanges else { return }
         if isWorking {
             retryRequestedAfterCurrentBackup = true
             return
         }
-        backupNow(storedRecords: storedRecords, context: context)
+        backupNow(library: library)
     }
 
-    func backupNow(storedRecords: [StoredJournalRecord], context: ModelContext) {
+    func backupNow(library: JournalSQLiteStore) {
         guard !isWorking else { return }
-        let recordSnapshots = storedRecords.map { $0.decodingSnapshot() }
         var activeFolderURL: URL?
 
         do {
@@ -321,6 +347,7 @@ final class BackupWorkflowModel: ObservableObject {
             let libraryID = currentOrCreateLibraryID()
             let changeTracker = BackupChangeTracker()
             let backupGeneration = changeTracker.generation
+            let databaseGeneration = library.dataGeneration
             let backupStore = BackupDirectoryStore(userSelectedFolderURL: folderURL)
             let photoStore = AppStoragePaths.photoStore
             let brandLogoStore = AppStoragePaths.brandLogoPhotoStore
@@ -332,13 +359,16 @@ final class BackupWorkflowModel: ObservableObject {
                 defer {
                     folderURL.stopAccessingSecurityScopedResource()
                     isWorking = false
-                    queueFollowupBackupIfRequested(using: context)
+                    queueFollowupBackupIfRequested(using: library)
                 }
 
                 do {
                     let records = try await Task.detached(priority: .utility) {
-                        try recordSnapshots.map { try $0.decodeRecord() }
+                        try library.allRecords().map(\.record)
                     }.value
+                    guard library.dataGeneration == databaseGeneration else {
+                        throw JournalSQLiteStoreError.sqliteFailure("备份期间资料库发生变化，请重新备份。")
+                    }
                     let result = try await Task.detached(priority: .utility) {
                         let catalogRepository = MenuCatalogRepository()
                         guard let catalogURL = Bundle.main.url(forResource: "catalog", withExtension: "json") else {
@@ -355,7 +385,8 @@ final class BackupWorkflowModel: ObservableObject {
                             catalogState: catalogState,
                             brandLogoAssets: brandLogoAssets,
                             catalog: catalog,
-                            nutritionDataPack: nutritionDataPack
+                            nutritionDataPack: nutritionDataPack,
+                            preserveRecordPrecision: true
                         )
                         var photoData: [UUID: Data] = [:]
                         for asset in snapshot.photos {
@@ -365,8 +396,11 @@ final class BackupWorkflowModel: ObservableObject {
                         for asset in snapshot.brandLogoAssets ?? [] {
                             brandLogoData[asset.id] = try brandLogoStore.load(asset)
                         }
-                        return try backupStore.write(
+                        return try backupStore.writeSQLite(
                             snapshot: snapshot,
+                            library: library,
+                            changeGeneration: backupGeneration,
+                            databaseGeneration: databaseGeneration,
                             photoData: photoData,
                             brandLogoData: brandLogoData
                         )
@@ -376,19 +410,13 @@ final class BackupWorkflowModel: ObservableObject {
                         try backupStore.listSnapshots()
                     }.value
                     homeFailure = nil
-                    if changeTracker.generation == backupGeneration {
-                        for storedRecord in storedRecords {
-                            storedRecord.needsBackup = false
-                        }
-                        do {
-                            try context.save()
-                        } catch {
-                            context.rollback()
-                            throw error
-                        }
-                        _ = changeTracker.markBackedUp(ifGenerationMatches: backupGeneration)
+                    if changeTracker.generation == backupGeneration,
+                       try library.markAllBackedUp(ifDataGenerationMatches: databaseGeneration),
+                       changeTracker.markBackedUp(ifGenerationMatches: backupGeneration) {
+                        NotificationCenter.default.post(name: .ganfanLibraryBackupStateChanged, object: nil)
                         let snapshotResult = result.didCreateSnapshot ? "已写入新快照" : "内容未变化，沿用已有快照"
-                        status = "\(snapshotResult)：\(result.recordCount) 条记录、\(result.photoCount) 张原图、\(result.brandLogoCount) 个自定义图案、\(result.brandCount) 个品牌、\(result.drinkCount) 款饮品目录和营养数据（更新包 \(result.nutritionEntryCount) 条）。iCloud 同步状态由系统处理，App 未确认云端上传。"
+                        let legacyText = result.legacyIssueCount == 0 ? "" : "、\(result.legacyIssueCount) 条无法解析的旧记录已原样保留"
+                        status = "\(snapshotResult)：\(result.recordCount) 条可读取记录\(legacyText)、\(result.photoCount) 张原图、\(result.brandLogoCount) 个自定义图案、\(result.brandCount) 个品牌、\(result.drinkCount) 款饮品目录和营养数据（更新包 \(result.nutritionEntryCount) 条）。iCloud 同步状态由系统处理，App 未确认云端上传。"
                     } else {
                         status = result.didCreateSnapshot
                             ? "已写入一份快照，但备份期间资料又有变更，仍标记为待备份。iCloud 同步状态由系统处理。"
@@ -488,9 +516,9 @@ final class BackupWorkflowModel: ObservableObject {
         isConfirmingRestore = true
     }
 
-    func restoreSelectedSnapshot(storedRecords: [StoredJournalRecord], context: ModelContext) {
+    func restoreSelectedSnapshot(library: JournalSQLiteStore) {
         guard !isWorking else { return }
-        guard storedRecords.isEmpty else {
+        guard let counts = try? library.migrationCounts(), counts.records == 0, counts.legacy == 0 else {
             status = "当前资料库非空，未执行恢复。"
             return
         }
@@ -515,8 +543,12 @@ final class BackupWorkflowModel: ObservableObject {
             status = "正在下载并校验快照与全部原图。"
 
             Task { @MainActor in
+                var temporaryDatabaseSnapshotURL: URL?
                 defer {
                     folderURL.stopAccessingSecurityScopedResource()
+                    if let temporaryDatabaseSnapshotURL {
+                        try? FileManager.default.removeItem(at: temporaryDatabaseSnapshotURL)
+                    }
                     isWorking = false
                 }
 
@@ -524,22 +556,26 @@ final class BackupWorkflowModel: ObservableObject {
                     let archive = try await Task.detached(priority: .utility) {
                         try backupStore.loadSnapshot(named: selectedSnapshot.fileName)
                     }.value
+                    temporaryDatabaseSnapshotURL = archive.databaseSnapshotURL
                     try await JournalLibraryRestoreService.restore(
                         archive,
                         photoStore: photoStore,
                         catalogRepository: MenuCatalogRepository(),
                         brandLogoStore: brandLogoStore,
                         nutritionRepository: NutritionUpdateRepository(),
-                        into: context
+                        into: library
                     )
-
                     saveLibraryID(archive.snapshot.libraryID)
                     let changeTracker = BackupChangeTracker()
                     _ = changeTracker.markBackedUp(ifGenerationMatches: changeTracker.generation)
                     let catalogSummary = archive.snapshot.catalog.map {
                         "\($0.brands.count) 个品牌、\($0.drinks.count) 款饮品及营养数据（更新包 \(archive.snapshot.nutritionDataPack?.entries.count ?? 0) 条）"
                     } ?? "此旧快照未包含饮品目录和营养数据"
-                    status = "恢复完成：\(archive.snapshot.records.count) 条记录、\(archive.snapshot.photos.count) 张原图、\((archive.snapshot.brandLogoAssets ?? []).count) 个自定义图案、\(catalogSummary)。图片与菜单数据已保存在本机，可离线使用。"
+                    NotificationCenter.default.post(name: .ganfanJournalRecordsRestored, object: nil)
+                    NotificationCenter.default.post(name: .ganfanLibraryBackupStateChanged, object: nil)
+                    let restoredCounts = try library.migrationCounts()
+                    let legacyText = restoredCounts.legacy == 0 ? "" : "，另有 \(restoredCounts.legacy) 条无法解析的旧记录已原样保留"
+                    status = "恢复完成：\(restoredCounts.records) 条可读取记录\(legacyText)、\(archive.snapshot.photos.count) 张原图、\((archive.snapshot.brandLogoAssets ?? []).count) 个自定义图案、\(catalogSummary)。图片与菜单数据已保存在本机，可离线使用。"
                 } catch {
                     status = "恢复失败；本机没有新增部分记录。请等待 iCloud 文件下载完成后重试。\n\(error.localizedDescription)"
                 }
@@ -584,13 +620,12 @@ final class BackupWorkflowModel: ObservableObject {
         UserDefaults.standard.set(libraryID.uuidString, forKey: Self.libraryIDKey)
     }
 
-    private func queueFollowupBackupIfRequested(using context: ModelContext) {
+    private func queueFollowupBackupIfRequested(using library: JournalSQLiteStore) {
         guard retryRequestedAfterCurrentBackup else { return }
         retryRequestedAfterCurrentBackup = false
-        guard let latestRecords = try? context.fetch(FetchDescriptor<StoredJournalRecord>()) else { return }
         Task { @MainActor in
             await Task.yield()
-            backupIfNeeded(storedRecords: latestRecords, context: context)
+            backupIfNeeded(library: library)
         }
     }
 }

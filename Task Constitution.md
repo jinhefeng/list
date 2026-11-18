@@ -22,8 +22,8 @@ Build the meal-logging product, with the current release direction as the native
 - Objective: Deliver a branded, local-first iPhone app reproducing all nine Mini Program pages and their data behavior, without importing Mini Program history; preserve the user's existing iOS records and keep a bounded extension path for future shared lists.
 - Acceptance: Nine pages/data contracts are mapped and accepted; offline records/photos, menu, history, nutrition insights, diagnostics, and backup/restore work; iOS data survives upgrades; no login/sharing in v1; stable IDs and versioned boundaries support future architecture work.
 - Details: `docs/ios-development-plan.md`; page/data map `docs/ios-miniprogram-parity-map.md`; core checks in `tests/mvp.test.md` sections G–I and full parity checks in section J.
-- Current result: Native SwiftUI target includes local-first drink/meal flows, selected-folder backup/restore, the approved Logo/AppIcon, all nine page shells, and the first drink-data parity increment. Temperature/ice fields are backward-decodable; nutrition variants and per-unit baselines preserve confidence and source URL. Full effective drink catalog, nutrition data pack, custom logo assets, and logo visibility/overrides are now included in backup/restore, with legacy-snapshot compatibility; drink and meal forms support MapKit selection and manual address fallback. Swift core automation passes 54/54, and unsigned iOS/device-SDK and simulator builds succeed. The latest iPhone 18 Pro simulator screenshot confirms one visible brand title, an in-content search field, and a compact drink-count/cup/nutrition summary. Full page interaction/visual parity, physical iPhone launch (previous attempt stopped at the untrusted Developer App certificate), and actual iCloud delivery remain unverified.
-- Next action: Continue page-by-page interaction and visual checks, then verify the selected-folder backup flow and empty-library restore on the physical iPhone after its developer certificate is trusted.
+- Current result: Native SwiftUI target includes local-first drink/meal flows, selected-folder backup/restore, the approved Logo/AppIcon, nine page shells, and drink/meal data parity work. Records now use structured SQLite with all-time paginated history and `.sqlite` backups while retaining old JSON backup import; Swift core automation passes 72/72, including isolated SwiftData migration and 22,000-row pagination, and the iOS simulator-target build succeeds. Full page interaction/visual parity, real user-library migration, physical-device performance and actual iCloud delivery remain unverified.
+- Next action: Verify migration and all-history behavior with isolated legacy and large synthetic libraries, then measure scrolling, launch and backup/restore on the target iPhone; continue remaining page visual checks separately.
 
 #### T6.1 — 页面/数据基线与品牌视觉
 - Status: 进行中（九页映射、Logo/AppIcon 和共享品牌组件已接入；模拟器首页已做局部视觉检查，其余页面仍待对照）
@@ -33,20 +33,20 @@ Build the meal-logging product, with the current release direction as the native
 - Evidence: `docs/ios-miniprogram-parity-map.md`; `tests/mvp.test.md` J-01/J-02.
 
 #### T6.2 — 数据契约与本机仓储边界
-- Status: 进行中（菜单、完整饮品目录和营养数据的备份恢复兼容已接入；重复快照抑制、旧备份预览清理及本机旧品牌/菜单自动合并已实现；本机仓储抽象和全量兼容验收仍待完成）
+- Status: 进行中（结构化 SQLite 主库、旧 SwiftData 分批迁移、SQLite 单文件备份及旧 JSON 兼容已实现；72/72 核心测试通过，含隔离迁移和 22,000 条分页用例；真实用户旧库升级与设备/iCloud 验收仍待完成）
 - Objective: Complete the catalog/nutrition/local override contract and isolate local persistence behind a replaceable boundary, with versioned IDs and backup compatibility.
 - Acceptance: Domain tests cover catalog, nutrition provenance, custom overrides and stable record/photo IDs; existing iOS data stays readable; no account, membership or online sync is introduced.
 - Depends on: T6.1
 
 #### T6.3 — 九页功能与数据补齐
-- Status: 进行中（新增品牌、网页菜单/Logo 候选、裁切保存及旧目录合并已接入；摄入洞察趋势页已实现，页面交互与视觉验收仍待完成）
+- Status: 进行中（历史页已取消默认日期并接入 SQLite 分批读取；新增品牌、菜单候选和摄入趋势已实现；九页交互与视觉验收仍待完成）
 - Objective: Complete Today, drink entry, catalog, meal entry, photo preview, storage diagnostics, history, record detail and nutrition insights.
 - Acceptance: IOS-3-02–15 pass their behavior and page gates; IOS-3-13 defaults to 7 days with 30/90-day options and orders metrics as 热量、咖啡因、糖、脂肪、蛋白质、碳水化合物、水分（饮品）; has no separate daily-average cards, shows each metric's range average with the concise label 日均摄入 and the number of days used, excluding missing days from the average, and uses consistent cards with latest valid-day value, latest contributing record time, and a noninteractive mini trend on the collapsed face without a redundant source/estimate/date footer; the card flips to a large chart on tap, chart taps select a day immediately, vertical movement scrolls the page, and selection persists after release; drink-only metrics remain bar charts with visible fixed-point widths calculated from chart size and range length; combines shared meal/drink nutrients, keeps beverage volume/caffeine drink-only, includes estimates, preserves missing values as gaps, and has no record list; single-user navigation and filtering match scope.
 - Depends on: T6.1, T6.2
-- Current result: 饮品目录提供“新增品牌”向导，可在百度/Bing 的 App 内网页中读取结构化商品名、菜单列表和图片候选；用户可编辑菜单并选择、裁切 Logo 后保存。检索不调用 AI 或搜索 API，菜单候选保留网页来源并标记待核验。目录加载会把旧本地品牌按唯一名称/别名迁到内置 ID，合并同名菜单并保留旧饮品 ID；用户 Logo 优先，无用户 Logo 时继承软件包图案，恢复出的目录也会处理。今日页已按日查询并缓存解码结果，备份 I/O 和目录首次读取移到后台；核心测试 67/67、iOS 模拟器 Debug 构建和空态启动通过。历史数据量、备份目录与完整页面交互及 Release/Profile 性能采样仍待验收。
+- Current result: 饮品目录提供“新增品牌”向导，可在百度/Bing 的 App 内网页中读取结构化商品名、菜单列表和图片候选；用户可编辑菜单并选择、裁切 Logo 后保存。检索不调用 AI 或搜索 API，菜单候选保留网页来源并标记待核验。目录加载会把旧本地品牌按唯一名称/别名迁到内置 ID，合并同名菜单并保留旧饮品 ID；用户 Logo 优先，无用户 Logo 时继承软件包图案，恢复出的目录也会处理。今日页已按日查询并缓存解码结果，备份 I/O 和目录首次读取移到后台。历史默认不限日期、按 50 条分页，搜索覆盖未加载记录；Swift 核心测试 72/72（含隔离旧库迁移和 22,000 条分页）、iOS 模拟器目标构建通过。真实用户旧库迁移、设备性能和页面验收仍待完成。
 
 #### T6.4 — 集成与设备验收
-- Status: 进行中（今日页模拟器空态启动通过；Release/Profile 性能和目标设备交互待测）
+- Status: 进行中（本轮 Swift 核心测试 72/72、iOS 模拟器目标构建通过；真实用户旧库、目标设备交互、Release/Profile 性能与 iCloud 行为待测）
 - Objective: Verify visual parity, data preservation, offline behavior, selected-folder backup and empty-library restore on the target iPhone.
 - Acceptance: IOS-3-16/17 and relevant real-device checks pass; build, automation, UI runtime and cloud sync evidence remain distinct.
 - Depends on: T6.1–T6.3
@@ -88,10 +88,10 @@ Build the meal-logging product, with the current release direction as the native
 - Next action: Check date grouping, content scrolling, and navigation through Today links and native back; review the photo stack and viewer in WeChat Developer Tools, then verify map selection and dish ordering on device.
 
 ## 4. Current Focus
-- Task: T6.3
-- Parent path: T6 → T6.3
-- Objective: Complete and verify the nine iOS page flows against the Mini Program's behavior and data contracts.
-- Next action: 按新趋势页口径完成摄入洞察的图表交互与视觉验收；九页页面门未完整通过前保持 T6.3 进行中。
+- Task: T6.4
+- Parent path: T6 → T6.4
+- Objective: Verify the implemented history/storage change with isolated legacy data, large synthetic libraries, device interaction, and backup/restore evidence.
+- Next action: 在隔离资料上验证真实 SwiftData 迁移与历史滚动；用目标 iPhone 和 11k/22k 合成资料记录启动、查询、卡顿及内存数据。其他页面视觉验收仍保留在 T6.1/T6.3。
 
 ## 5. Decision Log
 | Date | Decision | Rationale | Impact |
@@ -174,6 +174,7 @@ Build the meal-logging product, with the current release direction as the native
 ## 8. Detail Pointers
 - Format: v1 single-file
 - iOS plan: docs/ios-development-plan.md；今日页性能修复与验收（T6.3/T6.4）：`docs/ios-today-performance-plan.md`
+- 全部历史与长期存储（T6.2–T6.4，代码完成；Swift 核心测试 72/72、22,000 条分页通过、模拟器目标构建通过；真实用户旧库、设备性能和 iCloud 验收待完成）。历史默认日期不限，日期筛选可选。[开发计划](docs/ios-journal-storage-delivery-plan.md)
 - History: recent changes retained here
 
 ## 9. Current Round

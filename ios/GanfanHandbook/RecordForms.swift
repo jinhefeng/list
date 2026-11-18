@@ -3,7 +3,6 @@ import Photos
 import CoreLocation
 import ImageIO
 import UniformTypeIdentifiers
-import SwiftData
 import SwiftUI
 import UIKit
 
@@ -22,10 +21,9 @@ private enum DrinkRecordSheet: Identifiable {
 
 struct DrinkRecordForm: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.journalSQLiteStore) private var library
     @FocusState private var focusedField: DrinkRecordFocusedField?
 
-    private let storedRecord: StoredJournalRecord?
     private let originalRecord: DrinkRecord?
     private let onSave: (() -> Void)?
 
@@ -59,10 +57,9 @@ struct DrinkRecordForm: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
-    init(storedRecord: StoredJournalRecord? = nil, onSave: (() -> Void)? = nil) {
-        self.storedRecord = storedRecord
+    init(record: DrinkRecord? = nil, onSave: (() -> Void)? = nil) {
         self.onSave = onSave
-        let originalRecord = Self.decodeDrink(storedRecord)
+        let originalRecord = record
         self.originalRecord = originalRecord
         let servingSelection = DrinkServingSelection(
             temperature: originalRecord?.temperature,
@@ -367,7 +364,7 @@ struct DrinkRecordForm: View {
                 .onTapGesture(perform: dismissDrinkNameFocus)
         }
         .tint(GanfanPalette.forest)
-        .navigationTitle(storedRecord == nil ? "记录饮品" : "编辑饮品")
+        .navigationTitle(originalRecord == nil ? "记录饮品" : "编辑饮品")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
         .toolbar {
@@ -982,20 +979,14 @@ struct DrinkRecordForm: View {
     }
 
     private func persist(_ record: JournalRecord, createdPhotoAssets: [PhotoAsset]) throws {
+        guard let library else { throw JournalSQLiteStoreError.cannotOpen("资料库尚未就绪") }
         try JournalRecordCommitService.save(
             record,
-            replacing: storedRecord,
+            replacing: originalRecord?.id,
             createdPhotoAssets: createdPhotoAssets,
             photoStore: AppStoragePaths.photoStore,
-            into: modelContext
+            into: library
         )
-    }
-
-    private static func decodeDrink(_ storedRecord: StoredJournalRecord?) -> DrinkRecord? {
-        guard let storedRecord, let decoded = try? storedRecord.decodeRecord(), case .drink(let drink) = decoded else {
-            return nil
-        }
-        return drink
     }
 
     private static func loadBundledCatalog() -> MenuCatalog? {
@@ -1148,9 +1139,8 @@ private enum DrinkPhotoPreview {
 
 struct MealRecordForm: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.journalSQLiteStore) private var library
 
-    private let storedRecord: StoredJournalRecord?
     private let originalRecord: MealRecord?
     private let onSave: (() -> Void)?
 
@@ -1166,10 +1156,9 @@ struct MealRecordForm: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
-    init(storedRecord: StoredJournalRecord? = nil, onSave: (() -> Void)? = nil) {
-        self.storedRecord = storedRecord
+    init(record: MealRecord? = nil, onSave: (() -> Void)? = nil) {
         self.onSave = onSave
-        let originalRecord = Self.decodeMeal(storedRecord)
+        let originalRecord = record
         self.originalRecord = originalRecord
 
         _consumedAt = State(initialValue: originalRecord?.consumedAt ?? .now)
@@ -1244,7 +1233,7 @@ struct MealRecordForm: View {
         .scrollContentBackground(.hidden)
         .background(GanfanPalette.canvas)
         .tint(GanfanPalette.forest)
-        .navigationTitle(storedRecord == nil ? "记录用餐" : "编辑用餐")
+        .navigationTitle(originalRecord == nil ? "记录用餐" : "编辑用餐")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -1348,20 +1337,14 @@ struct MealRecordForm: View {
     }
 
     private func persist(_ record: JournalRecord, createdPhotoAssets: [PhotoAsset]) throws {
+        guard let library else { throw JournalSQLiteStoreError.cannotOpen("资料库尚未就绪") }
         try JournalRecordCommitService.save(
             record,
-            replacing: storedRecord,
+            replacing: originalRecord?.id,
             createdPhotoAssets: createdPhotoAssets,
             photoStore: AppStoragePaths.photoStore,
-            into: modelContext
+            into: library
         )
-    }
-
-    private static func decodeMeal(_ storedRecord: StoredJournalRecord?) -> MealRecord? {
-        guard let storedRecord, let decoded = try? storedRecord.decodeRecord(), case .meal(let meal) = decoded else {
-            return nil
-        }
-        return meal
     }
 }
 

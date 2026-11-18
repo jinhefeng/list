@@ -1,4 +1,3 @@
-import SwiftData
 import PhotosUI
 import ImageIO
 import SwiftUI
@@ -114,7 +113,9 @@ private enum CatalogDrinkEditorPresentation: Identifiable {
 }
 
 struct CatalogManagementView: View {
-    @Query private var storedRecords: [StoredJournalRecord]
+    @Environment(\.journalSQLiteStore) private var library
+    @AppStorage(BackupChangeTracker.generationKey) private var libraryChangeGeneration = 0
+    @State private var referencedDrinkIDs: Set<String> = []
     @State private var catalog: MenuCatalog?
     @State private var userState = MenuCatalogUserState()
     @State private var query = ""
@@ -141,13 +142,6 @@ struct CatalogManagementView: View {
 
     private var categories: [String] {
         Array(Set(catalog?.drinks.map(\.category).filter { !$0.isEmpty } ?? [])).sorted()
-    }
-
-    private var referencedDrinkIDs: Set<String> {
-        Set(storedRecords.compactMap { storedRecord -> String? in
-            guard let record = try? storedRecord.decodeRecord(), case .drink(let drink) = record else { return nil }
-            return drink.drinkID.isEmpty ? nil : drink.drinkID
-        })
     }
 
     var body: some View {
@@ -282,6 +276,7 @@ struct CatalogManagementView: View {
             }
         }
         .task { loadCatalog() }
+        .task(id: libraryChangeGeneration) { await refreshRecordReferences() }
         .sheet(item: $editorPresentation, onDismiss: loadCatalog) { presentation in
             NavigationStack {
                 switch presentation {
@@ -311,6 +306,17 @@ struct CatalogManagementView: View {
             Button("好", role: .cancel) { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "请重试。")
+        }
+    }
+
+    private func refreshRecordReferences() async {
+        guard let library else { return }
+        do {
+            referencedDrinkIDs = try await Task.detached(priority: .utility) {
+                try library.referencedDrinkIDs()
+            }.value
+        } catch {
+            referencedDrinkIDs = []
         }
     }
 

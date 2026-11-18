@@ -18,7 +18,9 @@ test('bundled catalog includes requested brands and brand logo assets', () => {
     ['brand-kfc', '肯德基', 'BrandIconKFC'],
     ['brand-quchashan', '去茶山', 'BrandIconQuchashan', '去茶山茶饮'],
     ['brand-red-tea-company', '红茶公司', 'BrandIconCharlieTown', 'Charlie Town Tea Company'],
-    ['brand-tai-ben-niu', '太犇牛', 'BrandIconTaiBenNiu', 'TAI BEN NIU']
+    ['brand-tai-ben-niu', '太犇牛', 'BrandIconTaiBenNiu', 'TAI BEN NIU'],
+    ['brand-chun-tian', '椿田熟成茶行', 'BrandIconChunTian'],
+    ['brand-yihetang', '益禾堂', 'BrandIconYihetang']
   ];
 
   for (const [id, name, assetName, expectedAlias] of expected) {
@@ -50,6 +52,28 @@ test('bundled catalog includes requested brands and brand logo assets', () => {
 
   for (const id of ['brand-quchashan', 'brand-red-tea-company', 'brand-tai-ben-niu']) {
     assert.equal(catalog.drinks.some((drink) => drink.brandId === id), false, `${id} should not have unverified menu drinks`);
+  }
+});
+
+test('益禾堂 keeps its existing menu and uses the supplied logo image', () => {
+  const brands = catalog.brands.filter((item) => item.id === 'brand-yihetang');
+  const drinks = catalog.drinks.filter((item) => item.brandId === 'brand-yihetang');
+  assert.equal(brands.length, 1);
+  assert.ok(drinks.some((item) => item.name === '杨枝甘露'));
+  assert.equal(brands[0].logoAssetName, 'BrandIconYihetang');
+
+  const manifestPath = path.join(assetsRoot, 'BrandIconYihetang.imageset/Contents.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  assert.equal(manifest.images[0].filename, 'BrandIconYihetang.png');
+});
+
+test('椿田熟成茶行 menu entries retain page sources and pending status', () => {
+  const drink = catalog.drinks.find((item) => item.brandId === 'brand-chun-tian' && item.name === '黄油朗姆饼干牛乳茶');
+  assert.ok(drink);
+  assert.equal(drink.status, 'pending');
+  assert.ok(drink.menuEntries.some((entry) => entry.sourceUrl.includes('chun-tian-shu-cheng-cha-xing/menu/available')));
+  for (const name of ['黑武士芋泥熟成薯丸', '香草籽芋泥熟成薯丸', '黑武士熟成薯丸']) {
+    assert.ok(catalog.drinks.some((item) => item.brandId === 'brand-chun-tian' && item.name === name), `missing ${name}`);
   }
 });
 

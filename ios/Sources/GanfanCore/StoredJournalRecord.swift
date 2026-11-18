@@ -10,8 +10,26 @@ public enum StoredJournalRecordError: Error, Equatable {
 public struct StoredJournalRecordSnapshot: Sendable {
     public let recordID: String
     public let recordType: String
+    public let consumedAt: Date
     public let payloadVersion: Int
     public let payload: Data
+    public let needsBackup: Bool
+
+    public init(
+        recordID: String,
+        recordType: String,
+        consumedAt: Date,
+        payloadVersion: Int,
+        payload: Data,
+        needsBackup: Bool
+    ) {
+        self.recordID = recordID
+        self.recordType = recordType
+        self.consumedAt = consumedAt
+        self.payloadVersion = payloadVersion
+        self.payload = payload
+        self.needsBackup = needsBackup
+    }
 
     public func decodeRecord() throws -> JournalRecord {
         guard payloadVersion == 1 else {
@@ -66,8 +84,10 @@ public final class StoredJournalRecord {
         StoredJournalRecordSnapshot(
             recordID: recordID,
             recordType: recordType,
+            consumedAt: consumedAt,
             payloadVersion: payloadVersion,
-            payload: payload
+            payload: payload,
+            needsBackup: needsBackup
         )
     }
 

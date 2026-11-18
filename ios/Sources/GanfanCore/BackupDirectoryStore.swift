@@ -31,16 +31,24 @@ public struct BackupSnapshot: Codable, Equatable, Sendable {
         brandLogoAssets: [PhotoAsset] = [],
         catalog: MenuCatalog? = nil,
         nutritionDataPack: NutritionDataPack? = nil,
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        preserveRecordPrecision: Bool = false
     ) throws {
         self.formatVersion = Self.currentFormatVersion
         self.libraryID = libraryID
         let createdAtMilliseconds = (createdAt.timeIntervalSince1970 * 1_000).rounded(.down)
         self.createdAt = Date(timeIntervalSince1970: createdAtMilliseconds / 1_000)
-        let normalizedRecords = try records.map { record in
-            try JournalRecordCodec.decode(JournalRecordCodec.encode(record))
+        let normalizedRecords: [JournalRecord]
+        if preserveRecordPrecision {
+            try records.forEach { try $0.validate() }
+            normalizedRecords = JournalRecord.newestFirst(records)
+        } else {
+            let decodedRecords = try records.map { record in
+                try JournalRecordCodec.decode(JournalRecordCodec.encode(record))
+            }
+            normalizedRecords = JournalRecord.newestFirst(decodedRecords)
         }
-        self.records = JournalRecord.newestFirst(normalizedRecords)
+        self.records = normalizedRecords
         try catalogState?.validate()
         self.catalogState = catalogState
         self.photos = try Self.photoManifest(for: normalizedRecords)
@@ -177,6 +185,7 @@ public struct BackupWriteResult: Equatable, Sendable {
     public let fileName: String
     public let createdAt: Date
     public let recordCount: Int
+    public let legacyIssueCount: Int
     public let photoCount: Int
     public let brandLogoCount: Int
     public let brandCount: Int
@@ -199,6 +208,7 @@ public struct BackupSnapshotSummary: Equatable, Identifiable, Sendable {
     public let fileName: String
     public let createdAt: Date
     public let recordCount: Int
+    public let legacyIssueCount: Int
     public let photoCount: Int
     public let brandLogoCount: Int
     public let includesCatalog: Bool
@@ -213,12 +223,45 @@ public struct VerifiedBackupArchive: Equatable, Sendable {
     public let snapshot: BackupSnapshot
     public let photoData: [UUID: Data]
     public let brandLogoData: [UUID: Data]
+    public let structuredRecords: [JournalRecord]?
+    public let databaseSnapshotURL: URL?
 
-    public init(snapshot: BackupSnapshot, photoData: [UUID: Data], brandLogoData: [UUID: Data] = [:]) {
+    public init(
+        snapshot: BackupSnapshot,
+        photoData: [UUID: Data],
+        brandLogoData: [UUID: Data] = [:],
+        structuredRecords: [JournalRecord]? = nil,
+        databaseSnapshotURL: URL? = nil
+    ) {
         self.snapshot = snapshot
         self.photoData = photoData
         self.brandLogoData = brandLogoData
+        self.structuredRecords = structuredRecords
+        self.databaseSnapshotURL = databaseSnapshotURL
     }
+
+    public static func == (lhs: VerifiedBackupArchive, rhs: VerifiedBackupArchive) -> Bool {
+        lhs.snapshot == rhs.snapshot
+            && lhs.photoData == rhs.photoData
+            && lhs.brandLogoData == rhs.brandLogoData
+            && lhs.structuredRecords == rhs.structuredRecords
+            && (lhs.databaseSnapshotURL != nil) == (rhs.databaseSnapshotURL != nil)
+    }
+}
+
+private struct SQLiteBackupMetadata: Codable, Equatable, Sendable {
+    let formatVersion: Int
+    let libraryID: UUID
+    let createdAt: Date
+    let recordCount: Int
+    let legacyIssueCount: Int
+    let photos: [PhotoAsset]
+    let brandLogoAssets: [PhotoAsset]
+    let catalogState: MenuCatalogUserState?
+    let catalog: MenuCatalog?
+    let nutritionDataPack: NutritionDataPack?
+    let changeGeneration: Int
+    let databaseGeneration: Int
 }
 
 public struct BackupDirectoryStore: Sendable {
@@ -255,6 +298,7 @@ public struct BackupDirectoryStore: Sendable {
                 fileName: existing.summary.fileName,
                 createdAt: existing.snapshot.createdAt,
                 recordCount: existing.snapshot.records.count,
+                legacyIssueCount: 0,
                 photoCount: existing.snapshot.photos.count,
                 brandLogoCount: (existing.snapshot.brandLogoAssets ?? []).count,
                 brandCount: existing.snapshot.catalog?.brands.count ?? 0,
@@ -287,12 +331,13 @@ public struct BackupDirectoryStore: Sendable {
         }
 
         let snapshotData = try Self.encode(snapshot)
+        let encodedSnapshot = try Self.decode(snapshotData)
         let fileName = "snapshot-\(UUID().uuidString).json"
         _ = try LocalFolderProbe.writeAndVerify(snapshotData, fileName: fileName, in: snapshotsDirectory)
         let savedSnapshot = try Self.decode(readCoordinated(
             from: snapshotsDirectory.appendingPathComponent(fileName, isDirectory: false)
         ))
-        guard savedSnapshot == snapshot else {
+        guard savedSnapshot == encodedSnapshot else {
             throw BackupDirectoryStoreError.coordinatedReadFailed("写入后的快照与原数据不一致。")
         }
 
@@ -300,6 +345,7 @@ public struct BackupDirectoryStore: Sendable {
             fileName: fileName,
             createdAt: savedSnapshot.createdAt,
             recordCount: savedSnapshot.records.count,
+            legacyIssueCount: 0,
             photoCount: savedSnapshot.photos.count,
             brandLogoCount: (savedSnapshot.brandLogoAssets ?? []).count,
             brandCount: savedSnapshot.catalog?.brands.count ?? 0,
@@ -307,6 +353,74 @@ public struct BackupDirectoryStore: Sendable {
             nutritionEntryCount: savedSnapshot.nutritionDataPack?.entries.count ?? 0,
             didCreateSnapshot: true
         )
+    }
+
+    public func writeSQLite(
+        snapshot: BackupSnapshot,
+        library: JournalSQLiteStore,
+        changeGeneration: Int,
+        databaseGeneration: Int,
+        photoData: [UUID: Data],
+        brandLogoData: [UUID: Data] = [:]
+    ) throws -> BackupWriteResult {
+        try snapshot.validate()
+        try validatePhotoData(photoData, for: snapshot)
+        try validateBrandLogoData(brandLogoData, for: snapshot)
+        try prepareLibraryDirectory(for: snapshot.libraryID)
+
+        let snapshotsDirectory = backupDirectoryURL.appendingPathComponent("snapshots", isDirectory: true)
+        let photosDirectory = backupDirectoryURL.appendingPathComponent("photos", isDirectory: true)
+        let brandLogosDirectory = backupDirectoryURL.appendingPathComponent("brand-logos", isDirectory: true)
+        try createDirectoryIfNeeded(at: snapshotsDirectory)
+        try createDirectoryIfNeeded(at: photosDirectory)
+        if !(snapshot.brandLogoAssets ?? []).isEmpty { try createDirectoryIfNeeded(at: brandLogosDirectory) }
+
+        for asset in snapshot.photos {
+            guard let data = photoData[asset.id] else { throw BackupDirectoryStoreError.photoDataMismatch(asset.id) }
+            try writeOrReusePhoto(data, asset: asset, in: photosDirectory)
+        }
+        for asset in snapshot.brandLogoAssets ?? [] {
+            guard let data = brandLogoData[asset.id] else { throw BackupDirectoryStoreError.brandLogoDataMismatch(asset.id) }
+            try writeOrReuseBrandLogo(data, asset: asset, in: brandLogosDirectory)
+        }
+
+        let metadata = SQLiteBackupMetadata(
+            formatVersion: 1,
+            libraryID: snapshot.libraryID,
+            createdAt: snapshot.createdAt,
+            recordCount: snapshot.records.count,
+            legacyIssueCount: try library.legacyIssueCount(),
+            photos: snapshot.photos,
+            brandLogoAssets: snapshot.brandLogoAssets ?? [],
+            catalogState: snapshot.catalogState,
+            catalog: snapshot.catalog,
+            nutritionDataPack: snapshot.nutritionDataPack,
+            changeGeneration: changeGeneration,
+            databaseGeneration: databaseGeneration
+        )
+        if let existing = try latestSQLiteMetadata(in: snapshotsDirectory),
+           existing.metadata.libraryID == metadata.libraryID,
+           existing.metadata.changeGeneration == metadata.changeGeneration,
+           existing.metadata.databaseGeneration == metadata.databaseGeneration,
+           existing.metadata.recordCount == metadata.recordCount,
+           existing.metadata.legacyIssueCount == metadata.legacyIssueCount,
+           existing.metadata.photos == metadata.photos,
+           existing.metadata.brandLogoAssets == metadata.brandLogoAssets,
+           existing.metadata.catalogState == metadata.catalogState,
+           existing.metadata.catalog == metadata.catalog,
+           existing.metadata.nutritionDataPack == metadata.nutritionDataPack,
+           try storedAssetsExistAndMatch(for: snapshot) {
+            return Self.writeResult(fileName: existing.fileName, metadata: existing.metadata, didCreateSnapshot: false)
+        }
+
+        let fileName = "snapshot-\(UUID().uuidString).sqlite"
+        try writeDatabaseFile(
+            library: library,
+            metadata: metadata,
+            fileName: fileName,
+            in: snapshotsDirectory
+        )
+        return Self.writeResult(fileName: fileName, metadata: metadata, didCreateSnapshot: true)
     }
 
     public func previewCleanup(now: Date = .now, calendar: Calendar = .current) throws -> BackupCleanupPreview {
@@ -328,7 +442,7 @@ public struct BackupDirectoryStore: Sendable {
 
     private func performCleanup(_ plan: (
         preview: BackupCleanupPreview,
-        retainedSnapshots: [BackupSnapshot],
+        retainedSnapshots: [SnapshotAssetReference],
         canCollectOrphanedAssets: Bool
     )) throws -> BackupCleanupPreview {
         guard plan.preview.snapshotCount > 0 || plan.preview.orphanedPhotoCount > 0 else { return plan.preview }
@@ -347,7 +461,7 @@ public struct BackupDirectoryStore: Sendable {
             )
             let actualOrphanedLogos = try orphanedAssetURLs(
                 in: brandLogosDirectory,
-                retainingFileNames: Set(plan.retainedSnapshots.flatMap { $0.brandLogoAssets ?? [] }.map(\.fileName))
+                retainingFileNames: Set(plan.retainedSnapshots.flatMap(\.brandLogoAssets).map(\.fileName))
             )
             for url in actualOrphanedPhotos + actualOrphanedLogos {
                 try removeCoordinated(at: url)
@@ -373,14 +487,27 @@ public struct BackupDirectoryStore: Sendable {
         let files = try contentsOfDirectory(at: snapshotsDirectory)
             .filter { Self.isSnapshotName($0.lastPathComponent) }
         return files.compactMap { fileURL in
-            guard let snapshot = try? Self.decode(readCoordinated(from: fileURL)),
-                  snapshot.libraryID == libraryID else {
-                return nil
+            if fileURL.pathExtension.lowercased() == "sqlite" {
+                guard let metadata = try? readSQLiteMetadata(at: fileURL), metadata.libraryID == libraryID else { return nil }
+                return BackupSnapshotSummary(
+                    fileName: fileURL.lastPathComponent,
+                    createdAt: metadata.createdAt,
+                    recordCount: metadata.recordCount,
+                    legacyIssueCount: metadata.legacyIssueCount,
+                    photoCount: metadata.photos.count,
+                    brandLogoCount: metadata.brandLogoAssets.count,
+                    includesCatalog: metadata.catalog != nil,
+                    brandCount: metadata.catalog?.brands.count ?? 0,
+                    drinkCount: metadata.catalog?.drinks.count ?? 0,
+                    nutritionEntryCount: metadata.nutritionDataPack?.entries.count ?? 0
+                )
             }
+            guard let snapshot = try? Self.decode(readCoordinated(from: fileURL)), snapshot.libraryID == libraryID else { return nil }
             return BackupSnapshotSummary(
                 fileName: fileURL.lastPathComponent,
                 createdAt: snapshot.createdAt,
                 recordCount: snapshot.records.count,
+                legacyIssueCount: 0,
                 photoCount: snapshot.photos.count,
                 brandLogoCount: (snapshot.brandLogoAssets ?? []).count,
                 includesCatalog: snapshot.catalog != nil,
@@ -409,7 +536,17 @@ public struct BackupDirectoryStore: Sendable {
             throw BackupDirectoryStoreError.snapshotNotFound
         }
 
-        let snapshot = try Self.decode(readCoordinated(from: snapshotURL))
+        let snapshot: BackupSnapshot
+        let structuredRecords: [JournalRecord]?
+        let isSQLiteSnapshot = snapshotURL.pathExtension.lowercased() == "sqlite"
+        if isSQLiteSnapshot {
+            let contents = try readSQLiteSnapshot(at: snapshotURL)
+            snapshot = contents.snapshot
+            structuredRecords = contents.records
+        } else {
+            snapshot = try Self.decode(readCoordinated(from: snapshotURL))
+            structuredRecords = nil
+        }
         guard snapshot.libraryID == libraryID else {
             throw BackupDirectoryStoreError.differentLibrary
         }
@@ -442,7 +579,15 @@ public struct BackupDirectoryStore: Sendable {
             brandLogoData[asset.id] = data
         }
 
-        return VerifiedBackupArchive(snapshot: snapshot, photoData: photoData, brandLogoData: brandLogoData)
+        let databaseSnapshotURL = isSQLiteSnapshot ? try copySQLiteSnapshotToTemporaryFile(at: snapshotURL) : nil
+
+        return VerifiedBackupArchive(
+            snapshot: snapshot,
+            photoData: photoData,
+            brandLogoData: brandLogoData,
+            structuredRecords: structuredRecords,
+            databaseSnapshotURL: databaseSnapshotURL
+        )
     }
 
     private func validatePhotoData(_ photoData: [UUID: Data], for snapshot: BackupSnapshot) throws {
@@ -490,10 +635,196 @@ public struct BackupDirectoryStore: Sendable {
         return (latest, existing)
     }
 
+    private func latestSQLiteMetadata(in directory: URL) throws -> (fileName: String, metadata: SQLiteBackupMetadata)? {
+        let candidates = try contentsOfDirectory(at: directory)
+            .filter { $0.pathExtension.lowercased() == "sqlite" && Self.isSnapshotName($0.lastPathComponent) }
+        let values: [(URL, SQLiteBackupMetadata)] = candidates.compactMap { url in
+            guard let metadata = try? readSQLiteMetadata(at: url) else { return nil }
+            return (url, metadata)
+        }
+        guard let latest = values.max(by: {
+            if $0.1.createdAt != $1.1.createdAt { return $0.1.createdAt < $1.1.createdAt }
+            return $0.0.lastPathComponent < $1.0.lastPathComponent
+        }) else { return nil }
+        return (latest.0.lastPathComponent, latest.1)
+    }
+
+    private func writeDatabaseFile(
+        library: JournalSQLiteStore,
+        metadata: SQLiteBackupMetadata,
+        fileName: String,
+        in directory: URL
+    ) throws {
+        let operation: (URL) throws -> Void = { coordinatedDirectory in
+            let destination = coordinatedDirectory.appendingPathComponent(fileName, isDirectory: false)
+            let temporary = coordinatedDirectory.appendingPathComponent(".\(fileName).migrating", isDirectory: false)
+            defer {
+                try? FileManager.default.removeItem(at: temporary)
+                try? FileManager.default.removeItem(at: URL(fileURLWithPath: temporary.path + "-wal"))
+                try? FileManager.default.removeItem(at: URL(fileURLWithPath: temporary.path + "-shm"))
+            }
+
+            try library.writeConsistentSnapshot(to: temporary)
+            let stagingStore = try JournalSQLiteStore(url: temporary)
+            do {
+                guard stagingStore.migrationComplete,
+                      try stagingStore.count() == metadata.recordCount,
+                      try stagingStore.legacyIssueCount() == metadata.legacyIssueCount,
+                      try stagingStore.photoAssets() == metadata.photos,
+                      stagingStore.dataGeneration == metadata.databaseGeneration else {
+                    throw BackupDirectoryStoreError.coordinatedReadFailed("SQLite 快照与照片清单数量不一致。")
+                }
+                try stagingStore.markAllBackedUp()
+                try stagingStore.setArchiveMetadata(try Self.encode(metadata))
+                try stagingStore.validateIntegrity()
+                try stagingStore.closeForFileMove()
+            } catch {
+                stagingStore.close()
+                throw error
+            }
+            try FileManager.default.moveItem(at: temporary, to: destination)
+            try? FileManager.default.removeItem(at: URL(fileURLWithPath: temporary.path + "-wal"))
+            try? FileManager.default.removeItem(at: URL(fileURLWithPath: temporary.path + "-shm"))
+            let verified = try JournalSQLiteStore(url: destination, readOnly: true)
+            try verified.validateIntegrity()
+            guard try verified.count() == metadata.recordCount,
+                  try verified.legacyIssueCount() == metadata.legacyIssueCount,
+                  let savedMetadata = try verified.archiveMetadata(),
+                  try Self.decodeArchiveMetadata(savedMetadata) == metadata else {
+                throw BackupDirectoryStoreError.coordinatedReadFailed("写入后的 SQLite 快照校验失败。")
+            }
+        }
+
+        #if os(iOS)
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        var operationError: Error?
+        coordinator.coordinate(writingItemAt: directory, options: [], error: &coordinationError) { coordinated in
+            do { try operation(coordinated) } catch { operationError = error }
+        }
+        if let coordinationError {
+            throw BackupDirectoryStoreError.coordinatedReadFailed(coordinationError.localizedDescription)
+        }
+        if let operationError { throw operationError }
+        #else
+        try operation(directory)
+        #endif
+    }
+
+    private func readSQLiteMetadata(at url: URL) throws -> SQLiteBackupMetadata {
+        try withCoordinatedSQLiteRead(at: url) { coordinatedURL in
+            let store = try JournalSQLiteStore(url: coordinatedURL, readOnly: true)
+            try store.validateIntegrity()
+            guard let data = try store.archiveMetadata() else {
+                throw BackupDirectoryStoreError.coordinatedReadFailed("SQLite 快照摘要或记录清单无效。")
+            }
+            let metadata = try Self.decodeArchiveMetadata(data)
+            guard metadata.formatVersion == 1,
+                  store.migrationComplete,
+                  try store.count() == metadata.recordCount,
+                  try store.legacyIssueCount() == metadata.legacyIssueCount,
+                  try store.photoAssets() == metadata.photos else {
+                throw BackupDirectoryStoreError.coordinatedReadFailed("SQLite 快照摘要或记录清单无效。")
+            }
+            return metadata
+        }
+    }
+
+    private func readSQLiteSnapshot(at url: URL) throws -> (snapshot: BackupSnapshot, records: [JournalRecord]) {
+        try withCoordinatedSQLiteRead(at: url) { coordinatedURL in
+            let store = try JournalSQLiteStore(url: coordinatedURL, readOnly: true)
+            try store.validateIntegrity()
+            guard let data = try store.archiveMetadata() else {
+                throw BackupDirectoryStoreError.coordinatedReadFailed("SQLite 快照没有有效的版本化摘要。")
+            }
+            let metadata = try Self.decodeArchiveMetadata(data)
+            guard metadata.formatVersion == 1, store.migrationComplete else {
+                throw BackupDirectoryStoreError.coordinatedReadFailed("SQLite 快照没有有效的版本化摘要。")
+            }
+            let records = JournalRecord.newestFirst(try store.allRecords().map(\.record))
+            guard records.count == metadata.recordCount,
+                  try store.legacyIssueCount() == metadata.legacyIssueCount,
+                  try store.photoAssets() == metadata.photos else {
+                throw BackupDirectoryStoreError.coordinatedReadFailed("SQLite 快照的记录或照片清单不完整。")
+            }
+            let snapshot = try BackupSnapshot(
+                libraryID: metadata.libraryID,
+                records: records,
+                catalogState: metadata.catalogState,
+                brandLogoAssets: metadata.brandLogoAssets,
+                catalog: metadata.catalog,
+                nutritionDataPack: metadata.nutritionDataPack,
+                createdAt: metadata.createdAt,
+                preserveRecordPrecision: true
+            )
+            guard snapshot.photos == metadata.photos else {
+                throw BackupDirectoryStoreError.coordinatedReadFailed("SQLite 快照的照片清单与记录不一致。")
+            }
+            return (snapshot, records)
+        }
+    }
+
+    private func withCoordinatedSQLiteRead<T>(at url: URL, _ operation: (URL) throws -> T) throws -> T {
+        #if os(iOS)
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        var operationError: Error?
+        var result: T?
+        coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
+            do { result = try operation(coordinatedURL) } catch { operationError = error }
+        }
+        if let coordinationError {
+            throw BackupDirectoryStoreError.coordinatedReadFailed(coordinationError.localizedDescription)
+        }
+        if let operationError { throw operationError }
+        guard let result else { throw BackupDirectoryStoreError.coordinatedReadFailed("协调读取未返回 SQLite 结果。") }
+        return result
+        #else
+        return try operation(url)
+        #endif
+    }
+
+    private func copySQLiteSnapshotToTemporaryFile(at url: URL) throws -> URL {
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ganfan-restore-\(UUID().uuidString).sqlite", isDirectory: false)
+        do {
+            try withCoordinatedSQLiteRead(at: url) { coordinatedURL in
+                try FileManager.default.copyItem(at: coordinatedURL, to: destination)
+            }
+            return destination
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            throw error
+        }
+    }
+
+    private static func writeResult(
+        fileName: String,
+        metadata: SQLiteBackupMetadata,
+        didCreateSnapshot: Bool
+    ) -> BackupWriteResult {
+        BackupWriteResult(
+            fileName: fileName,
+            createdAt: metadata.createdAt,
+            recordCount: metadata.recordCount,
+            legacyIssueCount: metadata.legacyIssueCount,
+            photoCount: metadata.photos.count,
+            brandLogoCount: metadata.brandLogoAssets.count,
+            brandCount: metadata.catalog?.brands.count ?? 0,
+            drinkCount: metadata.catalog?.drinks.count ?? 0,
+            nutritionEntryCount: metadata.nutritionDataPack?.entries.count ?? 0,
+            didCreateSnapshot: didCreateSnapshot
+        )
+    }
+
     private func storedAssetsExistAndMatch(for snapshot: BackupSnapshot) throws -> Bool {
+        try storedAssetsExistAndMatch(photos: snapshot.photos, brandLogos: snapshot.brandLogoAssets ?? [])
+    }
+
+    private func storedAssetsExistAndMatch(photos: [PhotoAsset], brandLogos: [PhotoAsset]) throws -> Bool {
         let photosDirectory = backupDirectoryURL.appendingPathComponent("photos", isDirectory: true)
         let logosDirectory = backupDirectoryURL.appendingPathComponent("brand-logos", isDirectory: true)
-        for (assets, directory) in [(snapshot.photos, photosDirectory), (snapshot.brandLogoAssets ?? [], logosDirectory)] {
+        for (assets, directory) in [(photos, photosDirectory), (brandLogos, logosDirectory)] {
             for asset in assets {
                 let url = directory.appendingPathComponent(asset.fileName, isDirectory: false)
                 guard FileManager.default.fileExists(atPath: url.path) else { return false }
@@ -506,7 +837,7 @@ public struct BackupDirectoryStore: Sendable {
 
     private func cleanupPlan(now: Date, calendar: Calendar) throws -> (
         preview: BackupCleanupPreview,
-        retainedSnapshots: [BackupSnapshot],
+        retainedSnapshots: [SnapshotAssetReference],
         canCollectOrphanedAssets: Bool
     ) {
         let libraryID = try readLibraryMarker()
@@ -516,14 +847,30 @@ public struct BackupDirectoryStore: Sendable {
         }
 
         let files = try contentsOfDirectory(at: snapshotsDirectory).filter { Self.isSnapshotName($0.lastPathComponent) }
-        var valid: [(url: URL, snapshot: BackupSnapshot)] = []
+        var valid: [(url: URL, snapshot: SnapshotAssetReference)] = []
         var hasUnverifiedSnapshot = false
         for url in files {
-            guard let snapshot = try? Self.decode(readCoordinated(from: url)), snapshot.libraryID == libraryID else {
-                hasUnverifiedSnapshot = true
-                continue
+            if url.pathExtension.lowercased() == "sqlite" {
+                guard let metadata = try? readSQLiteMetadata(at: url), metadata.libraryID == libraryID else {
+                    hasUnverifiedSnapshot = true
+                    continue
+                }
+                valid.append((url, SnapshotAssetReference(
+                    createdAt: metadata.createdAt,
+                    photos: metadata.photos,
+                    brandLogoAssets: metadata.brandLogoAssets
+                )))
+            } else {
+                guard let snapshot = try? Self.decode(readCoordinated(from: url)), snapshot.libraryID == libraryID else {
+                    hasUnverifiedSnapshot = true
+                    continue
+                }
+                valid.append((url, SnapshotAssetReference(
+                    createdAt: snapshot.createdAt,
+                    photos: snapshot.photos,
+                    brandLogoAssets: snapshot.brandLogoAssets ?? []
+                )))
             }
-            valid.append((url, snapshot))
         }
         valid.sort {
             if $0.snapshot.createdAt != $1.snapshot.createdAt { return $0.snapshot.createdAt > $1.snapshot.createdAt }
@@ -531,7 +878,7 @@ public struct BackupDirectoryStore: Sendable {
         }
         guard !hasUnverifiedSnapshot,
               let newest = valid.first,
-              try storedAssetsExistAndMatch(for: newest.snapshot) else {
+              try storedAssetsExistAndMatch(photos: newest.snapshot.photos, brandLogos: newest.snapshot.brandLogoAssets) else {
             throw BackupDirectoryStoreError.cleanupRequiresVerifiedSnapshot
         }
 
@@ -567,7 +914,7 @@ public struct BackupDirectoryStore: Sendable {
         var orphanedURLs: [URL] = []
         if !hasUnverifiedSnapshot {
             let retainedPhotoNames = Set(keptSnapshots.flatMap(\.photos).map(\.fileName))
-            let retainedLogoNames = Set(keptSnapshots.flatMap { $0.brandLogoAssets ?? [] }.map(\.fileName))
+            let retainedLogoNames = Set(keptSnapshots.flatMap(\.brandLogoAssets).map(\.fileName))
             orphanedURLs += try orphanedAssetURLs(
                 in: backupDirectoryURL.appendingPathComponent("photos", isDirectory: true),
                 retainingFileNames: retainedPhotoNames
@@ -796,6 +1143,16 @@ public struct BackupDirectoryStore: Sendable {
         return snapshot
     }
 
+    private static func encode(_ metadata: SQLiteBackupMetadata) throws -> Data {
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        return try encoder.encode(metadata)
+    }
+
+    private static func decodeArchiveMetadata(_ data: Data) throws -> SQLiteBackupMetadata {
+        try PropertyListDecoder().decode(SQLiteBackupMetadata.self, from: data)
+    }
+
     private static func encodeMarker(_ marker: LibraryMarker) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -817,7 +1174,7 @@ public struct BackupDirectoryStore: Sendable {
 
     private static func isSnapshotName(_ fileName: String) -> Bool {
         fileName.range(
-            of: #"^snapshot-[0-9A-Fa-f-]{36}\.json$"#,
+            of: #"^snapshot-[0-9A-Fa-f-]{36}\.(json|sqlite)$"#,
             options: .regularExpression
         ) != nil
     }
@@ -835,4 +1192,10 @@ public struct BackupDirectoryStore: Sendable {
 private struct LibraryMarker: Codable, Sendable {
     let formatVersion: Int
     let libraryID: UUID
+}
+
+private struct SnapshotAssetReference: Sendable {
+    let createdAt: Date
+    let photos: [PhotoAsset]
+    let brandLogoAssets: [PhotoAsset]
 }

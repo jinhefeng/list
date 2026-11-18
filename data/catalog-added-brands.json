@@ -1221,5 +1221,305 @@
     "logoAssetName": "BrandIconTaiBenNiu",
     "sourceName": "用户提供品牌 Logo；菜单待补",
     "products": []
+  },
+  {
+    "id": "brand-chun-tian",
+    "name": "椿田熟成茶行",
+    "aliases": [
+      "椿田",
+      "CHUNTIAN",
+      "Chun Tian Tea Company"
+    ],
+    "category": "新茶饮",
+    "logoAssetName": "BrandIconChunTian",
+    "sourceName": "咖啡奶茶喝什么公开在售菜单汇编（椿田熟成茶行）",
+    "sourceType": "public_menu",
+    "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1",
+    "products": [
+      {
+        "name": "奶皮子熟成冰牛奶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "草莓奶皮子熟成冰牛奶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "黑武士芋泥熟成薯丸",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "香草籽芋泥熟成薯丸",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "芭乐小青柑冰萃",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "多重莓果岩浆可可",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "玫珑生椰岩浆可可",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "苦橙伯爵可可特调",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "香草籽干酪鎏金柿",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "生椰伯爵鎏金柿",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "玫珑秋梨鎏金柿",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "咸法酪丝绒牛乳茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "蓝纹芝士熟成牛乳茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "香草籽熟成牛乳茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "香草籽雪顶熟成牛乳茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "血橙柠檬冰萃特调",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "西番莲芭乐柠萃特调",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "黄油朗姆饼干牛乳茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "小青柑熟成普洱",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "香草籽雪顶熟成乌瓦",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=1"
+      },
+      {
+        "name": "香草籽雪顶熟成普洱",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "青柑熟成普洱",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "蓝纹芝士熟成普洱",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "蓝纹芝士熟成乌瓦",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "黄油红糖熟成普洱",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "黄油红糖熟成乌瓦",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "南洋青芒凤梨冰萃",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "西番莲青芒冰萃",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "日晒熟杏西番莲奇兰",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "熟成港奶碎冰Granita",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "熟成普洱碎冰Granita",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "树熟芭乐玫瑰Granita",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "西西里橙苹果冰茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "富士苹果草莓冰茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "西西里橙熟成鸳鸯特调(茶咖)",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "西西里橙熟成可可特调",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "七重莓果花青软法酪",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "草莓提拉米苏可可",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "苹果莓萃茉莉冰茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "干酪·熟成普洱鲜奶茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=2"
+      },
+      {
+        "name": "干酪云顶·九窨茉莉纯茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "干酪·熟成港式鲜奶茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "Chiang Mai龙眼桂花奇兰",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "黑武士熟成薯丸",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "800次手打鸳鸯",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "醒神金砖丝袜奶茶（每日限量）",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "富士苹果乌瓦冰茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "Chiang Mai龙眼鸳鸯特调（茶咖）",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "Chiang Mai龙眼奇兰冰奶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "Chiang Mai龙眼奇兰柠萃",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "日晒熟杏奇兰冰萃",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "日晒熟杏苹果奇兰",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "柚子苹果奇兰冰萃",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "柚子薄荷奇兰冰萃",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "富士苹果凤梨冰茶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "西西里血橙苹果",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "香草籽熟成普洱",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "香草籽熟成港奶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "香草籽熟成泰奶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "香草籽熟成锡兰可可",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=3"
+      },
+      {
+        "name": "咸法酪丝绒泰奶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=4"
+      },
+      {
+        "name": "咸法酪丝绒普洱",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=4"
+      },
+      {
+        "name": "咸法酪丝绒港奶",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=4"
+      },
+      {
+        "name": "熟成话梅茉莉冷萃",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=4"
+      },
+      {
+        "name": "熟成话梅芭乐茉莉",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=4"
+      },
+      {
+        "name": "熟成话梅凤梨茉莉",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=4"
+      },
+      {
+        "name": "九窨茉莉英式鲜奶缇",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=4"
+      },
+      {
+        "name": "手煮英式鲜奶缇",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=4"
+      },
+      {
+        "name": "香蕉巴斯克熟成可可",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=4"
+      },
+      {
+        "name": "超浓郁可可金砖",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=4"
+      },
+      {
+        "name": "特浓醇熟成鲜奶缇",
+        "sourceUrl": "https://www.nckfhsm.com/brands/chun-tian-shu-cheng-cha-xing/menu/available?page=4"
+      }
+    ]
   }
 ]

@@ -5,6 +5,32 @@ import SwiftData
 public enum JournalRecordCommitService {
     public static func save(
         _ record: JournalRecord,
+        replacing recordID: UUID? = nil,
+        createdPhotoAssets: [PhotoAsset],
+        photoStore: LocalPhotoStore,
+        into library: JournalSQLiteStore,
+        changeTracker: BackupChangeTracker = BackupChangeTracker()
+    ) throws {
+        do {
+            try record.validate()
+            if let recordID, recordID != record.id {
+                throw StoredJournalRecordError.invalidRecordIdentifier
+            }
+            for asset in photoAssets(in: record) {
+                _ = try photoStore.load(asset)
+            }
+            try library.save(record)
+            changeTracker.markChanged()
+        } catch {
+            for asset in createdPhotoAssets {
+                try? photoStore.remove(asset)
+            }
+            throw error
+        }
+    }
+
+    public static func save(
+        _ record: JournalRecord,
         replacing storedRecord: StoredJournalRecord? = nil,
         createdPhotoAssets: [PhotoAsset],
         photoStore: LocalPhotoStore,
