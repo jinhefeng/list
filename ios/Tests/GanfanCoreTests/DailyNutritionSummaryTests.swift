@@ -54,4 +54,18 @@ final class DailyNutritionSummaryTests: XCTestCase {
         XCTAssertEqual(summary.energyKcal.confidence, .unavailable)
         XCTAssertEqual(summary.drinkCount, 1)
     }
+
+    func testMixedSnapshotKeepsOfficialAndAIEstimatedMetricsDistinctInTotals() throws {
+        let date = Date()
+        let nutrition = NutritionSnapshot(
+            energyKcal: 185, sugarGrams: 14, caffeineMilligrams: 40, confidence: .rough,
+            metricSources: ["energyKcal": "official", "sugarGrams": "ai", "caffeineMilligrams": "rough"]
+        )
+        let drink = try DrinkRecord(consumedAt: date, drinkName: "测试饮品", nutrition: nutrition)
+        let summary = DailyNutritionSummary.summarize([.drink(drink)], on: date)
+
+        XCTAssertEqual(summary.energyKcal, NutritionMetricTotal(value: 185, confidence: .official, knownRecordCount: 1))
+        XCTAssertEqual(summary.sugarGrams, NutritionMetricTotal(value: 14, confidence: .estimated, knownRecordCount: 1))
+        XCTAssertEqual(summary.caffeineMilligrams, NutritionMetricTotal(value: 40, confidence: .rough, knownRecordCount: 1))
+    }
 }

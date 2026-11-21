@@ -63,6 +63,8 @@ public enum RoughNutritionEstimator {
         terms.contains(where: { text.localizedCaseInsensitiveContains($0) })
     }
 
+    static let drinkSource = "离线饮品分类粗估（非品牌配方）"
+
     public static func drink(
         name: String,
         category: String = "",
@@ -98,7 +100,7 @@ public enum RoughNutritionEstimator {
             sugarGrams: rounded(sugar * multiplier, to: 5),
             caffeineMilligrams: rounded(profile.caffeine * multiplier, to: 10),
             confidence: .rough,
-            source: "离线饮品分类粗估（非品牌配方）",
+            source: drinkSource,
             proteinGrams: rounded(profile.protein * multiplier, to: 1),
             fatGrams: rounded(profile.fat * multiplier, to: 1),
             carbohydrateGrams: rounded(max(0, profile.carbohydrate + addedSugar - defaultAddedSugar) * multiplier, to: 1),

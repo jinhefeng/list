@@ -577,6 +577,13 @@ private struct JournalNutritionMetric: Identifiable {
     var id: String { label }
 }
 
+private enum NutritionValueFormatting {
+    static func integer(_ value: Double) -> String {
+        value.rounded(.toNearestOrAwayFromZero)
+            .formatted(.number.precision(.fractionLength(0)))
+    }
+}
+
 private struct MealNutritionSummary {
     struct Total {
         let value: Double?
@@ -920,35 +927,26 @@ private struct JournalRecordCardRow: View {
 
     private static func nutritionMetrics(_ nutrition: NutritionSnapshot?) -> [JournalNutritionMetric] {
         guard let nutrition else { return [] }
-        let isEstimated: Bool
-        switch nutrition.confidence {
-        case .estimated, .rough: isEstimated = true
-        case .official, .unavailable: isEstimated = false
-        }
-
         var metrics: [JournalNutritionMetric] = []
         if let energy = nutrition.energyKcal {
-            let step = isEstimated ? 10.0 : 1.0
             metrics.append(JournalNutritionMetric(
                 symbol: "flame.fill",
                 label: "能量",
-                value: "\(compactNumber(rounded(energy, to: step))) kcal"
+                value: "\(NutritionValueFormatting.integer(energy)) kcal"
             ))
         }
         if let sugar = nutrition.sugarGrams {
-            let step = isEstimated ? 5.0 : 0.1
             metrics.append(JournalNutritionMetric(
                 symbol: "cube.fill",
                 label: "糖",
-                value: "\(compactNumber(rounded(sugar, to: step)))g"
+                value: "\(NutritionValueFormatting.integer(sugar))g"
             ))
         }
         if let caffeine = nutrition.caffeineMilligrams {
-            let step = isEstimated ? 10.0 : 1.0
             metrics.append(JournalNutritionMetric(
                 symbol: "cup.and.saucer.fill",
                 label: "咖啡因",
-                value: "\(compactNumber(rounded(caffeine, to: step)))mg"
+                value: "\(NutritionValueFormatting.integer(caffeine))mg"
             ))
         }
         return metrics
@@ -956,9 +954,9 @@ private struct JournalRecordCardRow: View {
 
     private static func mealNutritionMetrics(_ summary: MealNutritionSummary) -> [JournalNutritionMetric] {
         [
-            mealMetric(summary.energyKcal, symbol: "flame.fill", label: "能量", unit: "kcal", roughStep: 10),
-            mealMetric(summary.proteinGrams, symbol: "p.circle.fill", label: "蛋白质", unit: "g", roughStep: 1),
-            mealMetric(summary.fatGrams, symbol: "drop.fill", label: "脂肪", unit: "g", roughStep: 1)
+            mealMetric(summary.energyKcal, symbol: "flame.fill", label: "能量", unit: "kcal"),
+            mealMetric(summary.proteinGrams, symbol: "p.circle.fill", label: "蛋白质", unit: "g"),
+            mealMetric(summary.fatGrams, symbol: "drop.fill", label: "脂肪", unit: "g")
         ].compactMap { $0 }
     }
 
@@ -966,28 +964,14 @@ private struct JournalRecordCardRow: View {
         _ total: MealNutritionSummary.Total,
         symbol: String,
         label: String,
-        unit: String,
-        roughStep: Double
+        unit: String
     ) -> JournalNutritionMetric? {
         guard let value = total.value else { return nil }
-        let step = total.isApproximate ? roughStep : 0.1
         return JournalNutritionMetric(
             symbol: symbol,
             label: label,
-            value: "\(compactNumber(rounded(value, to: step))) \(unit)"
+            value: "\(NutritionValueFormatting.integer(value)) \(unit)"
         )
-    }
-
-    private static func rounded(_ value: Double, to step: Double) -> Double {
-        (value / step).rounded(.toNearestOrAwayFromZero) * step
-    }
-
-    private static func compactNumber(_ value: Double) -> String {
-        let nearestInteger = value.rounded(.toNearestOrAwayFromZero)
-        if abs(value - nearestInteger) < 0.0001 {
-            return String(Int(nearestInteger))
-        }
-        return String(format: "%.1f", locale: Locale(identifier: "en_US_POSIX"), value)
     }
 }
 
@@ -2176,10 +2160,8 @@ private struct IntakeDailyAccumulator {
 
     private static func isEstimated(_ snapshot: NutritionSnapshot?, metric: IntakeTrendMetric) -> Bool {
         guard let snapshot else { return false }
-        if snapshot.confidence != .official { return true }
-        guard let sourceKey = metric.nutritionSourceKey else { return false }
-        guard let source = snapshot.metricSources[sourceKey] else { return false }
-        return ["rough", "estimated"].contains(source)
+        let quality = metric.nutritionSourceKey.map { snapshot.confidence(for: $0) } ?? snapshot.confidence
+        return quality != .official
     }
 }
 
@@ -3371,9 +3353,11 @@ private struct RecordDetailMetricGrid: View {
 
 private struct RecordDetailConfidenceBadge: View {
     let confidence: NutritionSnapshot.Confidence
+    var hasAIEstimate = false
 
     private var symbol: String {
-        switch confidence {
+        if hasAIEstimate { return "sparkles" }
+        return switch confidence {
         case .official: "checkmark.seal.fill"
         case .estimated: "chart.bar.fill"
         case .rough: "sparkles"
@@ -3394,7 +3378,7 @@ private struct RecordDetailConfidenceBadge: View {
             Image(systemName: symbol)
                 .font(.system(size: 14, weight: .semibold))
                 .accessibilityHidden(true)
-            Text(confidence.displayName)
+            Text(hasAIEstimate ? "含 AI 估算" : confidence.displayName)
                 .font(.footnote.weight(.semibold))
         }
             .foregroundStyle(tint)
@@ -3406,12 +3390,14 @@ private struct RecordDetailConfidenceBadge: View {
 
 private struct RecordDetailNutritionHeaderAccessory: View {
     let confidence: NutritionSnapshot.Confidence
+    let hasAIEstimate: Bool
     let assumptions: String
     let source: String
     let sourceURL: String?
 
     init(nutrition: NutritionSnapshot) {
         confidence = nutrition.confidence
+        hasAIEstimate = nutrition.hasAIEstimate
         assumptions = nutrition.assumptions
         source = nutrition.source
         sourceURL = nutrition.sourceURL
@@ -3419,6 +3405,7 @@ private struct RecordDetailNutritionHeaderAccessory: View {
 
     init(snapshots: [NutritionSnapshot]) {
         let confidences = snapshots.map(\.confidence)
+        hasAIEstimate = snapshots.contains(where: \.hasAIEstimate)
         if confidences.isEmpty || confidences.allSatisfy({ $0 == .unavailable }) {
             confidence = .unavailable
         } else if confidences.contains(.rough) {
@@ -3441,7 +3428,7 @@ private struct RecordDetailNutritionHeaderAccessory: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            RecordDetailConfidenceBadge(confidence: confidence)
+            RecordDetailConfidenceBadge(confidence: confidence, hasAIEstimate: hasAIEstimate)
 
             if hasDetails {
                 RecordDetailNutritionInfoButton(
@@ -3468,6 +3455,7 @@ private struct RecordDetailNutritionInfoButton: View {
     let assumptions: String
     let source: String
     let sourceURL: String?
+    var dishName: String? = nil
 
     @State private var isPresented = false
 
@@ -3475,45 +3463,58 @@ private struct RecordDetailNutritionInfoButton: View {
         Button {
             isPresented = true
         } label: {
-            Image(systemName: "info.circle")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(GanfanPalette.forest)
-                .frame(width: 30, height: 30)
-                .background(GanfanPalette.paleLeaf, in: Circle())
-                .contentShape(Circle())
+            if dishName != nil {
+                Label("估算说明", systemImage: "info.circle")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(GanfanPalette.forest)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            } else {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(GanfanPalette.forest)
+                    .frame(width: 30, height: 30)
+                    .background(GanfanPalette.paleLeaf, in: Circle())
+                    .contentShape(Circle())
+            }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("查看营养估算说明")
+        .accessibilityLabel(dishName.map { "查看\($0)的营养估算说明" } ?? "查看营养估算说明")
         .popover(isPresented: $isPresented, arrowEdge: .top) {
-            VStack(alignment: .leading, spacing: 13) {
-                Text("营养说明")
-                    .font(.headline)
-                    .foregroundStyle(GanfanPalette.ink)
-
-                if !assumptions.isEmpty {
-                    detailBlock("估算假设", value: assumptions, symbol: "lightbulb")
-                }
-
-                if !source.isEmpty {
-                    detailBlock("营养来源", value: source, symbol: "doc.text.magnifyingglass")
-                }
-
-                if let sourceURL, !sourceURL.isEmpty {
-                    Divider()
-                    if let url = URL(string: sourceURL), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
-                        Link(destination: url) {
-                            Label("打开来源链接", systemImage: "arrow.up.right")
-                                .font(.footnote.weight(.medium))
-                        }
-                    } else {
-                        detailBlock("来源链接", value: sourceURL, symbol: "link")
-                    }
-                }
+            ViewThatFits(in: .vertical) {
+                explanation
+                ScrollView { explanation }
             }
-            .padding(16)
             .frame(width: 290, alignment: .leading)
             .presentationCompactAdaptation(.popover)
         }
+    }
+
+    private var explanation: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Text("营养说明")
+                .font(.headline)
+                .foregroundStyle(GanfanPalette.ink)
+
+            if !assumptions.isEmpty {
+                detailBlock("估算假设", value: assumptions, symbol: "lightbulb")
+            }
+            if !source.isEmpty {
+                detailBlock("营养来源", value: source, symbol: "doc.text.magnifyingglass")
+            }
+            if let sourceURL, !sourceURL.isEmpty {
+                Divider()
+                if let url = URL(string: sourceURL), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                    Link(destination: url) {
+                        Label("打开来源链接", systemImage: "arrow.up.right")
+                            .font(.footnote.weight(.medium))
+                    }
+                } else {
+                    detailBlock("来源链接", value: sourceURL, symbol: "link")
+                }
+            }
+        }
+        .padding(16)
     }
 
     private func detailBlock(_ title: String, value: String, symbol: String) -> some View {
@@ -3573,6 +3574,7 @@ private struct RecordDetailInfoRow: View {
 private struct RecordDetailView: View {
     @Environment(\.journalSQLiteStore) private var library
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(MenuCatalogRepository.changeGenerationKey) private var catalogChangeGeneration = 0
 
     let entry: JournalLibraryEntry
@@ -3785,34 +3787,35 @@ private struct RecordDetailView: View {
 
     private func nutritionMetrics(for nutrition: NutritionSnapshot) -> [RecordDetailMetric] {
         [
-            nutritionMetric("能量", symbol: "flame.fill", value: nutrition.energyKcal, unit: "kcal"),
-            nutritionMetric("糖", symbol: "cube.fill", value: nutrition.sugarGrams, unit: "g"),
-            nutritionMetric("咖啡因", symbol: "cup.and.saucer.fill", value: nutrition.caffeineMilligrams, unit: "mg"),
-            nutritionMetric("蛋白质", symbol: "figure.strengthtraining.traditional", value: nutrition.proteinGrams, unit: "g", sourceKey: "proteinGrams", sources: nutrition.metricSources),
-            nutritionMetric("脂肪", symbol: "drop.fill", value: nutrition.fatGrams, unit: "g", sourceKey: "fatGrams", sources: nutrition.metricSources),
-            nutritionMetric("碳水化合物", symbol: "leaf.fill", value: nutrition.carbohydrateGrams, unit: "g", sourceKey: "carbohydrateGrams", sources: nutrition.metricSources)
+            nutritionMetric(.energy, symbol: "flame.fill", nutrition: nutrition),
+            nutritionMetric(.sugar, symbol: "cube.fill", nutrition: nutrition),
+            nutritionMetric(.caffeine, symbol: "cup.and.saucer.fill", nutrition: nutrition),
+            nutritionMetric(.protein, symbol: "figure.strengthtraining.traditional", nutrition: nutrition),
+            nutritionMetric(.fat, symbol: "drop.fill", nutrition: nutrition),
+            nutritionMetric(.carbohydrate, symbol: "leaf.fill", nutrition: nutrition)
         ]
     }
 
     private func nutritionMetric(
-        _ title: String,
+        _ nutrient: DrinkNutritionCalculator.Nutrient,
         symbol: String,
-        value: Double?,
-        unit: String,
-        sourceKey: String? = nil,
-        sources: [String: String] = [:]
+        nutrition: NutritionSnapshot
     ) -> RecordDetailMetric {
-        guard let value, value.isFinite, value >= 0 else {
-            return RecordDetailMetric(title: title, value: "暂无数据", unit: "", symbol: symbol, note: nil, hasValue: false)
+        guard let value = nutrient.value(in: nutrition), value.isFinite, value >= 0 else {
+            return RecordDetailMetric(title: nutrient.title, value: "暂无数据", unit: "", symbol: symbol, note: nil, hasValue: false)
         }
 
-        let isRough = sourceKey.flatMap { sources[$0] } == "rough"
+        let note: String? = switch nutrition.metricSources[nutrient.rawValue] {
+        case "ai": "AI 估算"
+        case "rough": "粗估"
+        default: nil
+        }
         return RecordDetailMetric(
-            title: title,
-            value: value.formatted(.number.precision(.fractionLength(0...1))),
-            unit: unit,
+            title: nutrient.title,
+            value: NutritionValueFormatting.integer(value),
+            unit: nutrient.unit,
             symbol: symbol,
-            note: isRough ? "粗估" : nil,
+            note: note,
             hasValue: true
         )
     }
@@ -3841,10 +3844,10 @@ private struct RecordDetailView: View {
         ) {
             VStack(alignment: .leading, spacing: 7) {
                 RecordDetailMetricGrid(metrics: [
-                    mealMetric("能量", symbol: "flame.fill", value: mealNutrition.compactMap(\.energyKcal).reduce(0, +), unit: "kcal"),
-                    mealMetric("蛋白质", symbol: "figure.strengthtraining.traditional", value: mealNutrition.compactMap(\.proteinGrams).reduce(0, +), unit: "g"),
-                    mealMetric("脂肪", symbol: "drop.fill", value: mealNutrition.compactMap(\.fatGrams).reduce(0, +), unit: "g"),
-                    mealMetric("碳水化合物", symbol: "leaf.fill", value: mealNutrition.compactMap(\.carbohydrateGrams).reduce(0, +), unit: "g")
+                    mealMetric(.energy, symbol: "flame.fill", snapshots: mealNutrition),
+                    mealMetric(.protein, symbol: "figure.strengthtraining.traditional", snapshots: mealNutrition),
+                    mealMetric(.fat, symbol: "drop.fill", snapshots: mealNutrition),
+                    mealMetric(.carbohydrate, symbol: "leaf.fill", snapshots: mealNutrition)
                 ], compact: true)
 
                 HStack(alignment: .top, spacing: 7) {
@@ -3866,7 +3869,10 @@ private struct RecordDetailView: View {
                     .foregroundStyle(.secondary)
 
                 ForEach(Array(meal.dishes.enumerated()), id: \.element.id) { item in
-                    mealDishCard(dish: item.element, index: item.offset, photoEntries: photoEntries)
+                    mealDishCard(
+                        dish: item.element, nutrition: mealNutrition[item.offset],
+                        index: item.offset, photoEntries: photoEntries
+                    )
                 }
             }
         }
@@ -3901,88 +3907,145 @@ private struct RecordDetailView: View {
         }
     }
 
-    private func mealMetric(_ title: String, symbol: String, value: Double, unit: String) -> RecordDetailMetric {
-        RecordDetailMetric(
-            title: title,
-            value: "约 \(Int(value))",
-            unit: unit,
+    private func mealMetric(
+        _ nutrient: DrinkNutritionCalculator.Nutrient,
+        symbol: String,
+        snapshots: [NutritionSnapshot]
+    ) -> RecordDetailMetric {
+        let values = snapshots.compactMap { nutrient.value(in: $0) }.filter { $0.isFinite && $0 >= 0 }
+        let value = values.reduce(0, +)
+        let hasValue = !values.isEmpty && value.isFinite
+        return RecordDetailMetric(
+            title: nutrient.title,
+            value: hasValue ? "约 \(NutritionValueFormatting.integer(value))" : "暂无数据",
+            unit: hasValue ? nutrient.unit : "",
             symbol: symbol,
-            note: nil,
-            hasValue: true
+            note: hasValue && values.count < snapshots.count ? "部分" : nil,
+            hasValue: hasValue
         )
     }
 
-    @ViewBuilder
     private func mealDishCard(
+        dish: MealDish,
+        nutrition: NutritionSnapshot,
+        index: Int,
+        photoEntries: [(asset: PhotoAsset, label: String)]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: GanfanSpacing.small) {
+            HStack(alignment: .center, spacing: GanfanSpacing.mediumSmall) {
+                mealDishPhoto(dish: dish, index: index, photoEntries: photoEntries)
+
+                VStack(alignment: .leading, spacing: GanfanSpacing.xSmall) {
+                    Text("\(index + 1). \(dish.name)")
+                        .font(.headline)
+                        .foregroundStyle(GanfanPalette.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 6) {
+                        Text("能量")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        dishNutritionValue(.energy, nutrition: nutrition)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .accessibilityElement(children: .combine)
+                    Text(nutrition.confidence.displayName)
+                        .font(.caption)
+                        .foregroundStyle(GanfanPalette.leaf)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Divider()
+            dishNutritionGrid(nutrition)
+
+            if !nutrition.assumptions.isEmpty || !nutrition.source.isEmpty || !(nutrition.sourceURL?.isEmpty ?? true) {
+                RecordDetailNutritionInfoButton(
+                    assumptions: nutrition.assumptions, source: nutrition.source,
+                    sourceURL: nutrition.sourceURL, dishName: dish.name
+                )
+            }
+        }
+        .padding(GanfanSpacing.mediumSmall)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: GanfanShape.surface))
+    }
+
+    private func dishNutritionGrid(_ nutrition: NutritionSnapshot) -> some View {
+        let nutrients: [DrinkNutritionCalculator.Nutrient] = [.protein, .fat, .carbohydrate, .sugar]
+        let columns = dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible(), alignment: .leading)]
+            : [GridItem(.adaptive(minimum: dynamicTypeSize >= .xxLarge ? 108 : 66), spacing: 8, alignment: .leading)]
+
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+            ForEach(nutrients, id: \.self) { nutrient in
+                if nutrient != .sugar || nutrition.sugarGrams != nil {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(nutrient == .carbohydrate ? "碳水" : nutrient.title)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        dishNutritionValue(nutrient, nutrition: nutrition)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func dishNutritionValue(
+        _ nutrient: DrinkNutritionCalculator.Nutrient,
+        nutrition: NutritionSnapshot
+    ) -> some View {
+        if let value = nutrient.value(in: nutrition), value.isFinite, value >= 0 {
+            Text("\(NutritionValueFormatting.integer(value)) \(nutrient.unit)")
+                .monospacedDigit()
+                .foregroundStyle(GanfanPalette.ink)
+        } else {
+            Text("—")
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("暂无数据")
+        }
+    }
+
+    @ViewBuilder
+    private func mealDishPhoto(
         dish: MealDish,
         index: Int,
         photoEntries: [(asset: PhotoAsset, label: String)]
     ) -> some View {
-        let row = HStack(spacing: 12) {
-            if let photo = dish.photo {
-                JournalPhotoThumbnail(asset: photo, dimension: 76)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(alignment: .bottomTrailing) {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.primary)
-                            .padding(6)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .padding(4)
-                    }
-            } else {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(GanfanPalette.paleLeaf)
-                    .frame(width: 76, height: 76)
-                    .overlay {
-                        Image(systemName: "fork.knife")
-                            .font(.title3.weight(.medium))
-                            .foregroundStyle(GanfanPalette.leaf)
-                    }
-            }
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text("\(index + 1). \(dish.name)")
-                    .font(.headline)
-                    .foregroundStyle(GanfanPalette.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                let nutrition = dish.nutrition ?? RoughNutritionEstimator.dish(name: dish.name)
-                HStack(spacing: 6) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .accessibilityHidden(true)
-                    Text(nutrition.energyKcal.map { "约 \(Int($0)) kcal" } ?? "暂无能量数据")
-                        .font(.footnote)
-                }
-                    .foregroundStyle(.secondary)
-
-                Text(nutrition.confidence.displayName)
-                    .font(.caption)
-                    .foregroundStyle(GanfanPalette.leaf)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(GanfanPalette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .contentShape(Rectangle())
-
         if let photo = dish.photo {
-            let photoIndex = photoEntries.firstIndex { $0.asset.id == photo.id } ?? 0
             Button {
+                let photoIndex = photoEntries.firstIndex { $0.asset.id == photo.id } ?? 0
                 activePhotoOverlay = .photoViewer(
                     assets: photoEntries.map(\.asset),
                     labels: photoEntries.map(\.label),
                     initialIndex: photoIndex
                 )
             } label: {
-                row
+                JournalPhotoThumbnail(asset: photo, dimension: 76)
+                    .clipShape(RoundedRectangle(cornerRadius: GanfanShape.photo))
+                    .overlay(alignment: .bottomTrailing) {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.primary)
+                            .padding(6)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .padding(4)
+                    }
             }
             .buttonStyle(.plain)
             .accessibilityLabel("查看第 \(index + 1) 道菜：\(dish.name) 的照片")
         } else {
-            row
+            RoundedRectangle(cornerRadius: GanfanShape.photo)
+                .fill(GanfanPalette.paleLeaf)
+                .frame(width: 76, height: 76)
+                .overlay {
+                    Image(systemName: "fork.knife")
+                        .font(.title3.weight(.medium))
+                        .foregroundStyle(GanfanPalette.leaf)
+                }
+                .accessibilityHidden(true)
         }
     }
 

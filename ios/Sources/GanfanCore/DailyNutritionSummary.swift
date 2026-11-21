@@ -39,27 +39,28 @@ public struct DailyNutritionSummary: Equatable, Sendable {
             estimatedCount: qualities.filter { $0 == .estimated }.count,
             roughCount: qualities.filter { $0 == .rough }.count,
             unavailableCount: qualities.filter { $0 == .unavailable }.count,
-            energyKcal: Self.total(drinks) { $0.energyKcal },
-            proteinGrams: Self.total(drinks) { $0.proteinGrams },
-            fatGrams: Self.total(drinks) { $0.fatGrams },
-            sugarGrams: Self.total(drinks) { $0.sugarGrams },
-            caffeineMilligrams: Self.total(drinks) { $0.caffeineMilligrams }
+            energyKcal: Self.total(drinks, nutrient: .energy),
+            proteinGrams: Self.total(drinks, nutrient: .protein),
+            fatGrams: Self.total(drinks, nutrient: .fat),
+            sugarGrams: Self.total(drinks, nutrient: .sugar),
+            caffeineMilligrams: Self.total(drinks, nutrient: .caffeine)
         )
     }
 
     private static func total(
         _ drinks: [DrinkRecord],
-        value: (NutritionSnapshot) -> Double?
+        nutrient: DrinkNutritionCalculator.Nutrient
     ) -> NutritionMetricTotal {
         var values: [Double] = []
         var qualities: [NutritionSnapshot.Confidence] = []
         for drink in drinks {
             guard let snapshot = drink.nutrition,
-                  let amount = value(snapshot),
+                  let amount = nutrient.value(in: snapshot),
                   amount.isFinite,
                   amount >= 0 else { continue }
             values.append(amount)
-            qualities.append(snapshot.confidence == .unavailable ? .estimated : snapshot.confidence)
+            let confidence = snapshot.confidence(for: nutrient.rawValue)
+            qualities.append(confidence == .unavailable ? .estimated : confidence)
         }
 
         guard !values.isEmpty else {

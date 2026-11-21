@@ -54,25 +54,70 @@ public struct DrinkServingSelection: Equatable, Sendable {
 }
 
 public enum DrinkNutritionCalculator {
-    private enum Nutrient: CaseIterable {
-        case energy
-        case sugar
-        case caffeine
+    public enum Nutrient: String, CaseIterable, Sendable {
+        case energy = "energyKcal"
+        case sugar = "sugarGrams"
+        case caffeine = "caffeineMilligrams"
+        case protein = "proteinGrams"
+        case fat = "fatGrams"
+        case carbohydrate = "carbohydrateGrams"
 
-        var variantValue: (MenuNutritionVariant) -> Double? {
+        public var title: String {
             switch self {
-            case .energy: { $0.energyKcal }
-            case .sugar: { $0.sugarG }
-            case .caffeine: { $0.caffeineMg }
+            case .energy: "能量"
+            case .sugar: "糖"
+            case .caffeine: "咖啡因"
+            case .protein: "蛋白质"
+            case .fat: "脂肪"
+            case .carbohydrate: "碳水化合物"
             }
         }
 
-        var unitValue: (MenuNutritionPerUnit) -> Double? {
+        public var unit: String {
+            switch self {
+            case .energy: "kcal"
+            case .caffeine: "mg"
+            default: "g"
+            }
+        }
+
+        public func value(in snapshot: NutritionSnapshot) -> Double? {
+            switch self {
+            case .energy: snapshot.energyKcal
+            case .sugar: snapshot.sugarGrams
+            case .caffeine: snapshot.caffeineMilligrams
+            case .protein: snapshot.proteinGrams
+            case .fat: snapshot.fatGrams
+            case .carbohydrate: snapshot.carbohydrateGrams
+            }
+        }
+
+        fileprivate var variantValue: (MenuNutritionVariant) -> Double? {
             switch self {
             case .energy: { $0.energyKcal }
             case .sugar: { $0.sugarG }
             case .caffeine: { $0.caffeineMg }
+            case .protein: { $0.proteinG }
+            case .fat: { $0.fatG }
+            case .carbohydrate: { $0.carbohydrateG }
             }
+        }
+
+        fileprivate var unitValue: (MenuNutritionPerUnit) -> Double? {
+            switch self {
+            case .energy: { $0.energyKcal }
+            case .sugar: { $0.sugarG }
+            case .caffeine: { $0.caffeineMg }
+            case .protein: { $0.proteinG }
+            case .fat: { $0.fatG }
+            case .carbohydrate: { $0.carbohydrateG }
+            }
+        }
+
+        fileprivate func needsEstimate(in snapshot: NutritionSnapshot) -> Bool {
+            guard let value = value(in: snapshot), value.isFinite, value >= 0 else { return true }
+            let confidence = snapshot.confidence(for: rawValue)
+            return confidence == .rough || confidence == .unavailable
         }
     }
 
@@ -82,6 +127,8 @@ public enum DrinkNutritionCalculator {
         let source: String
         let sourceURL: String
     }
+
+    private static let headlineNutrients: [Nutrient] = [.energy, .sugar, .caffeine]
 
     public static func snapshot(
         for drink: MenuDrink?,
@@ -117,73 +164,120 @@ public enum DrinkNutritionCalculator {
         // A generic per-100ml label cannot be claimed to match an arbitrary sweetness.
         let multiplier = normalized(sweetness).isEmpty
             ? perUnitMultiplier(drink.nutritionPerUnit, sizeML: sizeML) : nil
-        let values: [ValueWithSource?] = Nutrient.allCases.map { nutrient in
+        let values = Dictionary(uniqueKeysWithValues: Nutrient.allCases.map { nutrient -> (Nutrient, ValueWithSource?) in
             if let selectedVariant,
                let value = valid(nutrient.variantValue(selectedVariant)) {
-                return ValueWithSource(
+                return (nutrient, ValueWithSource(
                     value: value,
                     confidence: confidence(selectedVariant.sourceType),
                     source: selectedVariant.source ?? "",
                     sourceURL: selectedVariant.sourceURL ?? ""
-                )
+                ))
             }
             guard let nutrition = drink.nutritionPerUnit,
                   let multiplier,
-                  let value = valid(nutrient.unitValue(nutrition)) else {
-                return nil
+                  let amount = valid(nutrient.unitValue(nutrition)),
+                  let value = valid(amount * multiplier) else {
+                return (nutrient, nil)
             }
-            return ValueWithSource(
-                value: value * multiplier,
+            return (nutrient, ValueWithSource(
+                value: value,
                 confidence: confidence(nutrition.sourceType),
                 source: nutrition.source ?? "",
                 sourceURL: ""
-            )
-        }
+            ))
+        }).compactMapValues { $0 }
 
-        let availableValues = values.compactMap { $0 }
         let rough = RoughNutritionEstimator.drink(name: drink.name, category: drink.category,
                                                    sizeML: sizeML, cupType: cupType, sweetness: sweetness,
                                                    temperature: temperature, ice: ice)
-        // Fill missing metrics independently, rather than reporting unknown sugar or caffeine
-        // as zero. Any mixed snapshot is marked as rough, with both sources preserved.
-        let usedRoughValue = values.contains(where: { $0 == nil })
-        let usedEstimatedValue = availableValues.contains { $0.confidence == .estimated }
+        // The summary confidence describes the three headline metrics. Each metric also keeps its own source.
+        let usedRoughValue = headlineNutrients.contains { values[$0] == nil }
+        let usedEstimatedValue = headlineNutrients.contains { values[$0]?.confidence == .estimated }
         let snapshotConfidence: NutritionSnapshot.Confidence = usedRoughValue ? .rough :
             (usedEstimatedValue ? .estimated : .official)
-        let sources = Array(Set(availableValues.map(\.source).filter { !$0.isEmpty })).sorted()
-        let sourceURLs = Array(Set(availableValues.map(\.sourceURL).filter { !$0.isEmpty })).sorted()
+        let sources = Set(values.values.map(\.source).filter { !$0.isEmpty }).sorted()
+        let sourceURLs = Set(values.values.map(\.sourceURL).filter { !$0.isEmpty }).sorted()
         let sourceDescription = (sources + (usedRoughValue ? [rough.source] : [])).joined(separator: "；")
 
         return NutritionSnapshot(
-            energyKcal: values[0]?.value ?? rough.energyKcal,
-            sugarGrams: values[1]?.value ?? rough.sugarGrams,
-            caffeineMilligrams: values[2]?.value ?? rough.caffeineMilligrams,
+            energyKcal: values[.energy]?.value ?? rough.energyKcal,
+            sugarGrams: values[.sugar]?.value ?? rough.sugarGrams,
+            caffeineMilligrams: values[.caffeine]?.value ?? rough.caffeineMilligrams,
             confidence: snapshotConfidence,
             source: sourceDescription,
             sourceURL: sourceURLs.isEmpty ? nil : sourceURLs.joined(separator: "；"),
-            proteinGrams: macro(variant: selectedVariant?.proteinG, unit: drink.nutritionPerUnit?.proteinG, multiplier: multiplier) ?? rough.proteinGrams,
-            fatGrams: macro(variant: selectedVariant?.fatG, unit: drink.nutritionPerUnit?.fatG, multiplier: multiplier) ?? rough.fatGrams,
-            carbohydrateGrams: macro(variant: selectedVariant?.carbohydrateG, unit: drink.nutritionPerUnit?.carbohydrateG, multiplier: multiplier) ?? rough.carbohydrateGrams,
-            assumptions: rough.assumptions,
-            metricSources: [
-                "energyKcal": values[0]?.confidence.rawValue ?? "rough",
-                "sugarGrams": values[1]?.confidence.rawValue ?? "rough",
-                "caffeineMilligrams": values[2]?.confidence.rawValue ?? "rough",
-                "proteinGrams": macro(variant: selectedVariant?.proteinG, unit: drink.nutritionPerUnit?.proteinG, multiplier: multiplier) == nil ? "rough" : snapshotConfidence.rawValue,
-                "fatGrams": macro(variant: selectedVariant?.fatG, unit: drink.nutritionPerUnit?.fatG, multiplier: multiplier) == nil ? "rough" : snapshotConfidence.rawValue,
-                "carbohydrateGrams": macro(variant: selectedVariant?.carbohydrateG, unit: drink.nutritionPerUnit?.carbohydrateG, multiplier: multiplier) == nil ? "rough" : snapshotConfidence.rawValue
-            ]
+            proteinGrams: values[.protein]?.value ?? rough.proteinGrams,
+            fatGrams: values[.fat]?.value ?? rough.fatGrams,
+            carbohydrateGrams: values[.carbohydrate]?.value ?? rough.carbohydrateGrams,
+            assumptions: values.count < Nutrient.allCases.count ? rough.assumptions : "",
+            metricSources: Dictionary(uniqueKeysWithValues: Nutrient.allCases.map {
+                ($0.rawValue, values[$0]?.confidence.rawValue ?? "rough")
+            })
         )
     }
 
-    private static func macro(variant: Double?, unit: Double?, multiplier: Double?) -> Double? {
-        if let variant = valid(variant) { return variant }
-        if let multiplier, let value = valid(unit) { return value * multiplier }
-        return nil
+    public static func nutrientsNeedingEstimate(
+        in snapshot: NutritionSnapshot,
+        catalog: NutritionSnapshot? = nil
+    ) -> [Nutrient] {
+        Nutrient.allCases.filter { nutrient in
+            nutrient.needsEstimate(in: snapshot) && (catalog.map { nutrient.needsEstimate(in: $0) } ?? true)
+        }
     }
 
-    private static var unavailable: NutritionSnapshot {
-        NutritionSnapshot(energyKcal: nil, sugarGrams: nil, caffeineMilligrams: nil, confidence: .unavailable)
+    public static func supplement(
+        _ snapshot: NutritionSnapshot,
+        withAI values: [String: Double],
+        assumptions: String,
+        catalog: NutritionSnapshot? = nil
+    ) -> NutritionSnapshot? {
+        let accepted = Dictionary(uniqueKeysWithValues: nutrientsNeedingEstimate(in: snapshot, catalog: catalog)
+            .compactMap { nutrient -> (Nutrient, Double)? in
+                guard let value = values[nutrient.rawValue], value.isFinite, (0...10_000).contains(value) else {
+                    return nil
+                }
+                return (nutrient, value)
+            })
+        guard !accepted.isEmpty else { return nil }
+
+        var metricSources = snapshot.metricSources
+        for nutrient in Nutrient.allCases {
+            if accepted[nutrient] != nil {
+                metricSources[nutrient.rawValue] = "ai"
+            } else if valid(nutrient.value(in: snapshot)) != nil, metricSources[nutrient.rawValue] == nil {
+                metricSources[nutrient.rawValue] = snapshot.confidence(for: nutrient.rawValue).rawValue
+            }
+        }
+
+        let source = "AI 饮品估算"
+        let usesOfflineEstimate = metricSources.values.contains("rough")
+        var sources = snapshot.source.components(separatedBy: "；").filter { !$0.isEmpty }
+        if usesOfflineEstimate, !sources.contains(RoughNutritionEstimator.drinkSource) {
+            sources.append(RoughNutritionEstimator.drinkSource)
+        } else if !usesOfflineEstimate {
+            sources.removeAll { $0 == RoughNutritionEstimator.drinkSource }
+        }
+        if !sources.contains(source) { sources.append(source) }
+        let existingNotes = usesOfflineEstimate || snapshot.hasAIEstimate ? snapshot.assumptions : ""
+        let notes = [existingNotes, assumptions].filter { !$0.isEmpty }.joined(separator: "；")
+
+        func value(_ nutrient: Nutrient) -> Double? {
+            accepted[nutrient] ?? valid(nutrient.value(in: snapshot))
+        }
+        return NutritionSnapshot(
+            energyKcal: value(.energy),
+            sugarGrams: value(.sugar),
+            caffeineMilligrams: value(.caffeine),
+            confidence: headlineNutrients.contains { metricSources[$0.rawValue] == "rough" } ? .rough : .estimated,
+            source: sources.joined(separator: "；"),
+            sourceURL: snapshot.sourceURL,
+            proteinGrams: value(.protein),
+            fatGrams: value(.fat),
+            carbohydrateGrams: value(.carbohydrate),
+            assumptions: notes,
+            metricSources: metricSources
+        )
     }
 
     private static func servingSelection(for variant: MenuNutritionVariant) -> DrinkServingSelection {

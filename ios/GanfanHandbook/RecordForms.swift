@@ -19,6 +19,15 @@ private enum DrinkRecordSheet: Identifiable {
     var id: Self { self }
 }
 
+private struct DrinkEstimateReview: Identifiable {
+    let id = UUID()
+    let serving: AIDrinkServing
+    let baseline: NutritionSnapshot
+    let nutrition: NutritionSnapshot
+    let changedNutrients: [DrinkNutritionCalculator.Nutrient]
+    let assumptions: String
+}
+
 struct DrinkRecordForm: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.journalSQLiteStore) private var library
@@ -51,7 +60,15 @@ struct DrinkRecordForm: View {
     @State private var savedPhotoPreview: UIImage?
     @State private var photoImportMessage: String?
     @State private var isImportingPhoto = false
+    @State private var isLoadingSavedPhoto = false
     @State private var isNutritionDetailsExpanded = false
+    @State private var aiConfigured = false
+    @State private var drinkEstimateTask: Task<Void, Never>?
+    @State private var drinkEstimateCollapseTask: Task<Void, Never>?
+    @State private var drinkEstimateError: String?
+    @State private var drinkEstimateStatus: String?
+    @State private var appliedDrinkEstimate: DrinkEstimateReview?
+    @State private var isDrinkEstimateResultExpanded = false
     @State private var photoExtension = "jpg"
     @State private var photoRemoved = false
     @State private var isSaving = false
@@ -329,10 +346,7 @@ struct DrinkRecordForm: View {
             }
 
             Section {
-                DrinkNutritionQuickView(
-                    nutrition: calculatedNutrition,
-                    isExpanded: $isNutritionDetailsExpanded
-                )
+                drinkNutritionCard
             } header: {
                 formSectionTitle("营养快照")
             }
@@ -388,6 +402,14 @@ struct DrinkRecordForm: View {
                 ice = ""
             }
         }
+        .onAppear { aiConfigured = AISettingsStore.isReady }
+        .onDisappear { cancelDrinkEstimate() }
+        .onChange(of: drinkEstimateServing) {
+            cancelDrinkEstimate()
+            appliedDrinkEstimate = nil
+            drinkEstimateError = nil
+            drinkEstimateStatus = nil
+        }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .menu:
@@ -441,6 +463,8 @@ struct DrinkRecordForm: View {
     }
 
     private func removeDrinkPhoto() {
+        cancelDrinkEstimate()
+        appliedDrinkEstimate = nil
         photoRemoved = true
         selectedPhotoData = nil
         selectedPhotoPreview = nil
@@ -582,7 +606,7 @@ struct DrinkRecordForm: View {
         )
     }
 
-    private var calculatedNutrition: NutritionSnapshot {
+    private var savedNutritionForCurrentServing: NutritionSnapshot? {
         if let originalRecord,
            originalRecord.brandName == brandName,
            originalRecord.drinkName == drinkName,
@@ -601,53 +625,179 @@ struct DrinkRecordForm: View {
                 return savedNutrition
             }
         }
+        return nil
+    }
 
-        let selectedMenuIsCurrent = selectedMenuDrink?.brandName == brandName
-            && selectedMenuDrink?.name == drinkName
-        if selectedMenuIsCurrent {
-            return DrinkNutritionCalculator.snapshot(
-                for: selectedMenuDrink,
-                cupType: cupType,
-                sizeML: recordSizeML,
-                sweetness: sweetness,
-                temperature: temperature,
-                ice: ice
+    private var catalogNutrition: NutritionSnapshot? {
+        let drink: MenuDrink?
+        if let selectedMenuDrink, selectedMenuDrink.brandName == brandName, selectedMenuDrink.name == drinkName {
+            drink = selectedMenuDrink
+        } else {
+            drink = matchingCatalogDrink(
+                name: drinkName,
+                brandID: matchingCatalogBrand(named: brandName)?.id ?? "",
+                brandName: brandName
             )
         }
-
-        guard let originalRecord,
-              originalRecord.brandName == brandName,
-              originalRecord.drinkName == drinkName else {
-            return RoughNutritionEstimator.drink(name: drinkName, sizeML: recordSizeML,
-                                                  cupType: cupType, sweetness: sweetness,
-                                                  temperature: temperature, ice: ice)
-        }
-        let originalServing = DrinkServingSelection(
-            temperature: originalRecord.temperature,
-            ice: originalRecord.ice,
-            legacyServingOption: originalRecord.temperature == nil && originalRecord.ice == nil
-                ? originalRecord.servingOption
-                : nil
+        guard let drink else { return nil }
+        return DrinkNutritionCalculator.snapshot(
+            for: drink, cupType: cupType, sizeML: recordSizeML,
+            sweetness: sweetness, temperature: temperature, ice: ice
         )
-        if originalRecord.cupType == cupType,
-           originalRecord.sizeML == recordSizeML,
-           Self.normalizedSweetness(originalRecord.sweetness) == sweetness,
-           originalServing.temperature == temperature,
-           originalServing.ice == ice {
-            if let existing = originalRecord.nutrition, existing.confidence != .unavailable {
-                return existing
-            }
-            return RoughNutritionEstimator.drink(name: drinkName, sizeML: recordSizeML,
-                                                 cupType: cupType, sweetness: sweetness,
-                                                 temperature: temperature, ice: ice)
+    }
+
+    private var calculatedNutrition: NutritionSnapshot {
+        if let appliedDrinkEstimate, appliedDrinkEstimate.serving == drinkEstimateServing {
+            return appliedDrinkEstimate.nutrition
         }
-        return RoughNutritionEstimator.drink(name: drinkName, sizeML: recordSizeML,
-                                             cupType: cupType, sweetness: sweetness,
-                                             temperature: temperature, ice: ice)
+        return savedNutritionForCurrentServing ?? catalogNutrition ?? RoughNutritionEstimator.drink(
+            name: drinkName, sizeML: recordSizeML, cupType: cupType,
+            sweetness: sweetness, temperature: temperature, ice: ice
+        )
+    }
+
+    private var drinkEstimateServing: AIDrinkServing {
+        AIDrinkServing(
+            drinkName: drinkName.trimmingCharacters(in: .whitespacesAndNewlines),
+            brandName: brandName.trimmingCharacters(in: .whitespacesAndNewlines),
+            cupType: cupType, sizeML: recordSizeML, sweetness: sweetness, temperature: temperature, ice: ice
+        )
+    }
+
+    private var drinkNutritionCard: some View {
+        let nutrition = calculatedNutrition
+        let canEstimate = aiConfigured && !drinkEstimateServing.drinkName.isEmpty
+            && !DrinkNutritionCalculator.nutrientsNeedingEstimate(in: nutrition, catalog: catalogNutrition).isEmpty
+
+        return DrinkNutritionQuickView(nutrition: nutrition, isExpanded: $isNutritionDetailsExpanded) {
+            if canEstimate {
+                AINutritionActionButton(
+                    title: "AI 补估营养", busyTitle: "正在估算这一杯…", isBusy: drinkEstimateTask != nil
+                ) {
+                    focusedField = nil
+                    estimateDrink()
+                }
+                .disabled(isSaving || isDrinkPhotoLoading)
+            }
+            if let drinkEstimateStatus {
+                AILatestStatusLine(
+                    message: drinkEstimateStatus,
+                    isBusy: drinkEstimateTask != nil,
+                    isError: drinkEstimateError != nil
+                )
+            }
+            if let estimate = appliedDrinkEstimate, estimate.serving == drinkEstimateServing {
+                AINutritionInlineDisclosure(
+                    title: "估算已加入营养草稿",
+                    isExpanded: $isDrinkEstimateResultExpanded
+                ) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach(estimate.changedNutrients, id: \.self) { nutrient in
+                            NutritionReviewValue(nutrient: nutrient, nutrition: estimate.nutrition)
+                        }
+                        if !estimate.assumptions.isEmpty {
+                            Text(estimate.assumptions)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Text("保存饮品记录后，这些估算会写入营养快照。")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            if let drinkEstimateError {
+                Label(drinkEstimateError, systemImage: "info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var drinkEstimatePhoto: Data? {
+        guard !photoRemoved, !isImportingPhoto else { return nil }
+        return selectedPhotoData ?? savedPhotoData
+    }
+
+    private var isDrinkPhotoLoading: Bool {
+        isImportingPhoto || isLoadingSavedPhoto
+    }
+
+    private func estimateDrink() {
+        let serving = drinkEstimateServing
+        let baseline = calculatedNutrition
+        let catalog = catalogNutrition
+        let requested = DrinkNutritionCalculator.nutrientsNeedingEstimate(in: baseline, catalog: catalog)
+        guard drinkEstimateTask == nil, !isSaving, !isDrinkPhotoLoading, !serving.drinkName.isEmpty, !requested.isEmpty,
+              AISettingsStore.isReady, let apiKey = AISettingsStore.apiKey() else { return }
+
+        let configuration = AISettingsStore.load()
+        let photo = drinkEstimatePhoto
+        drinkEstimateError = nil
+        drinkEstimateStatus = "正在准备饮品资料\(photo == nil ? "" : "和照片")"
+        drinkEstimateTask = Task { @MainActor in
+            defer { if !Task.isCancelled { drinkEstimateTask = nil } }
+            do {
+                let result = try await AINutritionService().estimateDrink(
+                    serving: serving, nutrients: requested, photo: photo,
+                    configuration: configuration, apiKey: apiKey,
+                    onStatus: { status in drinkEstimateStatus = status }
+                )
+                guard !Task.isCancelled else { return }
+                guard serving == drinkEstimateServing, baseline == calculatedNutrition else {
+                    drinkEstimateStatus = "饮品资料已变化，已忽略本次旧结果"
+                    return
+                }
+
+                let assumptions = result.assumptions.map {
+                    String($0.trimmingCharacters(in: .whitespacesAndNewlines).prefix(600))
+                } ?? ""
+                guard let snapshot = DrinkNutritionCalculator.supplement(
+                    baseline, withAI: result.values.compactMapValues { $0 },
+                    assumptions: assumptions, catalog: catalog
+                ) else { throw AISettingsError.noUsableEstimate }
+
+                let estimate = DrinkEstimateReview(
+                    serving: serving, baseline: baseline, nutrition: snapshot,
+                    changedNutrients: requested.filter { snapshot.metricSources[$0.rawValue] == "ai" },
+                    assumptions: assumptions
+                )
+                appliedDrinkEstimate = estimate
+                drinkEstimateStatus = "估算完成，结果已加入营养草稿"
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isDrinkEstimateResultExpanded = true
+                }
+                drinkEstimateCollapseTask?.cancel()
+                drinkEstimateCollapseTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 6_000_000_000)
+                    guard !Task.isCancelled, appliedDrinkEstimate?.id == estimate.id else { return }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isDrinkEstimateResultExpanded = false
+                    }
+                    drinkEstimateCollapseTask = nil
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                drinkEstimateError = "\(error.localizedDescription) 当前营养快照已保留。"
+                drinkEstimateStatus = "估算失败：\(drinkEstimateError ?? error.localizedDescription)"
+            }
+        }
+    }
+
+    private func cancelDrinkEstimate() {
+        drinkEstimateTask?.cancel()
+        drinkEstimateTask = nil
+        drinkEstimateCollapseTask?.cancel()
+        drinkEstimateCollapseTask = nil
+        isDrinkEstimateResultExpanded = false
+        drinkEstimateStatus = nil
     }
 
     private func loadSelectedPhoto() async {
         guard let selectedPhoto else { return }
+        cancelDrinkEstimate()
+        appliedDrinkEstimate = nil
         isImportingPhoto = true
         defer {
             if self.selectedPhoto == selectedPhoto {
@@ -716,6 +866,8 @@ struct DrinkRecordForm: View {
 
     private func loadSavedPhoto() async {
         guard let photo = originalRecord?.photo else { return }
+        isLoadingSavedPhoto = true
+        defer { isLoadingSavedPhoto = false }
         do {
             let photoStore = AppStoragePaths.photoStore
             let loaded = try await Task.detached(priority: .utility) {
@@ -732,6 +884,7 @@ struct DrinkRecordForm: View {
 
     private func saveRecord() {
         guard !isSaving else { return }
+        cancelDrinkEstimate()
         isSaving = true
 
         Task { @MainActor in
@@ -1199,10 +1352,9 @@ struct MealRecordForm: View {
             }
 
             Section {
-                ForEach($dishes) { $dish in
-                    MealDishEditorRow(draft: $dish) {
-                        let removedID = dish.id
-                        dishes.removeAll { $0.id == removedID }
+                ForEach(dishes) { dish in
+                    MealDishEditorRow(draft: binding(for: dish), storeName: storeName) {
+                        dishes.removeAll { $0.id == dish.id }
                     }
                         .padding(.vertical, 6)
                         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
@@ -1263,6 +1415,16 @@ struct MealRecordForm: View {
             Button("好", role: .cancel) { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "请重试。")
+        }
+    }
+
+    private func binding(for dish: MealDishDraft) -> Binding<MealDishDraft> {
+        Binding {
+            dishes.first { $0.id == dish.id } ?? dish
+        } set: { updated in
+            if let index = dishes.firstIndex(where: { $0.id == dish.id }) {
+                dishes[index] = updated
+            }
         }
     }
 
@@ -1348,17 +1510,21 @@ struct MealRecordForm: View {
     }
 }
 
-private struct DrinkNutritionQuickView: View {
+private struct DrinkNutritionQuickView<Actions: View>: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let nutrition: NutritionSnapshot
     @Binding var isExpanded: Bool
+    @ViewBuilder let actions: () -> Actions
 
     var body: some View {
         GanfanCard {
             VStack(alignment: .leading, spacing: GanfanSpacing.mediumSmall) {
                 metrics
 
-                Label(nutrition.confidence.displayName, systemImage: "info.circle")
+                Label(
+                    nutrition.hasAIEstimate ? "含 AI 估算" : nutrition.confidence.displayName,
+                    systemImage: nutrition.hasAIEstimate ? "sparkles" : "info.circle"
+                )
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -1372,6 +1538,7 @@ private struct DrinkNutritionQuickView: View {
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(GanfanPalette.ink)
                 }
+                actions()
             }
         }
         .listRowBackground(Color.clear)
@@ -1384,22 +1551,24 @@ private struct DrinkNutritionQuickView: View {
     private var metrics: some View {
         if dynamicTypeSize.isAccessibilitySize {
             VStack(alignment: .leading, spacing: 14) {
-                metric("能量", amount: nutrition.energyKcal, unit: "kcal")
-                metric("糖", amount: nutrition.sugarGrams, unit: "g")
-                metric("咖啡因", amount: nutrition.caffeineMilligrams, unit: "mg")
+                metric(.energy)
+                metric(.sugar)
+                metric(.caffeine)
             }
         } else {
             HStack(alignment: .top, spacing: 10) {
-                metric("能量", amount: nutrition.energyKcal, unit: "kcal")
-                metric("糖", amount: nutrition.sugarGrams, unit: "g")
-                metric("咖啡因", amount: nutrition.caffeineMilligrams, unit: "mg")
+                metric(.energy)
+                metric(.sugar)
+                metric(.caffeine)
             }
         }
     }
 
-    private func metric(_ title: String, amount: Double?, unit: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
+    private func metric(_ nutrient: DrinkNutritionCalculator.Nutrient) -> some View {
+        let amount = nutrient.value(in: nutrition)
+        let isAI = nutrition.metricSources[nutrient.rawValue] == "ai"
+        return VStack(alignment: .leading, spacing: 5) {
+            Text(nutrient.title)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
@@ -1410,24 +1579,29 @@ private struct DrinkNutritionQuickView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 if amount != nil {
-                    Text(unit)
+                    Text(nutrient.unit)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
             .lineLimit(1)
             .minimumScaleFactor(0.8)
+            if isAI {
+                Text("AI 估算")
+                    .font(.caption2)
+                    .foregroundStyle(GanfanPalette.forest)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title)，\(amount == nil ? "暂无数据" : "\(displayValue(amount) ?? "") \(unit)")")
+        .accessibilityLabel("\(nutrient.title)，\(amount == nil ? "暂无数据" : "\(displayValue(amount) ?? "") \(nutrient.unit)")\(isAI ? "，AI 估算" : "")")
     }
 
     private var detailContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            nutritionValue("蛋白质" + roughSuffix(for: "proteinGrams"), amount: nutrition.proteinGrams, unit: "g")
-            nutritionValue("脂肪" + roughSuffix(for: "fatGrams"), amount: nutrition.fatGrams, unit: "g")
-            nutritionValue("碳水化合物" + roughSuffix(for: "carbohydrateGrams"), amount: nutrition.carbohydrateGrams, unit: "g")
+            nutritionValue(.protein)
+            nutritionValue(.fat)
+            nutritionValue(.carbohydrate)
             if !nutrition.assumptions.isEmpty {
                 Text(nutrition.assumptions)
                     .font(.caption)
@@ -1449,9 +1623,11 @@ private struct DrinkNutritionQuickView: View {
         .padding(.top, 8)
     }
 
-    private func nutritionValue(_ title: String, amount: Double?, unit: String) -> some View {
-        LabeledContent(title, value: amount.map {
-            "\($0.formatted(.number.precision(.fractionLength(0...1)))) \(unit)"
+    private func nutritionValue(_ nutrient: DrinkNutritionCalculator.Nutrient) -> some View {
+        let source = nutrition.metricSources[nutrient.rawValue]
+        let suffix = source == "ai" ? "（AI 估算）" : (source == "rough" ? "（粗估）" : "")
+        return LabeledContent(nutrient.title + suffix, value: nutrient.value(in: nutrition).map {
+            "\($0.formatted(.number.precision(.fractionLength(0...1)))) \(nutrient.unit)"
         } ?? "暂无数据")
     }
 
@@ -1459,8 +1635,130 @@ private struct DrinkNutritionQuickView: View {
         amount?.formatted(.number.precision(.fractionLength(0...1)))
     }
 
-    private func roughSuffix(for metric: String) -> String {
-        nutrition.metricSources[metric] == "rough" ? "（粗估）" : ""
+}
+
+private struct AINutritionActionButton: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let title: String
+    let busyTitle: String
+    let isBusy: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: GanfanSpacing.small) {
+                Group {
+                    if isBusy {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(GanfanPalette.forest)
+                    } else {
+                        Image(systemName: "sparkles")
+                    }
+                }
+                .frame(minWidth: 22)
+                .accessibilityHidden(true)
+                Text(isBusy ? busyTitle : title)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(colorScheme == .dark ? GanfanPalette.leaf : GanfanPalette.forest)
+            .padding(.horizontal, GanfanSpacing.mediumSmall)
+            .padding(.vertical, GanfanSpacing.small)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(GanfanPalette.paleLeaf, in: RoundedRectangle(cornerRadius: GanfanShape.control))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isBusy)
+    }
+}
+
+private struct AINutritionInlineDisclosure<Content: View>: View {
+    let title: String
+    @Binding var isExpanded: Bool
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(GanfanPalette.forest)
+                    Text(title)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(GanfanPalette.ink)
+                    Spacer(minLength: 8)
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(minHeight: 40)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(isExpanded ? "收起 AI 估算详情" : "展开 AI 估算详情")
+
+            if isExpanded {
+                content()
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(
+            GanfanPalette.leaf.opacity(0.09),
+            in: RoundedRectangle(cornerRadius: GanfanShape.control, style: .continuous)
+        )
+    }
+}
+
+private struct AILatestStatusLine: View {
+    let message: String
+    let isBusy: Bool
+    let isError: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 7) {
+            if isBusy {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 16, height: 16)
+                    .accessibilityHidden(true)
+            } else {
+                Image(systemName: isError ? "exclamationmark.circle.fill" : "info.circle")
+                    .foregroundStyle(isError ? Color(uiColor: .systemRed) : .secondary)
+                    .frame(width: 16, height: 16)
+                    .accessibilityHidden(true)
+            }
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(isError ? Color(uiColor: .systemRed) : .secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct NutritionReviewValue: View {
+    let nutrient: DrinkNutritionCalculator.Nutrient
+    let nutrition: NutritionSnapshot
+
+    var body: some View {
+        LabeledContent(nutrient.title) {
+            if let amount = nutrient.value(in: nutrition), amount.isFinite, amount >= 0 {
+                Text("\(amount.formatted(.number.precision(.fractionLength(0...1)))) \(nutrient.unit)")
+                    .monospacedDigit()
+            } else {
+                Text("—")
+                    .accessibilityLabel("暂无数据")
+            }
+        }
     }
 }
 
@@ -1531,7 +1829,7 @@ private struct OptionChipPicker: View {
     }
 }
 
-private enum PhotoRemoveStyle {
+private enum PhotoRemoveStyle: Equatable {
     case drink
     case meal
 }
@@ -1608,6 +1906,8 @@ private struct PhotoPickerWell: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(removeAccessibilityLabel)
                 .padding(4)
+                .offset(x: removeStyle == .meal ? 12 : 0, y: removeStyle == .meal ? -12 : 0)
+                .zIndex(1)
             }
         }
     }
@@ -1662,9 +1962,9 @@ private struct PhotoPickerWell: View {
                 .contentShape(Capsule())
         case .meal:
             Image(systemName: "xmark")
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(Color(uiColor: .systemRed))
-                .frame(width: 27, height: 27)
+                .frame(width: 22, height: 22)
                 .background(GanfanPalette.card, in: Circle())
                 .overlay {
                     Circle()
@@ -1738,28 +2038,85 @@ private struct MealDishDraft: Identifiable {
 private struct MealDishEditorRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var draft: MealDishDraft
+    let storeName: String
     let onRemove: () -> Void
     @State private var savedPhotoData: Data?
     @State private var errorMessage: String?
     @State private var aiConfigured = false
-    @State private var isRecognizing = false
-    @State private var showUploadConfirmation = false
+    @State private var isImportingPhoto = false
+    @State private var recognitionTask: Task<Void, Never>?
+    @State private var recognitionCollapseTask: Task<Void, Never>?
+    @State private var recognitionResult: MealDishRecognitionReview?
+    @State private var isRecognitionResultExpanded = false
+    @State private var aiLatestStatus: String?
+    @State private var aiLatestStatusIsError = false
 
     var body: some View {
-        let imageData = draft.photoData ?? (draft.photoRemoved ? nil : savedPhotoData)
-        let image = imageData.flatMap { UIImage(data: $0) }
-
-        Group {
+        let image = photoData.flatMap(UIImage.init(data:))
+        VStack(alignment: .leading, spacing: GanfanSpacing.mediumSmall) {
             if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: GanfanSpacing.mediumSmall) {
                     photoPicker(image: image)
                     dishFields
                 }
             } else {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: GanfanSpacing.mediumSmall) {
                     photoPicker(image: image)
                     dishFields
                 }
+            }
+
+            if aiConfigured && image != nil {
+                AINutritionActionButton(
+                    title: "AI 识别并估算营养", busyTitle: "正在分析照片…", isBusy: recognitionTask != nil
+                ) {
+                    recognizeFood()
+                }
+                .disabled(isImportingPhoto)
+            }
+
+            if let aiLatestStatus {
+                AILatestStatusLine(
+                    message: aiLatestStatus,
+                    isBusy: recognitionTask != nil,
+                    isError: aiLatestStatusIsError
+                )
+            }
+
+            if let recognitionResult {
+                AINutritionInlineDisclosure(
+                    title: "识别结果已加入菜品草稿",
+                    isExpanded: $isRecognitionResultExpanded
+                ) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        if recognitionResult.recognizedName != recognitionResult.estimatedName {
+                            Text("模型识别菜名：\(recognitionResult.recognizedName)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(
+                            [DrinkNutritionCalculator.Nutrient.energy, .protein, .fat, .carbohydrate, .sugar],
+                            id: \.self
+                        ) { nutrient in
+                            NutritionReviewValue(nutrient: nutrient, nutrition: recognitionResult.nutrition)
+                        }
+                        if !recognitionResult.nutrition.assumptions.isEmpty {
+                            Text(recognitionResult.nutrition.assumptions)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Text("保存用餐记录后，这份估算会与菜品一起保存。")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if let errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.circle")
+                    .font(.footnote)
+                    .foregroundStyle(Color(uiColor: .systemRed))
             }
         }
         .task(id: draft.selectedPhoto) {
@@ -1769,58 +2126,65 @@ private struct MealDishEditorRow: View {
             await loadSavedPhoto()
         }
         .onAppear { aiConfigured = AISettingsStore.isReady }
-        .confirmationDialog("将菜品照片发送给您配置的 AI 服务商？",
-                            isPresented: $showUploadConfirmation, titleVisibility: .visible) {
-            Button("发送照片并识别") { Task { await recognizeFood() } }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("仅本次发送处理后的照片，服务商可能收费。营养结果为估算值，您可以更正菜名。")
-        }
+        .onDisappear { cancelRecognition() }
     }
 
-    private var hasPhoto: Bool {
-        draft.photoData != nil || (!draft.photoRemoved && savedPhotoData != nil)
+    private var photoData: Data? {
+        draft.photoRemoved ? nil : (draft.photoData ?? savedPhotoData)
+    }
+
+    private var normalizedDishName: String {
+        draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var dishFields: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            TextField("菜品名称（必填）", text: $draft.name)
+        VStack(alignment: .leading, spacing: GanfanSpacing.xSmall) {
+            HStack(spacing: GanfanSpacing.xSmall) {
+                TextField("菜品名称（必填）", text: $draft.name)
+                    .font(.body.weight(.medium))
 
-            if !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                let nutrition = draft.nutritionName == draft.name && draft.nutrition != nil
-                    ? draft.nutrition!
-                    : RoughNutritionEstimator.dish(name: draft.name)
+                Menu {
+                    Button("移除这道菜", systemImage: "trash", role: .destructive) {
+                        cancelRecognition()
+                        onRemove()
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.body)
+                        .foregroundStyle(GanfanPalette.forest)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("菜品操作")
+            }
+
+            if !normalizedDishName.isEmpty {
+                let nutrition = (draft.nutritionName == normalizedDishName ? draft.nutrition : nil)
+                    ?? RoughNutritionEstimator.dish(name: normalizedDishName)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(nutrition.confidence.displayName) · \(Int(nutrition.energyKcal ?? 0)) kcal")
+                    Text("\(nutrition.confidence.displayName) · \(amount(nutrition.energyKcal, unit: "kcal"))")
                         .font(.subheadline.weight(.semibold))
-                    Text("蛋白质 \(Int(nutrition.proteinGrams ?? 0))g · 脂肪 \(Int(nutrition.fatGrams ?? 0))g · 碳水 \(Int(nutrition.carbohydrateGrams ?? 0))g")
+                        .monospacedDigit()
+                    Text("蛋白质 \(amount(nutrition.proteinGrams, unit: "g")) · 脂肪 \(amount(nutrition.fatGrams, unit: "g")) · 碳水 \(amount(nutrition.carbohydrateGrams, unit: "g"))")
                         .font(.caption)
+                        .monospacedDigit()
                         .foregroundStyle(.secondary)
-                    Text(nutrition.assumptions)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    if !nutrition.assumptions.isEmpty {
+                        Text(nutrition.assumptions)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            if aiConfigured && hasPhoto {
-                Button {
-                    showUploadConfirmation = true
-                } label: {
-                    Label(isRecognizing ? "正在分析照片…" : "AI 识别并估算营养", systemImage: "sparkles")
-                }
-                .disabled(isRecognizing)
-            }
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-            Button("移除这道菜", role: .destructive, action: onRemove)
-                .font(.footnote)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func amount(_ value: Double?, unit: String) -> String {
+        guard let value, value.isFinite, value >= 0 else { return "—" }
+        return "\(value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)"
     }
 
     private func photoPicker(image: UIImage?) -> some View {
@@ -1830,56 +2194,126 @@ private struct MealDishEditorRow: View {
             title: image == nil ? "添加菜品照片" : "更换菜品照片",
             detail: "可选",
             compact: true,
-            showsRemove: hasPhoto,
+            isLoading: isImportingPhoto,
+            showsRemove: photoData != nil,
             removeStyle: .meal,
             onRemove: removeDishPhoto
         )
     }
 
     private func removeDishPhoto() {
+        cancelRecognition()
         draft.photoRemoved = true
         draft.photoData = nil
         draft.selectedPhoto = nil
+        isImportingPhoto = false
         draft.nutrition = nil
         draft.nutritionName = ""
+        errorMessage = nil
     }
 
     private func loadSelectedPhoto() async {
         guard let selectedPhoto = draft.selectedPhoto else { return }
+        cancelRecognition()
+        isImportingPhoto = true
+        defer {
+            if draft.selectedPhoto == selectedPhoto {
+                isImportingPhoto = false
+                if !Task.isCancelled { draft.selectedPhoto = nil }
+            }
+        }
         do {
-            draft.photoData = try await selectedPhoto.loadTransferable(type: Data.self)
+            guard let data = try await selectedPhoto.loadTransferable(type: Data.self),
+                  UIImage(data: data) != nil else { throw AISettingsError.noPhoto }
+            guard !Task.isCancelled, draft.selectedPhoto == selectedPhoto else { return }
+            draft.photoData = data
             draft.photoExtension = selectedPhoto.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
             draft.photoRemoved = false
             draft.nutrition = nil
             draft.nutritionName = ""
             errorMessage = nil
         } catch {
-            draft.photoData = nil
+            guard !Task.isCancelled, draft.selectedPhoto == selectedPhoto else { return }
             PhotoStorageDiagnosticsStore().record(stage: .photoSelection, reason: PhotoStorageDiagnosticsStore.reason(for: error))
             errorMessage = "读取照片失败：\(error.localizedDescription)"
         }
     }
 
-    private func recognizeFood() async {
-        guard aiConfigured, AISettingsStore.isReady,
-              let apiKey = AISettingsStore.apiKey(),
-              let photo = draft.photoData ?? (draft.photoRemoved ? nil : savedPhotoData) else { return }
-        isRecognizing = true
-        defer { isRecognizing = false }
-        do {
-            let result = try await AIPhotoNutritionService().recognize(
-                photo: photo, configuration: AISettingsStore.load(), apiKey: apiKey
-            )
-            let name = result.dishName.trimmingCharacters(in: .whitespacesAndNewlines)
-            draft.name = name
-            draft.nutritionName = name
-            draft.nutrition = IngredientNutritionEstimator.calculate(
-                dishName: name, ingredients: result.ingredients
-            )
-            errorMessage = nil
-        } catch {
-            errorMessage = "AI 识别失败：\(error.localizedDescription)。您仍可使用离线粗估。"
+    private func recognizeFood() {
+        guard recognitionTask == nil, !isImportingPhoto, aiConfigured, AISettingsStore.isReady,
+              let apiKey = AISettingsStore.apiKey(), let photo = photoData else { return }
+        let configuration = AISettingsStore.load()
+        let requestedDishName = normalizedDishName
+        let requestedStoreName = storeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        errorMessage = nil
+        aiLatestStatusIsError = false
+        aiLatestStatus = "正在准备照片和菜品资料"
+        recognitionTask = Task { @MainActor in
+            defer { if !Task.isCancelled { recognitionTask = nil } }
+            do {
+                let result = try await AINutritionService().recognize(
+                    photo: photo,
+                    dishName: requestedDishName,
+                    storeName: requestedStoreName,
+                    configuration: configuration,
+                    apiKey: apiKey,
+                    onStatus: { status in
+                        aiLatestStatus = status
+                        aiLatestStatusIsError = false
+                    }
+                )
+                guard !Task.isCancelled else { return }
+                guard photo == photoData,
+                      requestedDishName == normalizedDishName,
+                      requestedStoreName == storeName.trimmingCharacters(in: .whitespacesAndNewlines) else {
+                    aiLatestStatus = "照片或菜品资料已变化，已忽略本次旧结果"
+                    return
+                }
+                let recognizedName = result.dishName.trimmingCharacters(in: .whitespacesAndNewlines)
+                let effectiveName = requestedDishName.isEmpty ? recognizedName : requestedDishName
+                guard !effectiveName.isEmpty else { throw AISettingsError.invalidRecognition }
+                let nutrition = IngredientNutritionEstimator.calculate(
+                    dishName: effectiveName, ingredients: result.ingredients
+                )
+                if requestedDishName.isEmpty { draft.name = effectiveName }
+                draft.nutritionName = effectiveName
+                draft.nutrition = nutrition
+                let review = MealDishRecognitionReview(
+                    recognizedName: recognizedName,
+                    estimatedName: effectiveName,
+                    nutrition: nutrition
+                )
+                recognitionResult = review
+                aiLatestStatus = "识别完成，结果已加入菜品草稿"
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isRecognitionResultExpanded = true
+                }
+                recognitionCollapseTask?.cancel()
+                recognitionCollapseTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 6_000_000_000)
+                    guard !Task.isCancelled, recognitionResult?.id == review.id else { return }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isRecognitionResultExpanded = false
+                    }
+                    recognitionCollapseTask = nil
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                aiLatestStatus = "识别失败：\(error.localizedDescription)"
+                aiLatestStatusIsError = true
+            }
         }
+    }
+
+    private func cancelRecognition() {
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        recognitionCollapseTask?.cancel()
+        recognitionCollapseTask = nil
+        isRecognitionResultExpanded = false
+        recognitionResult = nil
+        aiLatestStatus = nil
+        aiLatestStatusIsError = false
     }
 
     private func loadSavedPhoto() async {
@@ -1891,4 +2325,11 @@ private struct MealDishEditorRow: View {
             errorMessage = "读取本机照片失败：\(error.localizedDescription)"
         }
     }
+}
+
+private struct MealDishRecognitionReview: Identifiable {
+    let id = UUID()
+    let recognizedName: String
+    let estimatedName: String
+    let nutrition: NutritionSnapshot
 }

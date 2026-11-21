@@ -77,6 +77,15 @@ public struct NutritionSnapshot: Codable, Equatable, Sendable {
     public let assumptions: String
     public let metricSources: [String: String]
 
+    public var hasAIEstimate: Bool {
+        metricSources.values.contains("ai")
+    }
+
+    public func confidence(for metric: String) -> Confidence {
+        guard let source = metricSources[metric] else { return confidence }
+        return source == "ai" ? .estimated : Confidence(rawValue: source) ?? confidence
+    }
+
     public init(
         energyKcal: Double?,
         sugarGrams: Double?,

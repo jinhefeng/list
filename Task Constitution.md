@@ -45,6 +45,8 @@ Build the meal-logging product, with the current release direction as the native
 - Depends on: T6.1, T6.2
 - Current result: 饮品目录提供“新增品牌”向导，可在百度/Bing 的 App 内网页中读取结构化商品名、菜单列表和图片候选；用户可编辑菜单并选择、裁切 Logo 后保存。检索不调用 AI 或搜索 API，菜单候选保留网页来源并标记待核验。目录加载会把旧本地品牌按唯一名称/别名迁到内置 ID，合并同名菜单并保留旧饮品 ID；用户 Logo 优先，无用户 Logo 时继承软件包图案，恢复出的目录也会处理。今日页已按日查询并缓存解码结果，备份 I/O 和目录首次读取移到后台。历史默认不限日期、按 50 条分页，搜索覆盖未加载记录；Swift 核心测试 72/72（含隔离旧库迁移和 22,000 条分页）、iOS 模拟器目标构建通过。真实用户旧库迁移、设备性能和页面验收仍待完成。
 
+- 2026-11-21 完成逐菜营养详情、菜品 AI 防误删与结果预览、饮品逐项补估及来源保存；后续改为一次点击直接发送、结果短暂内联展示、只显示最新一条的非持久请求状态，并补入可编辑生成参数、流式读取与 NVIDIA HTTP 202 轮询。上一轮模拟器构建与 Swift 核心测试 76/76 通过；本次构建与设备验收待核。
+
 #### T6.4 — 集成与设备验收
 - Status: 进行中（本轮 Swift 核心测试 72/72、iOS 模拟器目标构建通过；真实用户旧库、目标设备交互、Release/Profile 性能与 iCloud 行为待测）
 - Objective: Verify visual parity, data preservation, offline behavior, selected-folder backup and empty-library restore on the target iPhone.

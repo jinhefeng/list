@@ -150,6 +150,68 @@ final class DrinkNutritionCalculatorTests: XCTestCase {
         XCTAssertNotEqual(result.energyKcal, 400)
     }
 
+    func testAISupplementProtectsCatalogValuesAndRetainsOfflineFallback() throws {
+        let variant = MenuNutritionVariant(
+            cupType: "中杯", sizeML: 500, energyKcal: 185, proteinG: 8, fatG: 0,
+            sourceType: "official", source: "品牌营养表", sourceURL: "https://example.invalid/nutrition"
+        )
+        let baseline = DrinkNutritionCalculator.snapshot(for: menuDrink(variants: [variant]), cupType: "中杯", sizeML: 500)
+        XCTAssertEqual(baseline.confidence, .rough)
+        XCTAssertEqual(baseline.confidence(for: "proteinGrams"), .official)
+
+        let result = try XCTUnwrap(DrinkNutritionCalculator.supplement(
+            baseline,
+            withAI: ["energyKcal": 300, "proteinGrams": 12, "fatGrams": 2, "sugarGrams": 14, "caffeineMilligrams": -1],
+            assumptions: "按整杯估算"
+        ))
+
+        XCTAssertEqual(result.energyKcal, 185)
+        XCTAssertEqual(result.proteinGrams, 8)
+        XCTAssertEqual(result.fatGrams, 0)
+        XCTAssertEqual(result.sugarGrams, 14)
+        XCTAssertEqual(result.caffeineMilligrams, baseline.caffeineMilligrams)
+        XCTAssertEqual(result.metricSources["sugarGrams"], "ai")
+        XCTAssertEqual(result.confidence(for: "sugarGrams"), .estimated)
+        XCTAssertEqual(result.confidence(for: "caffeineMilligrams"), .rough)
+        XCTAssertTrue(result.hasAIEstimate)
+        XCTAssertTrue(result.source.contains("品牌营养表"))
+        XCTAssertTrue(result.source.contains("离线饮品分类粗估"))
+        XCTAssertTrue(result.source.contains("AI 饮品估算"))
+        XCTAssertEqual(result.sourceURL, baseline.sourceURL)
+        XCTAssertTrue(result.assumptions.contains("按整杯估算"))
+    }
+
+    func testAILeavesUnknownValuesMissingAndKeepsPreviouslyAcceptedEstimates() throws {
+        let baseline = NutritionSnapshot(
+            energyKcal: nil, sugarGrams: nil, caffeineMilligrams: nil, confidence: .unavailable
+        )
+        let result = try XCTUnwrap(DrinkNutritionCalculator.supplement(
+            baseline, withAI: ["sugarGrams": 0, "energyKcal": .infinity], assumptions: ""
+        ))
+        XCTAssertNil(result.energyKcal)
+        XCTAssertNil(result.caffeineMilligrams)
+        XCTAssertEqual(result.sugarGrams, 0)
+        XCTAssertEqual(result.metricSources["sugarGrams"], "ai")
+        XCTAssertNil(DrinkNutritionCalculator.supplement(result, withAI: ["sugarGrams": 9], assumptions: ""))
+    }
+
+    func testMatchedCatalogProtectsLegacySnapshotWithAmbiguousMacroSources() throws {
+        let legacy = NutritionSnapshot(
+            energyKcal: 100, sugarGrams: nil, caffeineMilligrams: nil, confidence: .rough,
+            proteinGrams: 12, metricSources: ["proteinGrams": "rough"]
+        )
+        let catalog = NutritionSnapshot(
+            energyKcal: nil, sugarGrams: nil, caffeineMilligrams: nil, confidence: .rough,
+            proteinGrams: 12, metricSources: ["proteinGrams": "official"]
+        )
+        let result = try XCTUnwrap(DrinkNutritionCalculator.supplement(
+            legacy, withAI: ["sugarGrams": 10, "proteinGrams": 17], assumptions: "", catalog: catalog
+        ))
+
+        XCTAssertEqual(result.proteinGrams, 12)
+        XCTAssertEqual(result.sugarGrams, 10)
+    }
+
     private func menuDrink(
         variants: [MenuNutritionVariant] = [],
         perUnit: MenuNutritionPerUnit? = nil
